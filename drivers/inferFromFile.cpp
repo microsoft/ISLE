@@ -15,7 +15,7 @@ int main(int argv, char**argc)
             << "<num_topics> <vocab_size> <num_docs_in_infer_file> "
             << "<nnzs_in_infer_file> <nnzs_in_sparse_model_file>" 
             << "<iters>[0 for default]  "
-            << "Lifschitz_constant_guess>[0 for deafult]" << std::endl;
+            << "Lifschitz_constant_guess>[0 for default]" << std::endl;
         exit(-1);
     }
     const std::string sparse_model_file = std::string(argc[1]);
