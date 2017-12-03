@@ -6,7 +6,8 @@ Both Linux and Windows 10 builds use Intel(R) MKL(R) library. We used 2017 versi
 Suppose you have installed MKL at <MKL_ROOT>. In Linux, this is typically `/opt/intel/mkl`.
 In Windows 10, this is typically `C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2017\windows\mkl`
 
-## Linux
+## Linux / gcc
+We built this project on Ubuntu 16.04LTS with gcc 5.4. Other linux versions with gcc 5+ could also work.
 ```
 cd <ISLE_ROOT>
 export LD_LIBRARY_PATH=<MKL_ROOT>/lib/intel64/:.
@@ -15,7 +16,7 @@ make -j
 This should generate two executables `trainFromFile` and `inferFromFile` in the `<ISLE_ROOT>` directory.
 
 
-## Compilation instructions for VS2015
+## Windows 10 / Visual Studio 2015
 
 Open `<ISLE_ROOT>\win\ISLE.sln` in VS2015, and build the `ISLETrain` and `ISLEInfer` projects.  
 
