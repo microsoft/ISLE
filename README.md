@@ -16,12 +16,12 @@ This should generate two executables `trainFromFile` and `inferFromFile` in the 
 
 ## Compilation instructions for VS2015
 
-Load `ISLE.sln`, and build the `ISLETrain` and `ISLEInfer` projects.  
+Open `win\ISLE.sln` in VS2015, and build the `ISLETrain` and `ISLEInfer` projects.  
 
 If there is a problem with this, you could configure project file properties as follows:
 * Under VC++ Directories >
-  * Include '.' folder to path, to include Eigen and Spectra include folders.
-  * Include '<MKL_ROOT>\include\intel64\ilp64'
+  * To Include directories, add `<ISLE_ROOT>` and `<ISLE_ROOT>\include`. This will include `include`,  `Eigen` and `Spectra` directories.
+  * To Library Directories, add `<MKL_ROOT>\lib\intel64_win`.
 
 * Under C/C++ >
   * Enable optimizations, and disable runtime and SCL checks (this conflicts with turning on optimizations).
