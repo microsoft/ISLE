@@ -40,21 +40,37 @@ If there is a problem with this, you could configure project file properties as 
 # Training on a dataset
 
 1. Create a `<tdf_file>` which has one `<doc_id> <word_id> <frequency>` entry per line.
-   * The `<doc_id>` entries are 1-based and range between 1 and <num_docs>. 
-   * The `<word_id>` enties are 1-based and range between 1 and <vocab_size>.
+   * The `<doc_id>` entries are 1-based and range between 1 and `<num_docs>`. 
+   * The `<word_id>` enties are 1-based and range between 1 and `<vocab_size>`.
    * Let `<max_entries>` be the number of entries (or lines) in this file.
 
 2. Create a `<vocab_file>` file with mapping from word id to the word; the i-th line of the file is the word with word_id=i.
 
 3. Run 
- ```trainFromFile <tdf_file> <vocab_file> <output_dir> <vocab_size> <num_docs> <max_entries> <num_topics> <sample(0/1)> <sample_rate>```
-   * Here `<num_topics>` is the number of topics you want to recover from the `<tdf_file>`.
+ ```
+ trainFromFile <tdf_file> <vocab_file> <output_dir> <vocab_size> <num_docs> <max_entries> <num_topics> <sample(0/1)> <sample_rate>
+ ```
+   * `<num_topics>` is the number of topics you want to recover from the `<tdf_file>`.
    * If the dataset is too large and you wish to use importance sampling, set `<sample>` to 1 (otherwise 0).
    * When `<sample>` is enabled by setting it to 1, you can specify the sampling rate with `<sample_rate>`. For example, 0.1.
    * The output will be stored in a log directory under `<output_dir>`
 
 # Inference for a dataset using the trained model
 
+1. Locate the trained `<sparse_model_file>` in the log directory under the trainer's `<output_dir>`.
+
+2. Prepare `<infer_file>` for the documents you want to infer in the same way `<tdf_file>` was prepared from training. `<vocab_size>`, `<num_docs_in_infer_file>` and  `<nnzs_in_infer_file>` are the vocabulary size, the number of documents in the `<infer_file>`, and
+ the number of entries(lines) in the `<infer_file>` respectively. Note that the `<vocab_size>` of the infer file can not be larger than the `<vocab_size>` of the `<tdf_file>` on which the model was trained.
+
+3. Run
+```
+inferFromFile <sparse_model_file> <infer_file> <output_dir> <num_topics> <vocab_size> <num_docs_in_infer_file> <nnzs_in_infer_file> <nnzs_in_sparse_model_file> <iters> <Lifschitz_constant>
+```
+   * `<output_dir>` is the location where the file containing the inferred weights is written.
+   * `<num_topics>` is the number of topics in the trained model.
+   * `<nnzs_in_sparse_model_file>` is the number of entries (lines) in `<sparse_model_file>`.
+   * `<iters>` is the number if iterations of multiplicative weight update. Set to 0 to use default number of iterations.
+   * `<Lifschitz_constant>` is an estimate of the Lifschitz constant for the gradient of the log-likelihood terms. Set to 0 to use default.
 
 
 # Contributing
