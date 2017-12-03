@@ -8,15 +8,16 @@ In Windows 10, this is typically `C:\Program Files (x86)\IntelSWTools\compilers_
 
 ## Linux
 ```
+cd <ISLE_ROOT>
 export LD_LIBRARY_PATH=<MKL_ROOT>/lib/intel64/:.
 make -j
 ```
-This should generate two executables `trainFromFile` and `inferFromFile` in the root directory.
+This should generate two executables `trainFromFile` and `inferFromFile` in the `<ISLE_ROOT>` directory.
 
 
 ## Compilation instructions for VS2015
 
-Open `win\ISLE.sln` in VS2015, and build the `ISLETrain` and `ISLEInfer` projects.  
+Open `<ISLE_ROOT>\win\ISLE.sln` in VS2015, and build the `ISLETrain` and `ISLEInfer` projects.  
 
 If there is a problem with this, you could configure project file properties as follows:
 * Under VC++ Directories >
