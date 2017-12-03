@@ -1,4 +1,4 @@
-This repository provides code SVD- and Importance sampling-based algorithms for large scale topic modeling.
+This repository provides code for SVD and Importance sampling-based algorithms for large scale topic modeling.
 
 # Build
 
