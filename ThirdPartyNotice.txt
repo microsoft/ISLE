@@ -2,3 +2,6 @@ This Microsoft Edge Machine Learning project is based on or incorporates materia
 
 (c) The Eigen Project.  Benoît Jacob (founder), Gaël Guennebaud (guru) and other contributors.
 Mozilla Public License, version 2.0.  https://opensource.org/licenses/MPL-2.0 
+
+(c) The Spectra Project.  Yixuan Qiu (founder), and other contributors.
+Mozilla Public License, version 2.0.  https://opensource.org/licenses/MPL-2.0 
