@@ -9,7 +9,7 @@ using namespace ISLE;
 // Output: list of <doc_id> <topic id> <wt>  (small wt entries will be dropped)
 int main(int argv, char**argc)
 {
-    if (argv != 11) {
+    /*if (argv != 11) {
         std::cout << "Incorrect usage of ISLEInfer. Use: \n"
             << "inferFromFile <sparse_model_file> <infer_file> <output_dir> "
             << "<num_topics> <vocab_size> <num_docs_in_infer_file> "
@@ -29,9 +29,9 @@ int main(int argv, char**argc)
     const offset_t M_hat_catch_sparse_entries = atol(argc[8]);
 
     int iters = atol(argc[9]);
-    FPTYPE Lfguess = atof(argc[10]);
+    FPTYPE Lfguess = atof(argc[10]);*/
 
-    /*const std::string sparse_model_file = "C:\\Users\\HARSHASI\\Source\\Repos\\ISLE\\ISLETrain\\data\\Pudmed_Vocab140762_TrainDocs500k\\log_t_500_eps1_0.016667_eps2_0.333333_eps3_5.000000_kMppReps_1_kMLowDReps_10_kMReps_10_sample_0\\M_hat_catch_sparse";
+    const std::string sparse_model_file = "C:\\Users\\HARSHASI\\Source\\Repos\\ISLE\\ISLETrain\\data\\Pudmed_Vocab140762_TrainDocs500k\\log_t_500_eps1_0.016667_eps2_0.333333_eps3_5.000000_kMppReps_1_kMLowDReps_10_kMReps_10_sample_0\\M_hat_catch_sparse";
     const std::string infer_file = "C:\\Users\\HARSHASI\\Source\\Repos\\ISLE\\ISLETrain\\data\\Pudmed_Vocab140762_TrainDocs500k\\TrainData500K.VocabIndex1.tsvd";
     const std::string output_dir = "C:\\Users\\HARSHASI\\Source\\Repos\\ISLE\\ISLETrain\\data\\Pudmed_Vocab140762_TrainDocs500k";
 
@@ -45,7 +45,7 @@ int main(int argv, char**argc)
     FPTYPE Lfguess = 15;
 
     if (iters == 0) iters = 15;
-    if (Lfguess == 0.0) Lfguess = 10.0;*/
+    if (Lfguess == 0.0) Lfguess = 10.0;
 
     //std::cout << "Loading sparse model file: " << fileUnderDirNameString(output_dir, sparse_model_file) << std::endl;
     //auto sparse_model = new SparseMatrix<FPTYPE>(vocab_size, num_topics);
@@ -96,9 +96,11 @@ int main(int argv, char**argc)
             + std::string("_Lf_") + std::to_string(Lfguess))
             + std::string("_block_") + std::to_string(block));
         FPTYPE* wts = new FPTYPE[num_topics];
-        for (int doc = block*doc_block_size; doc < (block + 1)*doc_block_size && doc < num_docs; ++doc) {
+        for (docsSz_t doc = block*doc_block_size; doc < (block + 1)*doc_block_size && doc < num_docs; ++doc) {
             if (doc % 10000 == 9999)
-                std::cout << "docs inferred: " << doc + 1 << std::endl;
+                std::cout << "docs inferred: [" 
+                << (((int64_t)doc - (int64_t)10000) > (int64_t)(block*doc_block_size) ? ((int64_t)doc - (int64_t)10000) : block*doc_block_size)
+                << ", " << doc << "]" << std::endl;
 
             llhs[doc] = infer.infer_doc_in_file(doc, wts, iters, Lfguess);
             if (llhs[doc] != 0.0)
