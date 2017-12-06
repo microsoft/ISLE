@@ -69,40 +69,43 @@ int main(int argv, char**argc)
     infer_data->populate_CSC(entries);
     infer_data->normalize_docs(true, true);
 
+    docsSz_t doc_block = 1000000;
+    for (docsSz_t block = 0; block < divide_round_up(num_docs, doc_block); ++block) {
 
-    std::cout << "Creating inference engine" << std::endl;
-    ISLEInfer infer(model_by_word, infer_data, num_topics, vocab_size, num_docs);
-    MMappedOutput out(fileUnderDirNameString(output_dir, 
-        std::string("inferred_weights_iters_") + std::to_string(iters)
-    + std::string("_Lf_") + std::to_string(Lfguess)));
-    FPTYPE* wts = new FPTYPE[num_topics];
-    auto llhs = new FPTYPE[num_docs];
-    docsSz_t nconverged = 0;
-    for (int doc = 0; doc < num_docs; ++doc) {
-        if (doc % 10000 == 9999)
-            std::cout << "#docs inferred: " << doc + 1 << std::endl;
+        std::cout << "Creating inference engine" << std::endl;
+        ISLEInfer infer(model_by_word, infer_data, num_topics, vocab_size, num_docs);
+        MMappedOutput out(fileUnderDirNameString(output_dir,
+            std::string("inferred_weights_iters_") + std::to_string(iters)
+            + std::string("_Lf_") + std::to_string(Lfguess)) 
+            + std::string("_block_") + std::to_string(block));
+        FPTYPE* wts = new FPTYPE[num_topics];
+        auto llhs = new FPTYPE[doc_block];
+        docsSz_t nconverged = 0;
+        for (int doc = block*doc_block; doc < (block + 1)*doc_block && doc < num_docs; ++doc) {
+            if (doc % 10000 == 9999)
+                std::cout << "#docs inferred: " << doc + 1 << std::endl;
 
-        llhs[doc] = infer.infer_doc_in_file(doc, wts, iters, Lfguess);
-        if (llhs[doc] != 0.0)
-            nconverged++;
-        else std::cout << "Doc: " << doc << "failed to converge" << std::endl;
-        for (docsSz_t topic = 0; topic < num_topics; ++topic)
-            out.concat_float(llhs[doc] == 0.0 ? 1.0 / (FPTYPE)num_topics : wts[topic], '\t', 1, 8);
-        out.add_endline();
+            llhs[doc] = infer.infer_doc_in_file(doc, wts, iters, Lfguess);
+            if (llhs[doc] != 0.0)
+                nconverged++;
+            else std::cout << "Doc: " << doc << "failed to converge" << std::endl;
+            for (docsSz_t topic = 0; topic < num_topics; ++topic)
+                out.concat_float(llhs[doc] == 0.0 ? 1.0 / (FPTYPE)num_topics : wts[topic], '\t', 1, 8);
+            out.add_endline();
+        }
+        out.flush_and_close();
+
+        std::cout << "Number of docs for which inference converged: " << nconverged
+            << " (of " << num_docs << ")" << std::endl;
+        std::cout << "Avg LLH for converged docs: "
+            << std::accumulate(llhs, llhs + num_docs, 0.0) / nconverged << std::endl;
+
+        delete[] llhs;
+        delete[] wts;
     }
-    out.flush_and_close();
-
-
-    std::cout << "Number of docs for which inference converged: " << nconverged
-        << " (of " << num_docs << ")" << std::endl;
-    std::cout << "Avg LLH for converged docs: "
-        << std::accumulate(llhs, llhs + num_docs, 0.0) / nconverged << std::endl;
-
     
     delete infer_data;
     delete[] model_by_word;
-    delete[] llhs;
-    delete[] wts;
 
     return 0;
 }
