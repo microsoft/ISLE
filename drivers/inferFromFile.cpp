@@ -9,7 +9,7 @@ using namespace ISLE;
 // Output: list of <doc_id> <topic id> <wt>  (small wt entries will be dropped)
 int main(int argv, char**argc)
 {
-    if (argv != 11) {
+   if (argv != 11) {
         std::cout << "Incorrect usage of ISLEInfer. Use: \n"
             << "inferFromFile <sparse_model_file> <infer_file> <output_dir> "
             << "<num_topics> <vocab_size> <num_docs_in_infer_file> "
@@ -31,8 +31,21 @@ int main(int argv, char**argc)
     int iters = atol(argc[9]);
     FPTYPE Lfguess = atof(argc[10]);
 
+    /*const std::string sparse_model_file = "C:\\Users\\HARSHASI\\Source\\Repos\\ISLE\\ISLETrain\\data\\NYTimes_Vocab5k_TrainDocs30k\\log_t_50_eps1_0.016667_eps2_0.333333_eps3_5.000000_kMppReps_1_kMLowDReps_10_kMReps_10_sample_0\\M_hat_catch_sparse";
+    const std::string infer_file = "C:\\Users\\HARSHASI\\Source\\Repos\\ISLE\\ISLETrain\\data\\NYTimes_Vocab5k_TrainDocs30k\\TrainData.VocabIndex1.DocIndex1.txt";
+    const std::string output_dir =  "C:\\Users\\HARSHASI\\Source\\Repos\\ISLE\\ISLETrain\\data\\NYTimes_Vocab5k_TrainDocs30k";
+
+    const docsSz_t num_topics = 50;
+    const vocabSz_t vocab_size = 5000;
+    const docsSz_t num_docs = 30000;
+    const offset_t max_entries = 4886003;
+    const offset_t M_hat_catch_sparse_entries = 248029;
+
+    int iters = 15;
+    FPTYPE Lfguess = 15;
+
     if (iters == 0) iters = 15;
-    if (Lfguess == 0.0) Lfguess = 10.0;  
+    if (Lfguess == 0.0) Lfguess = 10.0;  */
 
     //std::cout << "Loading sparse model file: " << fileUnderDirNameString(output_dir, sparse_model_file) << std::endl;
     //auto sparse_model = new SparseMatrix<FPTYPE>(vocab_size, num_topics);
@@ -69,9 +82,12 @@ int main(int argv, char**argc)
     infer_data->populate_CSC(entries);
     infer_data->normalize_docs(true, true);
 
-    docsSz_t doc_block = 1000000;
-    for (docsSz_t block = 0; block < divide_round_up(num_docs, doc_block); ++block) {
+      docsSz_t doc_block = 1000000;
+      auto llhs = new FPTYPE[num_docs];
+      auto nconverged = new docsSz_t(divide_round_up(num_docs, doc_block));
 
+    for (docsSz_t block = 0; block < divide_round_up(num_docs, doc_block); ++block) {
+        nconverged[block] = 0;
         std::cout << "Creating inference engine" << std::endl;
         ISLEInfer infer(model_by_word, infer_data, num_topics, vocab_size, num_docs);
         MMappedOutput out(fileUnderDirNameString(output_dir,
@@ -79,15 +95,13 @@ int main(int argv, char**argc)
             + std::string("_Lf_") + std::to_string(Lfguess)) 
             + std::string("_block_") + std::to_string(block));
         FPTYPE* wts = new FPTYPE[num_topics];
-        auto llhs = new FPTYPE[doc_block];
-        docsSz_t nconverged = 0;
         for (int doc = block*doc_block; doc < (block + 1)*doc_block && doc < num_docs; ++doc) {
             if (doc % 10000 == 9999)
                 std::cout << "#docs inferred: " << doc + 1 << std::endl;
 
             llhs[doc] = infer.infer_doc_in_file(doc, wts, iters, Lfguess);
             if (llhs[doc] != 0.0)
-                nconverged++;
+                nconverged[block]++;
             else std::cout << "Doc: " << doc << "failed to converge" << std::endl;
             for (docsSz_t topic = 0; topic < num_topics; ++topic)
                 out.concat_float(llhs[doc] == 0.0 ? 1.0 / (FPTYPE)num_topics : wts[topic], '\t', 1, 8);
@@ -95,15 +109,17 @@ int main(int argv, char**argc)
         }
         out.flush_and_close();
 
-        std::cout << "Number of docs for which inference converged: " << nconverged
-            << " (of " << num_docs << ")" << std::endl;
-        std::cout << "Avg LLH for converged docs: "
-            << std::accumulate(llhs, llhs + num_docs, 0.0) / nconverged << std::endl;
-
-        delete[] llhs;
         delete[] wts;
     }
-    
+    auto nconvergedall = std::accumulate(nconverged, nconverged + divide_round_up(num_docs, doc_block), 0.0);
+    std::cout << "Number of docs for which inference converged: " << nconvergedall
+        << " (of " << num_docs << ")" << std::endl;
+
+    std::cout << "Avg LLH for converged docs: "
+        << std::accumulate(llhs, llhs + num_docs, 0.0) / nconvergedall << std::endl;
+
+    delete[] nconverged;
+    delete[] llhs;
     delete infer_data;
     delete[] model_by_word;
 
