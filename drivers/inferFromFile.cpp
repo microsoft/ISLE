@@ -63,7 +63,7 @@ int main(int argv, char**argc)
     std::cout << "Loading sparse model file: " << sparse_model_file << std::endl;
     FPTYPE *model_by_word = new FPTYPE[vocab_size * num_topics];
     memset(model_by_word, 0, sizeof(FPTYPE)*vocab_size*num_topics);
-    load_model_from_sparse_file(model_by_word, num_topics, vocab_size, sparse_model_file);
+    load_model_from_sparse_file(model_by_word, num_topics, vocab_size, sparse_model_file, 1);
 
 
     std::cout << "Loading data from inference file: " << infer_file << std::endl;
