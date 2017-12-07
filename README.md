@@ -18,12 +18,14 @@ This should generate two executables `trainFromFile` and `inferFromFile` in the 
 
 ## Windows 10 / Visual Studio 2015
 
-Open `<ISLE_ROOT>\win\ISLE.sln` in VS2015, and build the `ISLETrain` and `ISLEInfer` projects.  
+Open `<ISLE_ROOT>\win\ISLE.sln` in VS2015, and build the `ISLETrain` and `ISLEInfer` projects.
+The Debug build uses dynamic linking for C runtime, OpenMP, and MKL libraries.
+The Relesae build links all these dependencies statically into a self-contained exe.
 
 If there is a problem with this, you could configure project file properties as follows:
 * Under VC++ Directories >
   * To Include directories, add `<ISLE_ROOT>` and `<ISLE_ROOT>\include`. This will include `include`,  `Eigen` and `Spectra` directories.
-  * To Library Directories, add `<MKL_ROOT>\lib\intel64_win`.
+  * To Library Directories, add `<MKL_ROOT>\lib\intel64_win` (for MKL libs) and `<MKL_ROOT>\..\compiler\lib\intel64_win\` (for OpenMP lib)
 
 * Under C/C++ >
   * Enable optimizations, and disable runtime and SCL checks (this conflicts with turning on optimizations).
@@ -34,10 +36,8 @@ If there is a problem with this, you could configure project file properties as 
   * Enable 'Parallel' option.
   * Enable MKL_ILP64 option for 8-byte MKL_INTs.
 
-* Under Linker > Input > Additional dependencies:
-  * `<MKL_ROOT>\lib\intel64_win\mkl_core.lib`
-  * `<MKL_ROOT>\lib\intel64_win\mkl_intel_lp64.lib`
-  * `<MKL_ROOT>\lib\intel64_win\mkl_sequential.lib`
+* Under Linker > Input > Additional dependencies: Add
+  * Add the prefix `libiomp5md.lib;mkl_core.lib;mkl_intel_ilp64.lib;mkl_sequential.lib;` to existing libraries
 
 # Training on a dataset
 
