@@ -13,7 +13,7 @@ cd <ISLE_ROOT>
 export LD_LIBRARY_PATH=<MKL_ROOT>/lib/intel64/:.
 make -j
 ```
-This should generate two executables `trainFromFile` and `inferFromFile` in the `<ISLE_ROOT>` directory.
+This should generate two executables `ISLETrain` and `ISLEInfer` in the `<ISLE_ROOT>` directory.
 
 
 ## Windows 10 / Visual Studio 2015
@@ -50,7 +50,7 @@ If there is a problem with this, you could configure project file properties as 
 
 3. Run 
  ```
- trainFromFile <tdf_file> <vocab_file> <output_dir> <vocab_size> <num_docs> <max_entries> <num_topics> <sample(0/1)> <sample_rate>
+ ISLETrain <tdf_file> <vocab_file> <output_dir> <vocab_size> <num_docs> <max_entries> <num_topics> <sample(0/1)> <sample_rate>
  ```
    * `<num_topics>` is the number of topics you want to recover from the `<tdf_file>`.
    * If the dataset is too large and you wish to use importance sampling, set `<sample>` to 1 (otherwise 0).
@@ -66,7 +66,7 @@ If there is a problem with this, you could configure project file properties as 
 
 3. Run
 ```
-inferFromFile <sparse_model_file> <infer_file> <output_dir> <num_topics> <vocab_size> <num_docs_in_infer_file> <nnzs_in_infer_file> <nnzs_in_sparse_model_file> <iters> <Lifschitz_constant>
+ISLEInfer <sparse_model_file> <infer_file> <output_dir> <num_topics> <vocab_size> <num_docs_in_infer_file> <nnzs_in_infer_file> <nnzs_in_sparse_model_file> <iters> <Lifschitz_constant>
 ```
    * `<output_dir>` is the location where the file containing the inferred weights is written.
    * `<num_topics>` is the number of topics in the trained model.

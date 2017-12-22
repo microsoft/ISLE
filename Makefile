@@ -35,22 +35,22 @@ INCLUDES =  $(INCLUDE_DIR)/timer.h $(INCLUDE_DIR)/logger.h \
 	    $(INCLUDE_DIR)/trainer.h $(INCLUDE_DIR)/parallel.h \
 	    $(INCLUDE_DIR)/infer.h
 
-all: trainFromFile inferFromFile
+all: ISLETrain ISLEInfer
 
 trainer.o: $(SRC_DIR)/trainer.cpp $(INCLUDES)
 	$(CC) -c -o $@ $< $(IFLAGS) $(CFLAGS) $(MKL_PAR_LDFLAGS) $(CILK_LDFLAGS)
 
 infer.o: $(SRC_DIR)/infer.cpp $(INCLUDES)
-	$(CC) -c -o $@ $< $(IFLAGS) $(CFLAGS) $(MKL_PAR_LDFLAGS) $(CILK_LDFLAGS)
+	$(CC) -c -o $@ $< $(IFLAGS) $(CFLAGS) $(MKL_SEQ_LDFLAGS) $(CILK_LDFLAGS)
 
 utils.o: $(SRC_DIR)/utils.cpp $(INCLUDES)
 	 $(CC) -c -o $@ $< $(IFLAGS) $(CFLAGS) $(MKL_PAR_LDFLAGS) $(CILK_LDFLAGS)
 
-trainFromFile:  $(DRIVER_DIR)/trainFromFile.cpp trainer.o utils.o $(INCLUDES)
+ISLETrain:  $(DRIVER_DIR)/ISLETrain.cpp trainer.o utils.o $(INCLUDES)
 	$(CC) -o $@ $< trainer.o utils.o $(IFLAGS) $(CFLAGS) $(MKL_PAR_LDFLAGS) $(CILK_LDFLAGS)
 
-inferFromFile: $(DRIVER_DIR)/inferFromFile.cpp infer.o utils.o $(INCLUDES)
-	$(CC) -o $@ $< infer.o utils.o $(IFLAGS) $(CFLAGS) $(MKL_PAR_LDFLAGS) $(CILK_LDFLAGS)
+ISLEInfer: $(DRIVER_DIR)/ISLEInfer.cpp infer.o utils.o $(INCLUDES)
+	$(CC) -o $@ $< infer.o utils.o $(IFLAGS) $(CFLAGS) $(MKL_SEQ_LDFLAGS) $(CILK_LDFLAGS)
 
 .PHONY: clean cleanest
 
@@ -58,4 +58,4 @@ clean:
 	rm -f *.o
 
 cleanest: clean
-	rm -f trainFromFile inferFromFile *.o
+	rm -f ISLETrain ISLEInfer *.o
