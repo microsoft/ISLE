@@ -187,7 +187,7 @@ namespace ISLE
 
         void write_to_file_as_sparse(
             const std::string& filename,
-            const uint base = 1) // 0-based or 1-based
+            const unsigned base = 1) // 0-based or 1-based
             const {
 #if FILE_IO_MODE == NAIVE_FILE_IO
             { // Naive File IO

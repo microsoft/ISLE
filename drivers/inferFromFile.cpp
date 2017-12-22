@@ -83,11 +83,11 @@ int main(int argv, char**argc)
     infer_data->normalize_docs(true, true);
 
     docsSz_t doc_block_size = 100000;
-    docsSz_t num_blocks = divide_round_up(num_docs, doc_block_size);
+    int64_t num_blocks = divide_round_up(num_docs, doc_block_size);
     auto llhs = new FPTYPE[num_docs];
     auto nconverged = new docsSz_t[num_blocks];
 
-    pfor(docsSz_t block = 0; block < num_blocks; ++block) {
+    pfor(int64_t block = 0; block < num_blocks; ++block) {
         nconverged[block] = 0;
         std::cout << "Creating inference engine" << std::endl;
         ISLEInfer infer(model_by_word, infer_data, num_topics, vocab_size, num_docs);
