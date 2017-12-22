@@ -53,7 +53,7 @@
     <ClCompile Include="..\..\src\trainer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\drivers\trainFromFile.cpp">
+    <ClCompile Include="..\..\drivers\ISLETrain.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>

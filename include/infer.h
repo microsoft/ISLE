@@ -22,12 +22,14 @@ namespace ISLE
         FPTYPE* model_by_word,
         const docsSz_t num_topics,
         const vocabSz_t vocab_size,
-        const std::string& model_file);
+        const std::string& model_file,
+        const unsigned base = 1);
 
     void load_sparse_model_from_file(
-        SparseMatrix<FPTYPE> *sparse_model,
+        SparseMatrix<FPTYPE>* sparse_model,
         const std::string& filename,
-        const offset_t max_entries);
+        const offset_t max_entries,
+        const unsigned base = 1);
 
     // Transpose a model matrix so its row-major, i.e., word major
     void create_model_by_word(

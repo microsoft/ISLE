@@ -185,15 +185,19 @@ namespace ISLE
 #endif
         }
 
-        void write_to_file_as_sparse(const std::string& filename) const {
+        void write_to_file_as_sparse(
+            const std::string& filename,
+            const unsigned base = 1) // 0-based or 1-based
+            const {
 #if FILE_IO_MODE == NAIVE_FILE_IO
             { // Naive File IO
                 std::ofstream out_model;
                 out_model.open(filename);
                 for (docsSz_t topic = 0; topic < num_docs(); ++topic) {
                     for (vocabSz_t word = 0; word < vocab_size(); ++word)
-                        if (elem(word,topic) > 0.00000001f)
-                        out_model << topic << " " << word << " " << std::setprecision(6) << elem(word, topic) << "\n";
+                        if (elem(word, topic) > 0.00000001f)
+                            out_model << topic + base << " " << word + base  // Sparse format written in 1-based indexing
+                            << " " << std::setprecision(6) << elem(word, topic) << "\n";
                 }
                 out_model.close();
             }
@@ -203,8 +207,8 @@ namespace ISLE
                 for (docsSz_t topic = 0; topic < num_docs(); ++topic) {
                     for (vocabSz_t word = 0; word < vocab_size(); ++word) {
                         if (elem(word, topic) > 0.00000001f) {
-                            out.concat_int(topic, '\t');
-                            out.concat_int(word, '\t');
+                            out.concat_int(topic + base, '\t');
+                            out.concat_int(word + base, '\t');
                             out.concat_float(elem(word, topic), '\n', 1, 10);
                         }
                     }

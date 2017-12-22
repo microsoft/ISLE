@@ -127,7 +127,8 @@ namespace ISLE
         const docsSz_t num_topics,
         const vocabSz_t vocab_size,
         char* buf,
-        uint64_t fileSize)
+        uint64_t fileSize,
+        const unsigned base)
     {
         docsSz_t topic = 0; vocabSz_t word = 0;
         assert(sizeof(size_t) == 8);
@@ -147,6 +148,7 @@ namespace ISLE
                 break;
             case '\n':
                 assert(state == 3);
+                topic -= base; word -= base;
                 model_by_word[num_topics * word + topic] 
                     = val_before_decimal + val_after_decimal * std::pow(0.1, pos_after_decimal);
                 state = 1;
@@ -199,6 +201,7 @@ namespace ISLE
         }
         assert(state == 1 || state == 3);
         if (state==3) { // Didnt reach "\n" on last line
+            topic -= base; word -= base;
             model_by_word[num_topics * word + topic]
                 = val_before_decimal + val_after_decimal * std::pow(0.1, pos_after_decimal);
         }
@@ -209,14 +212,15 @@ namespace ISLE
         FPTYPE* model_by_word,
         const docsSz_t num_topics,
         const vocabSz_t vocab_size,
-        const std::string& model_file)
+        const std::string& model_file,
+        const unsigned base)
     {
 #if FILE_IO_MODE == WIN_MMAP_FILE_IO
         {
             HANDLE hFile, hMapFile;
             char *pBuf;
             uint64_t fileSize = open_win_mmapped_file_handle(model_file, hFile, hMapFile, &pBuf);
-            read_sparse_model(model_by_word, num_topics, vocab_size, pBuf, fileSize);
+            read_sparse_model(model_by_word, num_topics, vocab_size, pBuf, fileSize, base);
             close_win_mmapped_file_handle(hFile, hMapFile);
         }
 #elif FILE_IO_MODE == LINUX_MMAP_FILE_IO
@@ -224,7 +228,7 @@ namespace ISLE
             int fd;
             char *pBuf;
             uint64_t fileSize = open_linux_mmapped_file_handle(model_file, fd, (void**)&pBuf);
-            read_sparse_model(model_by_word, num_topics, vocab_size, pBuf, fileSize);
+            read_sparse_model(model_by_word, num_topics, vocab_size, pBuf, fileSize, base);
             close_linux_mmapped_file_handle(fd, pBuf, fileSize);
         }
 #elif FILE_IO_MODE == NAIVE_FILE_IO 
@@ -236,6 +240,7 @@ namespace ISLE
             FPTYPE weight;
             while (in.peek() != EOF) {
                 in >> topic >> word >> weight;
+                topic -= base; word -= base;
                 model_by_word[num_topics * word + topic] = weight;
             }
             in.close();
@@ -247,7 +252,8 @@ namespace ISLE
     void load_sparse_model_from_file(
         SparseMatrix<FPTYPE> *sparse_model,
         const std::string& filename,
-        const offset_t max_entries)
+        const offset_t max_entries,
+        const unsigned base)
     {
         auto vocab_size = sparse_model->vocab_size();
         auto num_topics = sparse_model->num_docs();
@@ -261,7 +267,7 @@ namespace ISLE
             char *pBuf;
             uint64_t fileSize = open_win_mmapped_file_handle(filename, hFile, hMapFile, &pBuf);
             assert(false); // Not implemented yet
-            //read_model(model, pBuf, fileSize);
+            //read_model(model, pBuf, fileSize, base);
             close_win_mmapped_file_handle(hFile, hMapFile);
         }
 #elif FILE_IO_MODE == LINUX_MMAP_FILE_IO
@@ -270,7 +276,7 @@ namespace ISLE
             char *pBuf;
             uint64_t fileSize = open_linux_mmapped_file_handle(filename, fd, (void**)&pBuf);
             assert(false); // Not implemented yet
-            //read_model(model, pBuf, fileSize);
+            //read_model(model, pBuf, fileSize, base);
             close_linux_mmapped_file_handle(fd, pBuf, fileSize);
         }
 #elif FILE_IO_MODE == NAIVE_FILE_IO
@@ -284,6 +290,7 @@ namespace ISLE
             while (in.peek() != EOF) {
                 in >> topic;
                 in >> word >> weight;
+                topic -= base; word -= base;
                 sparse_model->set_row_CSC(entries_read, word);
                 sparse_model->set_val_CSC(entries_read, weight);
 

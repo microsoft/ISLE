@@ -13,17 +13,19 @@ cd <ISLE_ROOT>
 export LD_LIBRARY_PATH=<MKL_ROOT>/lib/intel64/:.
 make -j
 ```
-This should generate two executables `trainFromFile` and `inferFromFile` in the `<ISLE_ROOT>` directory.
+This should generate two executables `ISLETrain` and `ISLEInfer` in the `<ISLE_ROOT>` directory.
 
 
 ## Windows 10 / Visual Studio 2015
 
-Open `<ISLE_ROOT>\win\ISLE.sln` in VS2015, and build the `ISLETrain` and `ISLEInfer` projects.  
+Open `<ISLE_ROOT>\win\ISLE.sln` in VS2015, and build the `ISLETrain` and `ISLEInfer` projects.
+The Debug build uses dynamic linking for C runtime, OpenMP, and MKL libraries.
+The Relesae build links all these dependencies statically into a self-contained exe.
 
 If there is a problem with this, you could configure project file properties as follows:
 * Under VC++ Directories >
   * To Include directories, add `<ISLE_ROOT>` and `<ISLE_ROOT>\include`. This will include `include`,  `Eigen` and `Spectra` directories.
-  * To Library Directories, add `<MKL_ROOT>\lib\intel64_win`.
+  * To Library Directories, add `<MKL_ROOT>\lib\intel64_win` (for MKL libs) and `<MKL_ROOT>\..\compiler\lib\intel64_win\` (for OpenMP lib)
 
 * Under C/C++ >
   * Enable optimizations, and disable runtime and SCL checks (this conflicts with turning on optimizations).
@@ -34,10 +36,8 @@ If there is a problem with this, you could configure project file properties as 
   * Enable 'Parallel' option.
   * Enable MKL_ILP64 option for 8-byte MKL_INTs.
 
-* Under Linker > Input > Additional dependencies:
-  * `<MKL_ROOT>\lib\intel64_win\mkl_core.lib`
-  * `<MKL_ROOT>\lib\intel64_win\mkl_intel_lp64.lib`
-  * `<MKL_ROOT>\lib\intel64_win\mkl_sequential.lib`
+* Under Linker > Input > Additional dependencies: Add
+  * Add the prefix `libiomp5md.lib;mkl_core.lib;mkl_intel_ilp64.lib;mkl_sequential.lib;` to existing libraries
 
 # Training on a dataset
 
@@ -50,7 +50,7 @@ If there is a problem with this, you could configure project file properties as 
 
 3. Run 
  ```
- trainFromFile <tdf_file> <vocab_file> <output_dir> <vocab_size> <num_docs> <max_entries> <num_topics> <sample(0/1)> <sample_rate>
+ ISLETrain <tdf_file> <vocab_file> <output_dir> <vocab_size> <num_docs> <max_entries> <num_topics> <sample(0/1)> <sample_rate>
  ```
    * `<num_topics>` is the number of topics you want to recover from the `<tdf_file>`.
    * If the dataset is too large and you wish to use importance sampling, set `<sample>` to 1 (otherwise 0).
@@ -66,7 +66,7 @@ If there is a problem with this, you could configure project file properties as 
 
 3. Run
 ```
-inferFromFile <sparse_model_file> <infer_file> <output_dir> <num_topics> <vocab_size> <num_docs_in_infer_file> <nnzs_in_infer_file> <nnzs_in_sparse_model_file> <iters> <Lifschitz_constant>
+ISLEInfer <sparse_model_file> <infer_file> <output_dir> <num_topics> <vocab_size> <num_docs_in_infer_file> <nnzs_in_infer_file> <nnzs_in_sparse_model_file> <iters> <Lifschitz_constant>
 ```
    * `<output_dir>` is the location where the file containing the inferred weights is written.
    * `<num_topics>` is the number of topics in the trained model.
