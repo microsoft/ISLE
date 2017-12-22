@@ -33,7 +33,7 @@
     <ClInclude Include="..\..\include\utils.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\drivers\trainFromFile.cpp" />
+    <ClCompile Include="..\..\drivers\ISLETrain.cpp" />
     <ClCompile Include="..\..\src\trainer.cpp" />
     <ClCompile Include="..\..\src\utils.cpp" />
   </ItemGroup>
@@ -173,7 +173,6 @@
       <MultiProcessorCompilation>true</MultiProcessorCompilation>
       <EnableParallelCodeGeneration>true</EnableParallelCodeGeneration>
       <OpenMPSupport>true</OpenMPSupport>
-      <AdditionalOptions>/Qopenmp-link:static %(AdditionalOptions)</AdditionalOptions>
     </ClCompile>
     <Link>
       <SubSystem>Console</SubSystem>

@@ -33,7 +33,7 @@
     <ClInclude Include="..\..\include\utils.h" />
   </ItemGroup>
   <ItemGroup>
-    <ClCompile Include="..\..\drivers\inferFromFile.cpp" />
+    <ClCompile Include="..\..\drivers\ISLEInfer.cpp" />
     <ClCompile Include="..\..\src\infer.cpp" />
     <ClCompile Include="..\..\src\utils.cpp" />
   </ItemGroup>
