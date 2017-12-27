@@ -257,7 +257,7 @@ namespace ISLE
         //     assert(!U_Spectra.IsRowMajor);
         //     assert(U_Spectra.rows() == vocab_size());
         //     assert(ld_in >= (docsSz_t)U_Spectra.cols());
-        //     gemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
+        //     FPTYPE_gemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
         //         (MKL_INT)vocab_size(), (MKL_INT)ncols, (MKL_INT)U_Spectra.cols(),
         //         (FPTYPE)1.0, U_Spectra.data(), (MKL_INT)vocab_size(), in, (MKL_INT)ld_in,
         //         (FPTYPE)0.0, out, (MKL_INT)U_Spectra.rows());
@@ -267,7 +267,7 @@ namespace ISLE
             FPTYPE *const dst,
             const docsSz_t doc) const;
         // {
-        //     scal(vocab_size(), 0.0, dst, 1);
+        //     FPTYPE_scal(vocab_size(), 0.0, dst, 1);
         //     for (auto witer = offsets_CSC[doc]; witer < offsets_CSC[doc + 1]; ++witer)
         //         *(dst + rows_CSC[witer]) = vals_CSC[witer];
         // }

@@ -104,7 +104,7 @@ delete[] prev_closest_docs_lowd;
 
 
 /*
-// Full SVD with LAPACKe_?gesvd
+// Full SVD with LAPACKe_?FPTYPE_gesvd
 B_d_fl.initialize_for_full_svd();
 B_d_fl.compute_full_svd();
 timer.next_time_secs("Computing SVD with LAPACK");
@@ -472,7 +472,7 @@ timer.next_time_secs("Writing document-topic catchword sums");
 //	const bool normalized = false) 
 //{
 //	// Set BBT to all zeros
-//	scal(vocab_size()* vocab_size(), (FPTYPE)0.0, BBT.data(), 1);
+//	FPTYPE_scal(vocab_size()* vocab_size(), (FPTYPE)0.0, BBT.data(), 1);
 
 //	docsSz_t slice_sz = 131072;
 //	size_t num_slices = num_docs() / slice_sz;
@@ -482,7 +482,7 @@ timer.next_time_secs("Writing document-topic catchword sums");
 //	FPTYPE *temp = new FPTYPE[vocab_size()*slice_sz];
 //	Timer t;
 //	for (auto slice = 0; slice < num_slices; ++slice) {
-//		scal(slice_sz*vocab_size(), (FPTYPE)0.0, temp, 1);
+//		FPTYPE_scal(slice_sz*vocab_size(), (FPTYPE)0.0, temp, 1);
 
 //		docsSz_t doc_b = slice*slice_sz;
 //		docsSz_t doc_e = (slice + 1)*slice_sz > num_docs()
@@ -492,7 +492,7 @@ timer.next_time_secs("Writing document-topic catchword sums");
 
 //		csc_slice_to_dns(temp, doc_b, doc_e, normalized);
 //		t.next_time_secs("slice");
-//		gemm(CblasColMajor, CblasNoTrans, CblasTrans,
+//		FPTYPE_gemm(CblasColMajor, CblasNoTrans, CblasTrans,
 //			(MKL_INT)vocab_size(), (MKL_INT)vocab_size(), (MKL_INT)(doc_e - doc_b),
 //			1.0, temp, (MKL_INT)vocab_size(), temp, (MKL_INT)vocab_size(),
 //			1.0, BBT.data(), vocab_size());
@@ -502,19 +502,19 @@ timer.next_time_secs("Writing document-topic catchword sums");
 //}
 
 
-// Uses Intel MKL's LAPACKe_?gesvd; matrix = U*Sigma*VT
+// Uses Intel MKL's LAPACKe_?FPTYPE_gesvd; matrix = U*Sigma*VT
 //Call initialize_for_full_svd() before calling this method
 //void compute_full_svd()
 //{
 //	auto superb = new FPTYPE[num_singular_vals];
-//	auto info = gesvd(LAPACK_COL_MAJOR, 'S', 'S',
+//	auto info = FPTYPE_gesvd(LAPACK_COL_MAJOR, 'S', 'S',
 //		(lapack_int)vocab_size(), (lapack_int)num_docs(),
 //		svd_temp, (lapack_int)vocab_size(),				// data and its lda
 //		Sigma,
 //		U, (lapack_int)vocab_size(),
 //		VT, (lapack_int)num_singular_vals,
 //		superb);
-//	assert(info == 0); // gesvd has converged
+//	assert(info == 0); // FPTYPE_gesvd has converged
 //	delete[] superb;
 //}
 
@@ -524,18 +524,18 @@ timer.next_time_secs("Writing document-topic catchword sums");
 //	std::vector<docsSz_t> &centers) const
 //{
 //	assert(centers.size() > 0);
-//	FPTYPE min_dist = dot(vocab_size(), data() + centers[0]*vocab_size(), 1, 
+//	FPTYPE min_dist = FPTYPE_dot(vocab_size(), data() + centers[0]*vocab_size(), 1, 
 //										data() + centers[0] * vocab_size(), 1)
-//					- 2*dot(vocab_size(), data() + c*vocab_size(), 1,
+//					- 2*FPTYPE_dot(vocab_size(), data() + c*vocab_size(), 1,
 //										data() + centers[0] * vocab_size(), 1);
 //	for (auto idx_iter = centers.begin() + 1; idx_iter != centers.end(); ++idx_iter) {
-//		FPTYPE dist = dot(vocab_size(), data() + *idx_iter*vocab_size(), 1,
+//		FPTYPE dist = FPTYPE_dot(vocab_size(), data() + *idx_iter*vocab_size(), 1,
 //										data() + *idx_iter*vocab_size(), 1)
-//					- 2*dot(vocab_size(), data() + c*vocab_size(), 1,
+//					- 2*FPTYPE_dot(vocab_size(), data() + c*vocab_size(), 1,
 //										data() + *idx_iter*vocab_size(), 1);
 //		min_dist = (dist > min_dist) ? min_dist : dist;
 //	}
-//	return min_dist + dot(vocab_size(), data() + c*vocab_size(), 1, data() + c*vocab_size(), 1);
+//	return min_dist + FPTYPE_dot(vocab_size(), data() + c*vocab_size(), 1, data() + c*vocab_size(), 1);
 //}
 
 // Input @k: number of centers, @centers: reference to vector of indices of chosen seeds
@@ -576,7 +576,7 @@ timer.next_time_secs("Writing document-topic catchword sums");
 //#endif
 
 
-// TODO: convert to mkl_?dnscsr
+// TODO: convert to mkl_?FPTYPE_dnscsr
 //void csc_slice_to_dns(
 //	FPTYPE *const out,
 //	const docsSz_t doc_b,

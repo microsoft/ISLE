@@ -607,15 +607,15 @@ namespace ISLE
         auto avg_topic_vector = new FPTYPE[A_sp->vocab_size()];
         for (vocabSz_t w = 0; w < Model->vocab_size(); ++w) avg_topic_vector[w] = 0.0;
         for (auto t = 0; t < num_topics; ++t)
-            axpy(Model->vocab_size(), 1.0 / num_topics, Model->data() + Model->vocab_size() * (size_t)t, 1,
+            FPTYPE_axpy(Model->vocab_size(), 1.0 / num_topics, Model->data() + Model->vocab_size() * (size_t)t, 1,
                 avg_topic_vector, 1);
         auto l2sq_dist_to_avg_topic = new FPTYPE[num_topics];
-        FPTYPE l2sq_avg_topic_vector = dot(Model->vocab_size(), avg_topic_vector, 1, avg_topic_vector, 1);
+        FPTYPE l2sq_avg_topic_vector = FPTYPE_dot(Model->vocab_size(), avg_topic_vector, 1, avg_topic_vector, 1);
         for (auto t = 0; t < num_topics; ++t) {
             l2sq_dist_to_avg_topic[t] = l2sq_avg_topic_vector
-                + dot(Model->vocab_size(), Model->data() + Model->vocab_size() * (size_t)t, 1,
+                + FPTYPE_dot(Model->vocab_size(), Model->data() + Model->vocab_size() * (size_t)t, 1,
                     Model->data() + Model->vocab_size() * (size_t)t, 1)
-                - 2.0 * dot(Model->vocab_size(), Model->data() + Model->vocab_size(), 1,
+                - 2.0 * FPTYPE_dot(Model->vocab_size(), Model->data() + Model->vocab_size(), 1,
                     avg_topic_vector, 1);
         }
         auto avg_diversity = std::accumulate(l2sq_dist_to_avg_topic, l2sq_dist_to_avg_topic + num_topics, (FPTYPE)0.0) / num_topics;

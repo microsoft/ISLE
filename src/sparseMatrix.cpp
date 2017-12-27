@@ -742,8 +742,8 @@ namespace ISLE
         }*/
 
         pfor_dynamic_1(int t = 0; t < num_topics; ++t) {
-            auto topic_vector_sum = asum(Model.vocab_size(), Model.data() + (size_t)Model.vocab_size() * (size_t)t, 1);
-            scal(Model.vocab_size(), 1.0 / topic_vector_sum, Model.data() + (size_t)Model.vocab_size() * (size_t)t, 1);
+            auto topic_vector_sum = FPTYPE_asum(Model.vocab_size(), Model.data() + (size_t)Model.vocab_size() * (size_t)t, 1);
+            FPTYPE_scal(Model.vocab_size(), 1.0 / topic_vector_sum, Model.data() + (size_t)Model.vocab_size() * (size_t)t, 1);
         }
         timer.next_time_secs("c TM: scaling", 30);
 
@@ -1004,14 +1004,14 @@ namespace ISLE
     FPTYPE FloatingPointSparseMatrix<FPTYPE>::frobenius() const
     {
         assert(offsets_CSC[0] == 0);
-        return dot(get_nnzs(), vals_CSC, 1, vals_CSC, 1);
+        return FPTYPE_dot(get_nnzs(), vals_CSC, 1, vals_CSC, 1);
     }
 
     template<class FPTYPE>
     FPTYPE FloatingPointSparseMatrix<FPTYPE>::normalized_frobenius() const
     {
         assert(normalized_vals_CSC != NULL);
-        return dot(get_nnzs(), normalized_vals_CSC, 1,
+        return FPTYPE_dot(get_nnzs(), normalized_vals_CSC, 1,
             normalized_vals_CSC, 1);
     }
 
@@ -1086,8 +1086,8 @@ namespace ISLE
         assert(U_Spectra.IsRowMajor == false);
         assert(U_Spectra.rows() == vocab_size() && U_Spectra.cols() == num_topics);
         FPTYPE *U_rowm = new FPTYPE[(size_t)num_topics*(size_t)vocab_size()];
-        // MKl_?omatcopy does not seem to work
-        //omatcopy(CblasColMajor, 'T', vocab_size(), num_topics,
+        // MKl_?FPTYPE_omatcopy does not seem to work
+        //FPTYPE_omatcopy(CblasColMajor, 'T', vocab_size(), num_topics,
         //	1.0, U_Spectra.data(), vocab_size(), U_rowm, num_topics);
         // TODO: Improve this
         for (vocabSz_t r = 0; r < vocab_size(); ++r)
@@ -1095,9 +1095,9 @@ namespace ISLE
                 U_rowm[(size_t)c + (size_t)r * (size_t)num_topics]
                 = U_Spectra.data()[(size_t)r + (size_t)c * (size_t)vocab_size()];
 
-        auto tr_diff = std::abs(dot((size_t)vocab_size() * (size_t)num_topics,
+        auto tr_diff = std::abs(FPTYPE_dot((size_t)vocab_size() * (size_t)num_topics,
             U_Spectra.data(), 1, U_Spectra.data(), 1))
-            - dot((size_t)vocab_size()*(size_t)num_topics, U_rowm, 1, U_rowm, 1);
+            - FPTYPE_dot((size_t)vocab_size()*(size_t)num_topics, U_rowm, 1, U_rowm, 1);
         if (tr_diff > 0.01)
             std::cout << "\n === WARNING : Diff between marix and transpose is "
             << tr_diff << "\n" << std::endl;
@@ -1113,7 +1113,7 @@ namespace ISLE
         assert(sizeof(vocabSz_t) == sizeof(MKL_INT));
         assert(sizeof(offset_t) == sizeof(MKL_INT));
 
-        csrmm(&transa, &m, &n, &k, &alpha, matdescra,
+        FPTYPE_csrmm(&transa, &m, &n, &k, &alpha, matdescra,
             vals_CSC, (const MKL_INT*)rows_CSC, (const MKL_INT*)offsets_CSC, (const MKL_INT*)(offsets_CSC + 1),
             U_rowm, &n,
             &beta, spectraSigmaVT, &n);
@@ -1211,7 +1211,7 @@ namespace ISLE
         docsSz_t nz_docs = 0;
 
         auto doc_weights = new FPTYPE[from.num_docs()];
-        scal(from.num_docs(), 0.0, doc_weights, 1);
+        FPTYPE_scal(from.num_docs(), 0.0, doc_weights, 1);
         // Compute weights
         pfor_dynamic_131072(int64_t doc = 0; doc < num_docs(); ++doc) {
             for (offset_t pos = from.offsets_CSC[doc]; pos < from.offsets_CSC[doc + 1]; ++pos) {
@@ -1285,7 +1285,7 @@ namespace ISLE
         assert(!U_Spectra.IsRowMajor);
         assert(U_Spectra.rows() == vocab_size());
         assert(ld_in >= (docsSz_t)U_Spectra.cols());
-        gemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
+        FPTYPE_gemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
             (MKL_INT)vocab_size(), (MKL_INT)ncols, (MKL_INT)U_Spectra.cols(),
             (FPTYPE)1.0, U_Spectra.data(), (MKL_INT)vocab_size(), in, (MKL_INT)ld_in,
             (FPTYPE)0.0, out, (MKL_INT)U_Spectra.rows());
@@ -1296,7 +1296,7 @@ namespace ISLE
         FPTYPE *const dst,
         const docsSz_t doc) const
     {
-        scal(vocab_size(), 0.0, dst, 1);
+        FPTYPE_scal(vocab_size(), 0.0, dst, 1);
         for (auto witer = offsets_CSC[doc]; witer < offsets_CSC[doc + 1]; ++witer)
             *(dst + rows_CSC[witer]) = vals_CSC[witer];
     }
@@ -1308,8 +1308,8 @@ namespace ISLE
         const FPTYPE *const pt,
         const FPTYPE pt_l2sq) const
     {
-        FPTYPE ret = (pt_l2sq == -1.0) ? dot(vocab_size(), pt, 1, pt, 1) : pt_l2sq;
-        ret += dot(offsets_CSC[doc + 1] - offsets_CSC[doc],
+        FPTYPE ret = (pt_l2sq == -1.0) ? FPTYPE_dot(vocab_size(), pt, 1, pt, 1) : pt_l2sq;
+        ret += FPTYPE_dot(offsets_CSC[doc + 1] - offsets_CSC[doc],
             vals_CSC + offsets_CSC[doc], 1,
             vals_CSC + offsets_CSC[doc], 1);
         for (auto witer = offsets_CSC[doc]; witer < offsets_CSC[doc + 1]; ++witer)
@@ -1323,8 +1323,8 @@ namespace ISLE
         const FPTYPE *const pt,
         const FPTYPE pt_l2sq) const
     {
-        FPTYPE ret = (pt_l2sq == -1.0) ? dot(vocab_size(), pt, 1, pt, 1) : pt_l2sq;
-        ret += dot(offsets_CSC[doc + 1] - offsets_CSC[doc],
+        FPTYPE ret = (pt_l2sq == -1.0) ? FPTYPE_dot(vocab_size(), pt, 1, pt, 1) : pt_l2sq;
+        ret += FPTYPE_dot(offsets_CSC[doc + 1] - offsets_CSC[doc],
             normalized_vals_CSC + offsets_CSC[doc], 1,
             normalized_vals_CSC + offsets_CSC[doc], 1);
         for (auto witer = offsets_CSC[doc]; witer < offsets_CSC[doc + 1]; ++witer)
@@ -1348,8 +1348,8 @@ namespace ISLE
         std::fill_n(ones_vec, num_docs(), (FPTYPE)1.0);
 
         FPTYPE *centers_tr = new FPTYPE[(size_t)num_centers*(size_t)vocab_size()];
-        // TODO: mkl_?omatcopy doesn't seem to work. 
-        /*omatcopy(CblasColMajor, 'T',
+        // TODO: mkl_?FPTYPE_omatcopy doesn't seem to work. 
+        /*FPTYPE_omatcopy(CblasColMajor, 'T',
             vocab_size(), num_centers,
             1.0, centers, vocab_size(), centers_tr, num_centers);*/
 
@@ -1367,16 +1367,16 @@ namespace ISLE
         const char matdescra[6] = { 'G',0,0,'C',0,0 };
         FPTYPE alpha = -2.0; FPTYPE beta = 0.0;
 
-        csrmm(&transa, &m, &n, &k, &alpha, matdescra,
+        FPTYPE_csrmm(&transa, &m, &n, &k, &alpha, matdescra,
             vals_CSC, (const MKL_INT*)rows_CSC, (const MKL_INT*)offsets_CSC, (const MKL_INT*)(offsets_CSC + 1),
             centers_tr, &n,
             &beta, dist_matrix, &n);
 
-        gemm(CblasRowMajor, CblasTrans, CblasNoTrans,
+        FPTYPE_gemm(CblasRowMajor, CblasTrans, CblasNoTrans,
             num_docs(), num_centers, 1,
             (FPTYPE)1.0, ones_vec, num_docs(), centers_l2sq, num_centers,
             (FPTYPE)1.0, dist_matrix, num_centers);
-        gemm(CblasRowMajor, CblasTrans, CblasNoTrans,
+        FPTYPE_gemm(CblasRowMajor, CblasTrans, CblasNoTrans,
             num_docs(), num_centers, 1,
             (FPTYPE)1.0, docs_l2sq, num_docs(), ones_vec, num_centers,
             (FPTYPE)1.0, dist_matrix, num_centers);
@@ -1394,14 +1394,14 @@ namespace ISLE
         // Need to parallelize
         FPTYPE *const centers_l2sq = new FPTYPE[num_centers];
         for (docsSz_t c = 0; c < num_centers; ++c)
-            centers_l2sq[c] = dot(vocab_size(),
+            centers_l2sq[c] = FPTYPE_dot(vocab_size(),
                 centers + (size_t)c * (size_t)vocab_size(), 1,
                 centers + (size_t)c * (size_t)vocab_size(), 1);
 
         distsq_alldocs_to_centers(vocab_size(), num_centers, centers, centers_l2sq,
             docs_l2sq, dist_matrix);
         pfor_static_131072(int64_t d = 0; d < num_docs(); ++d)
-            center_index[d] = (docsSz_t)imin(num_centers, dist_matrix + (size_t)d * (size_t)num_centers, 1);
+            center_index[d] = (docsSz_t)FPTYPE_imin(num_centers, dist_matrix + (size_t)d * (size_t)num_centers, 1);
         delete[] centers_l2sq;
     }
 
@@ -1428,7 +1428,7 @@ namespace ISLE
                 closest_docs[c].clear();
         for (docsSz_t d = 0; d < num_docs(); ++d)
             closest_docs[closest_center[d]].push_back(d);
-        scal((size_t)num_centers * (size_t)vocab_size(), 0.0, centers, 1);
+        FPTYPE_scal((size_t)num_centers * (size_t)vocab_size(), 0.0, centers, 1);
         timer.next_time_secs("lloyd: init centers", 30);
 
         pfor_dynamic_1(int c = 0; c < num_centers; ++c) {
@@ -1467,7 +1467,7 @@ namespace ISLE
     void FloatingPointSparseMatrix<FPTYPE>::compute_docs_l2sq(FPTYPE *const docs_l2sq)
     {
         assert(docs_l2sq != NULL);
-        scal(num_docs(), 0.0, docs_l2sq, 1);
+        FPTYPE_scal(num_docs(), 0.0, docs_l2sq, 1);
         pfor_static_131072(int64_t d = 0; d < num_docs(); ++d)
             for (auto witer = offsets_CSC[d]; witer < offsets_CSC[d + 1]; ++witer)
                 docs_l2sq[d] += vals_CSC[witer] * vals_CSC[witer];
@@ -1577,7 +1577,7 @@ namespace ISLE
         for (docsSz_t doc = 0; doc < num_docs(); ++doc)
             nearest_docs[closest_center[doc]].push_back(doc);
         pfor_dynamic_16(auto c = 0; c < num_centers; ++c) {
-            centers_l2sq[c] = dot(vocab_size(),
+            centers_l2sq[c] = FPTYPE_dot(vocab_size(),
                 centers + (size_t)c * (size_t)vocab_size(), 1,
                 centers + (size_t)c * (size_t)vocab_size(), 1);
             for (auto diter = nearest_docs[c].begin(); diter != nearest_docs[c].end(); ++diter)
@@ -1585,7 +1585,7 @@ namespace ISLE
         }
         delete[] nearest_docs;
 
-        scal((size_t)num_centers * (size_t)num_centers, 0.0, centers_distsq, 1);
+        FPTYPE_scal((size_t)num_centers * (size_t)num_centers, 0.0, centers_distsq, 1);
         timer.next_time_secs("Elkan: init centers", 30);
 
         for (int rep = 0; rep < MAX_KMEANS_REPS; ++rep)
@@ -1594,29 +1594,29 @@ namespace ISLE
             //    Compute s(c) = 1 / 2 min_{ c'!=c} d(c, c0) for all c.
             auto ones_vec = new FPTYPE[num_centers];
             pfor_static_256(auto i = 0; i < num_centers; ++i) {
-                centers_l2sq[i] = dot(vocab_size(),
+                centers_l2sq[i] = FPTYPE_dot(vocab_size(),
                     centers + (size_t)i * (size_t)vocab_size(), 1,
                     centers + (size_t)i * (size_t)vocab_size(), 1);
                 ones_vec[i] = 1.0;
             }
             {
-                gemm(CblasColMajor, CblasTrans, CblasNoTrans,
+                FPTYPE_gemm(CblasColMajor, CblasTrans, CblasNoTrans,
                     num_centers, num_centers, vocab_size(),
                     (FPTYPE)-2.0, centers, vocab_size(), centers, vocab_size(),
                     (FPTYPE)0.0, centers_distsq, num_centers);
-                gemm(CblasColMajor, CblasNoTrans, CblasTrans,
+                FPTYPE_gemm(CblasColMajor, CblasNoTrans, CblasTrans,
                     num_centers, num_centers, 1,
                     (FPTYPE)1.0, ones_vec, num_centers, centers_l2sq, num_centers,
                     (FPTYPE)1.0, centers_distsq, num_centers);
-                gemm(CblasColMajor, CblasNoTrans, CblasTrans,
+                FPTYPE_gemm(CblasColMajor, CblasNoTrans, CblasTrans,
                     num_centers, num_centers, 1,
                     (FPTYPE)1.0, centers_l2sq, num_centers, ones_vec, num_centers,
                     (FPTYPE)1.0, centers_distsq, num_centers);
             }
             std::vector<FPTYPE> distsq_nearest_other_center(num_centers);
             pfor_dynamic_1024(auto c = 0; c < num_centers; ++c) {
-                auto imin1 = imin(c, centers_distsq + (size_t)c * (size_t)num_centers, 1);
-                auto imin2 = imin(num_centers - 1 - c, centers_distsq + (size_t)c * (size_t)num_centers + c + 1, 1);
+                auto imin1 = FPTYPE_imin(c, centers_distsq + (size_t)c * (size_t)num_centers, 1);
+                auto imin2 = FPTYPE_imin(num_centers - 1 - c, centers_distsq + (size_t)c * (size_t)num_centers + c + 1, 1);
                 auto min1 = centers_distsq[(size_t)c * (size_t)num_centers + imin1];
                 auto min2 = centers_distsq[(size_t)c * (size_t)num_centers + c + 1 + imin2];
                 distsq_nearest_other_center[c] = min1 < min2 ? min1 : min2;
@@ -1650,8 +1650,8 @@ namespace ISLE
                 auto c = closest_center[doc];
                 if (distsq_to_current_center < 0.25 * distsq_nearest_other_center[c])
                     continue;
-                auto imin1 = imin(c, lb_distsq_matrix + (size_t)doc * (size_t)num_centers, 1);
-                auto imin2 = imin(num_centers - 1 - c, lb_distsq_matrix + (size_t)doc * (size_t)num_centers + c + 1, 1);
+                auto imin1 = FPTYPE_imin(c, lb_distsq_matrix + (size_t)doc * (size_t)num_centers, 1);
+                auto imin2 = FPTYPE_imin(num_centers - 1 - c, lb_distsq_matrix + (size_t)doc * (size_t)num_centers + c + 1, 1);
                 auto min1 = lb_distsq_matrix[(size_t)doc * (size_t)num_centers + imin1];
                 auto min2 = lb_distsq_matrix[(size_t)doc * (size_t)num_centers + c + 1 + imin2];
                 auto min_distsq_to_other_center = min1 < min2 ? min1 : min2;
@@ -1699,16 +1699,16 @@ namespace ISLE
                         centers_tr[(size_t)c + (size_t)r * (size_t)n]
                         = centers[(size_t)r + (size_t)c * (size_t)vocab_size()];
 
-                csrmm(&transa, &m, &n, &k, &alpha, matdescra,
+                FPTYPE_csrmm(&transa, &m, &n, &k, &alpha, matdescra,
                     buffer_vals_CSC, (const MKL_INT*)buffer_rows_CSC,
                     (const MKL_INT*)buffer_offsets_CSC, (const MKL_INT*)(buffer_offsets_CSC + 1),
                     centers_tr, &n,
                     &beta, buffer_dist_matrix, &n);
-                gemm(CblasRowMajor, CblasTrans, CblasNoTrans,
+                FPTYPE_gemm(CblasRowMajor, CblasTrans, CblasNoTrans,
                     m, n, 1,
                     (FPTYPE)1.0, ones_vec, m, centers_l2sq, n,
                     (FPTYPE)1.0, buffer_dist_matrix, n);
-                gemm(CblasRowMajor, CblasTrans, CblasNoTrans,
+                FPTYPE_gemm(CblasRowMajor, CblasTrans, CblasNoTrans,
                     m, n, 1,
                     (FPTYPE)1.0, docs_l2sq, m, ones_vec, n,
                     (FPTYPE)1.0, buffer_dist_matrix, n);
@@ -1719,7 +1719,7 @@ namespace ISLE
                     const auto doc = moving_docs[batch][i];
                     memcpy(lb_distsq_matrix + (size_t)doc * (size_t)num_centers,
                         buffer_dist_matrix + (size_t)i * (size_t)num_centers, num_centers * sizeof(FPTYPE));
-                    closest_center[doc] = imin(num_centers, lb_distsq_matrix + (size_t)doc * (size_t)num_centers, 1);
+                    closest_center[doc] = FPTYPE_imin(num_centers, lb_distsq_matrix + (size_t)doc * (size_t)num_centers, 1);
                     ub_distsq[doc] = lb_distsq_matrix[(size_t)doc * (size_t)num_centers + closest_center[doc]];
                 }
                 delete[] buffer_vals_CSC, buffer_rows_CSC, buffer_offsets_CSC, buffer_dist_matrix;
@@ -1734,7 +1734,7 @@ namespace ISLE
                 closest_docs[closest_center[doc]].push_back(doc);
 
             auto new_centers = new FPTYPE[(size_t)vocab_size()*(size_t)num_centers];
-            scal((size_t)vocab_size() * (size_t)num_centers, 0.0, new_centers, 1);
+            FPTYPE_scal((size_t)vocab_size() * (size_t)num_centers, 0.0, new_centers, 1);
             pfor_dynamic_16(auto c = 0; c < num_centers; ++c) {
                 auto div = (FPTYPE)closest_docs[c].size();
                 for (auto diter = closest_docs[c].begin(); diter != closest_docs[c].end(); ++diter)
@@ -1746,9 +1746,9 @@ namespace ISLE
             // 5. Assign l(x, c) = max{ l(x, c) - d(c, m(c)), 0 } for all x, c
             // 6. For all x, assign: u(x) = u(x) + d(m(c(x)), c(x)).
             std::vector<FPTYPE> distsq_center_mv(num_centers);
-            axpy((size_t)vocab_size() * (size_t)num_centers, -1.0, new_centers, 1, centers, 1);
+            FPTYPE_axpy((size_t)vocab_size() * (size_t)num_centers, -1.0, new_centers, 1, centers, 1);
             pfor_dynamic_16(auto c = 0; c < num_centers; ++c)
-                distsq_center_mv[c] = dot(vocab_size(),
+                distsq_center_mv[c] = FPTYPE_dot(vocab_size(),
                     centers + (size_t)c * (size_t)vocab_size(), 1,
                     centers + (size_t)c * (size_t)vocab_size(), 1);
 
@@ -1767,7 +1767,7 @@ namespace ISLE
                 }
 
             // 7. Replace c by m(c).
-            //blascopy((size_t)num_centers* (size_t)vocab_size(), new_centers, 1, centers, 1);
+            //FPTYPE_blascopy((size_t)num_centers* (size_t)vocab_size(), new_centers, 1, centers, 1);
             memcpy(centers, new_centers, sizeof(FPTYPE) * (size_t)num_centers* (size_t)vocab_size());
             delete[] new_centers;
             delete[] moving_docs;
