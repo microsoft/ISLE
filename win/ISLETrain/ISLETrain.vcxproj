@@ -34,6 +34,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\drivers\ISLETrain.cpp" />
+    <ClCompile Include="..\..\src\denseMatrix.cpp" />
+    <ClCompile Include="..\..\src\sparseMatrix.cpp" />
     <ClCompile Include="..\..\src\trainer.cpp" />
     <ClCompile Include="..\..\src\utils.cpp" />
   </ItemGroup>

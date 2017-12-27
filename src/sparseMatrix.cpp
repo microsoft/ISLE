@@ -216,7 +216,7 @@ namespace ISLE
         Timer timer;
         assert(freqs != NULL);
         docsSz_t CHUNK_SIZE = 131072;
-        docsSz_t num_chunks = num_docs() / CHUNK_SIZE;
+        long long num_chunks = num_docs() / CHUNK_SIZE;
         if (num_docs() % CHUNK_SIZE > 0)
             num_chunks++;
         auto freqs_comp = new std::vector<T>*[num_chunks];
@@ -224,10 +224,9 @@ namespace ISLE
             freqs_comp[chunk] = new std::vector<T>[vocab_size()];
         timer.next_time_secs("list_freqs: alloc", 30);
 
-#pragma omp parallel for schedule(static,1)
-        for (docsSz_t chunk = 0; chunk < num_chunks; chunk++) {
-            docsSz_t chunk_b = chunk*CHUNK_SIZE;
-            docsSz_t chunk_e = (chunk + 1) * CHUNK_SIZE > num_docs() ? num_docs() : (chunk + 1) * CHUNK_SIZE;
+        pfor (long long chunk = 0; chunk < num_chunks; chunk++) {
+            auto chunk_b = chunk*CHUNK_SIZE;
+            auto chunk_e = (chunk + 1) * CHUNK_SIZE > num_docs() ? num_docs() : (chunk + 1) * CHUNK_SIZE;
             list_word_freqs_r(freqs_comp[chunk], chunk_b, chunk_e, 0, vocab_size());
         }
         timer.next_time_secs("list_freqs: chunks", 30);

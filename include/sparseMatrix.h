@@ -5,15 +5,17 @@
 
 #include <mkl.h>
 
+#include <set>
 #include <limits>
 
 #include "types.h"
+// types.h is included before influences the behavior of Eigen and, therefore, Spectra
+#include "spectra-master/include/SymEigsSolver.h"
+
 #include "parallel.h"
 #include "utils.h"
 #include "matUtils.h"
 #include "hyperparams.h"
-#include <set>
-#include "spectra-master/include/SymEigsSolver.h"
 #include "denseMatrix.h"
 
 namespace ISLE

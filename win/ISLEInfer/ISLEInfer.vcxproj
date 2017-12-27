@@ -34,7 +34,9 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\drivers\ISLEInfer.cpp" />
+    <ClCompile Include="..\..\src\denseMatrix.cpp" />
     <ClCompile Include="..\..\src\infer.cpp" />
+    <ClCompile Include="..\..\src\sparseMatrix.cpp" />
     <ClCompile Include="..\..\src\utils.cpp" />
   </ItemGroup>
   <PropertyGroup Label="Globals">

@@ -8,12 +8,14 @@
 #include "Eigen/Dense"
 
 #include "types.h"
+// types.h is included before influences the behavior of Eigen and, therefore, Spectra
+#include "spectra-master/include/SymEigsSolver.h"
+
 #include "parallel.h"
 #include "utils.h"
 #include "timer.h"
 #include "matUtils.h"
 #include "hyperparams.h"
-#include "spectra-master/include/SymEigsSolver.h"
 
 namespace ISLE
 {
