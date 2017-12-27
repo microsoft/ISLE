@@ -4,6 +4,7 @@
 #pragma once
 
 #include "types.h"
+#include "timer.h"
 
 namespace ISLE
 {
