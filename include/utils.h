@@ -205,11 +205,16 @@ namespace ISLE
                         count *= 10; count += buf[i] - '0';
                         break;
                     default:
-                        assert(false);
+		      std::cerr << "Bad line. nRead: " << nRead << std::endl;
+		      for (int j=-50; j<50; ++j)
+			printf("%c", *(buf+i+j));
+		      assert(false);
                     }
                     break;
                 default:
-                    std::cerr << "Bad format\n";
+ 		    printf("nRead: %lld \t", nRead);
+		    printf("char: %c \n", *(buf+i));
+		    std::cerr << "Bad format\n";
                 }
             }
             if (state == 3) { // Didnt reach "\n" on last line

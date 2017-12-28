@@ -24,7 +24,7 @@ int main(int argv, char **argc) {
     const docsSz_t	num_topics = atol(argc[7]);
 
     const bool sample = atoi(argc[8]);
-    const FPTYPE sample_rate = atoi(argc[9]);
+    const FPTYPE sample_rate = atof(argc[9]);
 
     try {
         ISLE::ISLETrainer trainer(vocab_size, num_docs, max_entries, num_topics,
