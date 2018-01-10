@@ -544,7 +544,7 @@ namespace ISLE
             : (num / denom) + 1;
     }
 
-    std::string fileUnderDirNameString(
+    std::string concat_file_path(
         const std::string& dir,
         const std::string& filename);
 }

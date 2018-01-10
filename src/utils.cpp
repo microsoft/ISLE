@@ -42,10 +42,10 @@ std::string ISLE::log_dir_name(
         + "_sample_" + std::to_string(sample_docs);
     if (sample_docs)
         log_subdir += "_Rate_" + std::to_string(sample_rate);
-    return fileUnderDirNameString(output_path_base, log_subdir);
+    return concat_file_path(output_path_base, log_subdir);
 }
 
-std::string ISLE::fileUnderDirNameString(const std::string& dir, const std::string& filename)
+std::string ISLE::concat_file_path(const std::string& dir, const std::string& filename)
 {
 #if defined(_MSC_VER)
     return dir + "\\" + filename;

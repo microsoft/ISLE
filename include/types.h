@@ -14,74 +14,76 @@
 #include "float.h"
 #endif
 
+namespace ISLE {
 
 #define MKL_USE_DNSCSR
 
-//#define MKL_LP64
-//#define EIGEN_USE_MKL_ALL
+    //#define MKL_LP64
+    //#define EIGEN_USE_MKL_ALL
 
-// vocabSz_t and docsSz_t have to be unsigned
-typedef MKL_UINT vocabSz_t;
-typedef MKL_UINT docsSz_t;
+    // vocabSz_t and docsSz_t have to be unsigned
+    typedef MKL_UINT vocabSz_t;
+    typedef MKL_UINT docsSz_t;
 
-typedef MKL_INT offset_t;
+    typedef MKL_INT offset_t;
 
-// Try to eliminate this out of code.
-typedef uint32_t count_t;
+    // Try to eliminate this out of code.
+    typedef uint32_t count_t;
 
 #define FP_PRECISION SINGLE
 
 #if FP_PRECISION == SINGLE
-typedef float FPTYPE;
+    typedef float FPTYPE;
 #elif FP_PRECISION == DOUBLE
-typedef double FPTYPE;
+    typedef double FPTYPE;
 #endif
 
 #if USE_INT_NORMALIZED_COUNTS 
-typedef count_t A_TYPE;
+    typedef count_t A_TYPE;
 #else
-typedef FPTYPE A_TYPE;
+    typedef FPTYPE A_TYPE;
 #endif
 
 
 #if FP_PRECISION == SINGLE
-#define FPTYPE_MAX FLT_MAX
-#define FPTYPE_asum	cblas_sasum
-#define FPTYPE_gemm	cblas_sgemm
-#define FPTYPE_gesvd	LAPACKE_sgesvd
-#define FPTYPE_axpy	cblas_saxpy
-#define FPTYPE_dot	cblas_sdot
-#define FPTYPE_nrm2	cblas_snrm2
-#define FPTYPE_blascopy cblas_scopy
-#define FPTYPE_imin	cblas_isamin   
-#define FPTYPE_dnscsr	mkl_sdnscsr
+#define FP_MAX FLT_MAX
+#define FPasum	cblas_sasum
+#define FPgemm	cblas_sgemm
+#define FPgesvd	LAPACKE_sgesvd
+#define FPaxpy	cblas_saxpy
+#define FPdot	cblas_sdot
+#define FPnrm2	cblas_snrm2
+#define FPblascopy cblas_scopy
+#define FPimin	cblas_isamin   
+#define FPdnscsr	mkl_sdnscsr
 #define MatrixX MatrixXf
-#define FPTYPE_gemv	cblas_sgemv
-#define FPTYPE_symv	cblas_ssymv
-#define FPTYPE_scal	cblas_sscal
-#define FPTYPE_csrmm	mkl_scsrmm
-#define FPTYPE_cscmm	mkl_scscmm
-#define FPTYPE_omatcopy mkl_somatcopy
-#define FPTYPE_csrcsc	mkl_scsrcsc
-#define FPTYPE_csrgemv mkl_cspblas_scsrgemv
+#define FPgemv	cblas_sgemv
+#define FPsymv	cblas_ssymv
+#define FPscal	cblas_sscal
+#define FPcsrmm	mkl_scsrmm
+#define FPcscmm	mkl_scscmm
+#define FPomatcopy mkl_somatcopy
+#define FPcsrcsc	mkl_scsrcsc
+#define FPcsrgemv mkl_cspblas_scsrgemv
 #elif FP_PRECISION == DOUBLE
-#define FPTYPE	MAX DBL_MAX
-#define FPTYPE_asum	cblas_dasum
-#define FPTYPE_gemm	cblas_dgemm
-#define FPTYPE_gesvd	LAPACKE_dgesvd
-#define FPTYPE_axpy	cblas_daxpy
-#define FPTYPE_dot		cblas_ddot
-#define FPTYPE_nrm2	cblas_snrm2
-#define FPTYPE_blascopy  cblas_dcopy
-#define FPTYPE_imin	cblas_idamin
-#define FPTYPE_dnscsr	mkl_ddnscsr
+#define FP_MAX DBL_MAX
+#define FPasum	cblas_dasum
+#define FPgemm	cblas_dgemm
+#define FPgesvd	LAPACKE_dgesvd
+#define FPaxpy	cblas_daxpy
+#define FPdot		cblas_ddot
+#define FPnrm2	cblas_snrm2
+#define FPblascopy  cblas_dcopy
+#define FPimin	cblas_idamin
+#define FPdnscsr	mkl_ddnscsr
 #define MatrixX MatrixXd
-#define FPTYPE_gemv	cblas_dgemv
-#define FPTYPE_symv	cblas_dsymv
-#define FPTYPE_scal	cblas_dscal
-#define FPTYPE_csrmm	mkl_dcsrmm
-#define FPTYPE_cscmm	mkl_dcscmm
-#define FPTYPE_omatcopy mkl_domatcopy
-#define FPTYPE_csrcsc	mkl_dcsrcsc
-#define FPTYPE_csrgemv mkl_cspblas_dcsrgemv
+#define FPgemv	cblas_dgemv
+#define FPsymv	cblas_dsymv
+#define FPscal	cblas_dscal
+#define FPcsrmm	mkl_dcsrmm
+#define FPcscmm	mkl_dcscmm
+#define FPomatcopy mkl_domatcopy
+#define FPcsrcsc	mkl_dcsrcsc
+#define FPcsrgemv mkl_cspblas_dcsrgemv
 #endif
+};

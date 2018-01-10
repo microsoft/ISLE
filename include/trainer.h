@@ -41,15 +41,15 @@ namespace ISLE
         const std::string	input_file;
         const std::string	vocab_file;
         const std::string	output_path_base;
-        const bool	        sample_docs;
+        const bool	        flag_sample_docs;
         const FPTYPE	    sample_rate;
-        const bool	        compute_log_combinatorial;
-        const bool	        compute_distinct_top_five_sets;
-        const bool	        compute_avg_coherence;
-        const bool	        construct_edge_topics;
+        const bool	        flag_compute_log_combinatorial;
+        const bool	        flag_compute_distinct_top_five_sets;
+        const bool	        flag_compute_avg_coherence;
+        const bool	        flag_construct_edge_topics;
         const int	        max_compound_topics;
-        const bool	        print_doctopic;
-        const bool          print_top_two_topics;
+        const bool	        flag_print_doctopic;
+        const bool          flag_print_top_two_topics;
 
         std::string			log_dir;
 #ifdef _MSC_VER
@@ -187,8 +187,10 @@ namespace ISLE
         // Output document catchword frequencies in 1-based index
         // Output doc-topic catchword sums in 1-based index
         //
-        void output_doc_topic(std::vector<std::pair<vocabSz_t, int> >& catchword_topics,
-            std::vector<std::tuple<docsSz_t, docsSz_t, FPTYPE> >& doc_topic_sum);
+        void output_doc_topic(
+            std::vector<std::pair<vocabSz_t, int> >& catchword_topics,
+            std::vector<std::tuple<docsSz_t, docsSz_t,
+            FPTYPE> >& doc_topic_sum);
 
         void get_basic_model(FPTYPE *const basicModel);
 
@@ -201,5 +203,17 @@ namespace ISLE
         // The final edge model
         //
         void get_edge_model(FPTYPE *const edgeModel);
+
+        //
+        // Find Top Two topics for each doc and print them to file
+        //
+        void print_top_two_topics(
+            std::vector<std::tuple<int, int, docsSz_t> >& top_topic_pairs);
+
+        //
+        // Compute edge topics based on the list of top-2 topics for each file
+        //
+        void construct_edge_topics(
+            std::vector<std::tuple<int, int, docsSz_t> >& top_topic_pairs);
     };
 }

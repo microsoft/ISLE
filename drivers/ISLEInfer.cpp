@@ -47,16 +47,16 @@ int main(int argv, char**argc)
     if (iters == 0) iters = 15;
     if (Lfguess == 0.0) Lfguess = 10.0*/;
 
-    //std::cout << "Loading sparse model file: " << fileUnderDirNameString(output_dir, sparse_model_file) << std::endl;
+    //std::cout << "Loading sparse model file: " << concat_file_path(output_dir, sparse_model_file) << std::endl;
     //auto sparse_model = new SparseMatrix<FPTYPE>(vocab_size, num_topics);
     //load_sparse_model_from_file(sparse_model, 
-    //    fileUnderDirNameString(output_dir, sparse_model_file), M_hat_catch_sparse_entries);
+    //    concat_file_path(output_dir, sparse_model_file), M_hat_catch_sparse_entries);
 
 
-    /*std::cout << "Loading model file: " << fileUnderDirNameString(output_dir, model_file) << std::endl;
+    /*std::cout << "Loading model file: " << concat_file_path(output_dir, model_file) << std::endl;
     auto model = new DenseMatrix<FPTYPE>(vocab_size, num_topics);
     FPTYPE *model_by_word = new FPTYPE[vocab_size * num_topics];
-    load_model_from_file(model, fileUnderDirNameString(output_dir, model_file));
+    load_model_from_file(model, concat_file_path(output_dir, model_file));
     create_model_by_word(model_by_word, model);
     delete model;*/
 
@@ -91,7 +91,7 @@ int main(int argv, char**argc)
         nconverged[block] = 0;
         std::cout << "Creating inference engine" << std::endl;
         ISLEInfer infer(model_by_word, infer_data, num_topics, vocab_size, num_docs);
-        MMappedOutput out(fileUnderDirNameString(output_dir,
+        MMappedOutput out(concat_file_path(output_dir,
             std::string("inferred_weights_iters_") + std::to_string(iters)
             + std::string("_Lf_") + std::to_string(Lfguess))
             + std::string("_block_") + std::to_string(block));

@@ -86,7 +86,7 @@ namespace ISLE
             const MKL_INT m = max_dim;
             MKL_INT info = 0;
 
-            FPTYPE_csrcsc(job, &m,
+            FPcsrcsc(job, &m,
                 vals_CSR, cols_CSR, offsets_CSR,
                 vals_CSC, (MKL_INT*)rows_CSC, (MKL_INT*)offsets_CSC,
                 &info); // info is useless
@@ -246,21 +246,21 @@ namespace ISLE
             op_timer->next_time_secs_silent();
             ++num_op_calls;
             const char no_trans = 'N';
-            FPTYPE_csrgemv(	// Pretend CSC_transpose is CSR.
+            FPcsrgemv(	// Pretend CSC_transpose is CSR.
                 &no_trans, (MKL_INT*)&max_dim,
                 vals_CSC, (MKL_INT*)offsets_CSC, (MKL_INT*)rows_CSC,
                 x_in, temp);
 
             if (!split_CSR_by_cols && !split_CSR_by_rows) {
-                FPTYPE_csrgemv(
+                FPcsrgemv(
                     &no_trans, (MKL_INT*)&max_dim,
                     vals_CSR, (MKL_INT*)offsets_CSR, (MKL_INT*)cols_CSR,
                     temp, y_temp);
-                //FPTYPE_blascopy(nrows, y_temp, 1, y_out, 1);
+                //FPblascopy(nrows, y_temp, 1, y_out, 1);
                 memcpy(y_out, y_temp, sizeof(FPTYPE) * nrows);
             }
             else if (split_CSR_by_rows) {
-                FPTYPE_scal(nrows, 0.0, y_out, 1);
+                FPscal(nrows, 0.0, y_out, 1);
                 {
                     int block_size = 32;
                     size_t num_blocks = nrows % block_size == 0
@@ -276,14 +276,14 @@ namespace ISLE
                 }
             }
             else if (split_CSR_by_cols) {
-                FPTYPE_scal(nrows, 0.0, y_out, 1);
+                FPscal(nrows, 0.0, y_out, 1);
 
                 for (auto block = 0; block < num_col_blocks; ++block) {
-                    FPTYPE_csrgemv(
+                    FPcsrgemv(
                         &no_trans, (MKL_INT*)&nrows,
                         vals_CSR_arr[block], (MKL_INT*)offsets_CSR_arr[block], (MKL_INT*)cols_CSR_arr[block],
                         temp + block*nrows, y_temp);
-                    FPTYPE_axpy(nrows, 1.0, y_temp, 1, y_out, 1);
+                    FPaxpy(nrows, 1.0, y_temp, 1, y_out, 1);
 
                 }
             }
@@ -314,7 +314,7 @@ namespace ISLE
 
         void perform_op(FPTYPE *x_in, FPTYPE *y_out) const
         {
-            FPTYPE_gemv(IsRowMajor ? CblasRowMajor : CblasColMajor, CblasNoTrans,
+            FPgemv(IsRowMajor ? CblasRowMajor : CblasColMajor, CblasNoTrans,
                 (MKL_INT)nrows, (MKL_INT)ncols, 1.0, data, (MKL_INT)(IsRowMajor ? ncols : nrows),
                 x_in, 1, 0.0, y_out, 1);
         }
@@ -340,7 +340,7 @@ namespace ISLE
 
         void perform_op(FPTYPE *x_in, FPTYPE *y_out) const
         {
-            FPTYPE_symv(IsRowMajor ? CblasRowMajor : CblasColMajor, CblasUpper,
+            FPsymv(IsRowMajor ? CblasRowMajor : CblasColMajor, CblasUpper,
                 (MKL_INT)nrows, 1.0, data, (MKL_INT)nrows, x_in, 1, 0.0, y_out, 1);
         }
     };

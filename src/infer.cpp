@@ -316,7 +316,7 @@ namespace ISLE
         auto vocab_size = model->vocab_size();
         auto num_topics = model->num_docs();
 
-        FPTYPE_omatcopy('C', 'T', vocab_size, num_topics, 1.0,
+        FPomatcopy('C', 'T', vocab_size, num_topics, 1.0,
             model->data(), vocab_size, model_by_word, num_topics);
 
         /*    for (vocabSz_t word = 0; word < vocab_size; ++word)
@@ -443,9 +443,9 @@ namespace ISLE
         FPTYPE* w,
         const int nnzs)
     {
-        FPTYPE_gemv(CblasRowMajor, CblasNoTrans, nnzs, num_topics,
+        FPgemv(CblasRowMajor, CblasNoTrans, nnzs, num_topics,
             1.0, M, num_topics, w, 1, 0.0, z, 1);
-        /* Equivalent to FPTYPE_gemv above
+        /* Equivalent to FPgemv above
         for (int r = 0; r < nnzs; ++r) {
             z[r] = 0.0;
             for (docsSz_t c = 0; c < num_topics; ++c) {
@@ -456,7 +456,7 @@ namespace ISLE
         for (int d = 0; d < num_topics; ++d)
             z[d] = a[d] / z[d];
 
-        FPTYPE_gemv(CblasRowMajor, CblasTrans, nnzs, num_topics,
+        FPgemv(CblasRowMajor, CblasTrans, nnzs, num_topics,
             1.0, M, num_topics, z, 1, 0.0, gradw, 1);
     }
 
@@ -468,7 +468,7 @@ namespace ISLE
     {
         auto z = new FPTYPE[nnzs];
 
-        FPTYPE_gemv(CblasRowMajor, CblasNoTrans, nnzs, num_topics,
+        FPgemv(CblasRowMajor, CblasNoTrans, nnzs, num_topics,
             1.0, M, num_topics, w, 1, 0.0, z, 1);
 
         FPTYPE llh = 0.0;

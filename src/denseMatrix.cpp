@@ -233,8 +233,8 @@ namespace ISLE
             offsets_MKL[doc] = (MKL_INT)from.offsets_CSC[doc];
         const MKL_INT cols = vocab_size(), rows = num_docs(), job[6] = { 1,0,0,2,0,0 };
         MKL_INT info;
-        // Since we are using FPTYPE_dnscsr for CSC, we have to think of matrices in transpose
-        FPTYPE_dnscsr(job, &rows, &cols,
+        // Since we are using FPdnscsr for CSC, we have to think of matrices in transpose
+        FPdnscsr(job, &rows, &cols,
             data(), &cols,
             (FPTYPE*)from.vals_CSC, (MKL_INT*)from.rows_CSC, offsets_MKL,
             &info);
@@ -250,7 +250,7 @@ namespace ISLE
     template<class FPTYPE>
     FPTYPE FloatingPointDenseMatrix<FPTYPE>::frobenius() const
     {
-        return FPTYPE_dot((size_t)num_docs() * (size_t)vocab_size(), data(), 1, data(), 1);
+        return FPdot((size_t)num_docs() * (size_t)vocab_size(), data(), 1, data(), 1);
     }
 
     template<class FPTYPE>
@@ -294,7 +294,7 @@ namespace ISLE
 
         // Construct BBT = this * (this)^T, defaults to col-major
         BBT.resize(vocab_size(), vocab_size());
-        FPTYPE_gemm(CblasColMajor, CblasNoTrans, CblasTrans,
+        FPgemm(CblasColMajor, CblasNoTrans, CblasTrans,
             (MKL_INT)vocab_size(), (MKL_INT)vocab_size(), (MKL_INT)num_docs(),
             1.0, data(), (MKL_INT)vocab_size(), data(), (MKL_INT)vocab_size(),
             0.0, BBT.data(), vocab_size());
@@ -328,14 +328,14 @@ namespace ISLE
         assert(U_Spectra.rows() == vocab_size() && U_Spectra.cols() == num_topics);
 
         std::cout << "\nFrob(U_Spectra) in dense: "
-            << FPTYPE_dot((size_t)vocab_size() * (size_t)num_topics, U_Spectra.data(), 1, U_Spectra.data(), 1) << "\n\n";
+            << FPdot((size_t)vocab_size() * (size_t)num_topics, U_Spectra.data(), 1, U_Spectra.data(), 1) << "\n\n";
 
         std::cout << "Eigvals:  ";
         for (docsSz_t t = 0; t < num_topics; ++t)
             std::cout << "(" << t << "): " << std::sqrt(evalues(t)) << "\t";
         std::cout << std::endl;
 
-        FPTYPE_gemm(CblasColMajor, CblasTrans, CblasNoTrans,
+        FPgemm(CblasColMajor, CblasTrans, CblasNoTrans,
             num_topics, num_docs(), vocab_size(),
             (FPTYPE)1.0, U_Spectra.data(), vocab_size(), this->data(), vocab_size(),
             (FPTYPE)0.0, spectraSigmaVT, num_topics);
@@ -397,7 +397,7 @@ namespace ISLE
         assert(!U_Spectra.IsRowMajor);
         assert(U_Spectra.rows() == vocab_size());
         assert(ld_in >= (docsSz_t)U_Spectra.cols());
-        FPTYPE_gemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
+        FPgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
             (MKL_INT)vocab_size(), (MKL_INT)ncols, (MKL_INT)U_Spectra.cols(),
             (FPTYPE)1.0, U_Spectra.data(), (MKL_INT)vocab_size(), in, (MKL_INT)ld_in,
             (FPTYPE)0.0, out, (MKL_INT)U_Spectra.rows());
@@ -482,7 +482,7 @@ namespace ISLE
                 = from.Sigma[s] * from.VT[(size_t)d * (size_t)num_singular_vals + (size_t)s];
 
         //  U[_ X k] *  (Sigma[1:k]) * VT[k X _])
-        FPTYPE_gemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
+        FPgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
             vocab_size(), num_docs(), k, 1.0,
             from.U, vocab_size(), SigmaVT, k, 0.0, this->data(), vocab_size());
         delete[] SigmaVT;
@@ -494,9 +494,9 @@ namespace ISLE
         const FPTYPE *const center)
     {
         const FPTYPE *const pt = data() + (size_t)d * (size_t)vocab_size();
-        return FPTYPE_dot(vocab_size(), pt, 1, pt, 1)
-            + FPTYPE_dot(vocab_size(), center, 1, center, 1)
-            - 2 * FPTYPE_dot(vocab_size(), pt, 1, center, 1);
+        return FPdot(vocab_size(), pt, 1, pt, 1)
+            + FPdot(vocab_size(), center, 1, center, 1)
+            - 2 * FPdot(vocab_size(), pt, 1, center, 1);
     }
 
     template<class FPTYPE>
@@ -513,15 +513,15 @@ namespace ISLE
             std::fill_n(ones_vec, num_docs > num_centers ? num_docs : num_centers, (FPTYPE)1.0);
             ones_vec_alloc = true;
         }
-        FPTYPE_gemm(CblasColMajor, CblasTrans, CblasNoTrans,
+        FPgemm(CblasColMajor, CblasTrans, CblasNoTrans,
             num_centers, num_docs, dim,
             (FPTYPE)-2.0, centers, dim, docs, dim,
             (FPTYPE)0.0, dist_matrix, num_centers);
-        FPTYPE_gemm(CblasColMajor, CblasNoTrans, CblasTrans,
+        FPgemm(CblasColMajor, CblasNoTrans, CblasTrans,
             num_centers, num_docs, 1,
             (FPTYPE)1.0, centers_l2sq, num_centers, ones_vec, num_docs,
             (FPTYPE)1.0, dist_matrix, num_centers);
-        FPTYPE_gemm(CblasColMajor, CblasNoTrans, CblasTrans,
+        FPgemm(CblasColMajor, CblasNoTrans, CblasTrans,
             num_centers, num_docs, 1,
             (FPTYPE)1.0, ones_vec, num_centers, docs_l2sq, num_docs,
             (FPTYPE)1.0, dist_matrix, num_centers);
@@ -546,7 +546,7 @@ namespace ISLE
             num_docs, docs, docs_l2sq,
             dist_matrix, ones_vec);
         pfor_static_131072(int64_t d = 0; d < num_docs; ++d) {
-            FPTYPE min = FPTYPE_MAX;
+            FPTYPE min = FP_MAX;
             for (docsSz_t c = 0; c < num_centers; ++c)
                 if (dist_matrix[(size_t)c + (size_t)d * (size_t)num_centers] < min)
                     min = dist_matrix[(size_t)c + (size_t)d * (size_t)num_centers];
@@ -580,7 +580,7 @@ namespace ISLE
         assert(dist != NULL);
         FPTYPE* center_l2sq = new FPTYPE[num_centers];
         for (auto c = 0; c < num_centers; ++c)
-            center_l2sq[c] = FPTYPE_dot(dim,
+            center_l2sq[c] = FPdot(dim,
                 centers + (size_t)c * (size_t)dim, 1,
                 centers + (size_t)c * (size_t)dim, 1);
         distsq_alldocs_to_centers(dim,
@@ -596,7 +596,7 @@ namespace ISLE
                 // TODO: Fix Ugly round about for small distance errors;
             }
             else {
-                FPTYPE min = FPTYPE_MAX;
+                FPTYPE min = FP_MAX;
                 for (docsSz_t c = 0; c < num_centers; ++c)
                     if (dist[(size_t)c + (size_t)d * (size_t)num_centers] < min)
                         min = dist[(size_t)c + (size_t)d * (size_t)num_centers];
@@ -622,17 +622,17 @@ namespace ISLE
         FPTYPE *const centers_coords = new FPTYPE[(size_t)k * (size_t)vocab_size()];
         std::vector<FPTYPE> dist_cumul(num_docs() + 1);
 
-        FPTYPE_scal((size_t)k * (size_t)vocab_size(), 0.0, centers_coords, 1);
-        std::fill_n(min_dist, num_docs(), FPTYPE_MAX);
+        FPscal((size_t)k * (size_t)vocab_size(), 0.0, centers_coords, 1);
+        std::fill_n(min_dist, num_docs(), FP_MAX);
         centers.push_back((docsSz_t)((size_t)rand() * (size_t)84619573 % (size_t)num_docs()));
-        centers_l2sq[0] = FPTYPE_dot(vocab_size(),
+        centers_l2sq[0] = FPdot(vocab_size(),
             data() + (size_t)centers[0] * (size_t)vocab_size(), 1,
             data() + (size_t)centers[0] * (size_t)vocab_size(), 1);
-        //FPTYPE_blascopy (vocab_size(), data() + (size_t)centers[0] * (size_t)vocab_size(), 1, centers_coords, 1);
+        //FPblascopy (vocab_size(), data() + (size_t)centers[0] * (size_t)vocab_size(), 1, centers_coords, 1);
         memcpy(centers_coords, data() + (size_t)centers[0] * (size_t)vocab_size(), sizeof(FPTYPE)*vocab_size());
 
         pfor_static_131072(int d = 0; d < num_docs(); ++d)
-            docs_l2sq[d] = FPTYPE_dot(vocab_size(),
+            docs_l2sq[d] = FPdot(vocab_size(),
                 data() + (size_t)d * (size_t)vocab_size(), 1,
                 data() + (size_t)d * (size_t)vocab_size(), 1);
 
@@ -660,10 +660,10 @@ namespace ISLE
             docsSz_t new_center = (docsSz_t)(std::upper_bound(dist_cumul.begin(), dist_cumul.end(), dice_throw)
                 - 1 - dist_cumul.begin());
             assert(new_center < num_docs());
-            centers_l2sq[centers.size()] = FPTYPE_dot(vocab_size(),
+            centers_l2sq[centers.size()] = FPdot(vocab_size(),
                 data() + (size_t)new_center * (size_t)vocab_size(), 1,
                 data() + (size_t)new_center * (size_t)vocab_size(), 1);
-            //FPTYPE_blascopy(vocab_size(), data() + (size_t)new_center * (size_t)vocab_size(), 1,
+            //FPblascopy(vocab_size(), data() + (size_t)new_center * (size_t)vocab_size(), 1,
             //			centers_coords + centers.size() * (size_t)vocab_size(), 1);
             memcpy(centers_coords + centers.size() * (size_t)vocab_size(),
                 data() + (size_t)new_center * (size_t)vocab_size(), sizeof(FPTYPE) * vocab_size());
@@ -697,16 +697,16 @@ namespace ISLE
         FPTYPE *const min_dist = new FPTYPE[num_docs()];
         FPTYPE *const centers_coords = new FPTYPE[(size_t)max_centers*(size_t)vocab_size()];
 
-        FPTYPE_scal((size_t)max_centers * (size_t)vocab_size(), 0.0, centers_coords, 1);
-        std::fill_n(min_dist, num_docs(), FPTYPE_MAX);
+        FPscal((size_t)max_centers * (size_t)vocab_size(), 0.0, centers_coords, 1);
+        std::fill_n(min_dist, num_docs(), FP_MAX);
         centers.push_back((docsSz_t)((size_t)rand() * (size_t)84619573 % (size_t)num_docs()));
-        centers_l2sq[0] = FPTYPE_dot(vocab_size(),
+        centers_l2sq[0] = FPdot(vocab_size(),
             data() + (size_t)centers[0] * (size_t)vocab_size(), 1,
             data() + (size_t)centers[0] * (size_t)vocab_size(), 1);
         memcpy(centers_coords, data() + (size_t)centers[0] * (size_t)vocab_size(), sizeof(FPTYPE) * vocab_size());
 
         pfor_static_131072(int d = 0; d < num_docs(); ++d)
-            docs_l2sq[d] = FPTYPE_dot(vocab_size(),
+            docs_l2sq[d] = FPdot(vocab_size(),
                 data() + (size_t)d * (size_t)vocab_size(), 1,
                 data() + (size_t)d * (size_t)vocab_size(), 1);
 
@@ -717,10 +717,10 @@ namespace ISLE
             num_docs(), data(), docs_l2sq, min_dist, NULL, ones_vec);
         docsSz_t old_num_centers = 1;
         for (count_t round = 0; round < KMEANSBB_R && centers.size() < max_centers; ++round) {
-            auto total_min_dist = FPTYPE_asum(num_docs(), min_dist, 1);
+            auto total_min_dist = FPasum(num_docs(), min_dist, 1);
             for (docsSz_t doc = 0; doc < num_docs() && centers.size() < max_centers; ++doc) {
                 if (rand_fraction() < KMEANSBB_L * min_dist[doc] / total_min_dist) {
-                    centers_l2sq[centers.size()] = FPTYPE_dot(vocab_size(),
+                    centers_l2sq[centers.size()] = FPdot(vocab_size(),
                         data() + (size_t)doc * (size_t)vocab_size(), 1,
                         data() + (size_t)doc * (size_t)vocab_size(), 1);
                     memcpy(centers_coords + centers.size() * (size_t)vocab_size(),
@@ -747,7 +747,7 @@ namespace ISLE
                 data() + (size_t)c * (size_t)vocab_size(), sizeof(FPTYPE) * vocab_size());
 
         for (docsSz_t c = 0; c < centers.size(); ++c)
-            centers_l2sq[c] = FPTYPE_dot(vocab_size(),
+            centers_l2sq[c] = FPdot(vocab_size(),
                 CentersMtx.data() + (size_t)c * (size_t)vocab_size(), 1,
                 CentersMtx.data() + (size_t)c * (size_t)vocab_size(), 1);
         docsSz_t doc_batch_size = 8192;
@@ -763,7 +763,7 @@ namespace ISLE
 
             for (docsSz_t d = 0; d < this_batch_size; ++d)
                 closest_center[d + batch * doc_batch_size]
-                = (docsSz_t)FPTYPE_imin(centers.size(), dist_matrix + (size_t)d*centers.size(), 1);
+                = (docsSz_t)FPimin(centers.size(), dist_matrix + (size_t)d*centers.size(), 1);
         }
 
         std::vector<size_t> center_weights(centers.size(), 0);
@@ -804,17 +804,17 @@ namespace ISLE
         std::vector<FPTYPE> dist_cumul(num_docs() + 1);
 
         std::fill_n(ones_vec, num_docs(), (FPTYPE)1.0);
-        std::fill_n(init_prob, num_docs(), FPTYPE_MAX);
-        FPTYPE_scal((size_t)k * (size_t)vocab_size(), 0.0, centers_coords, 1);
+        std::fill_n(init_prob, num_docs(), FP_MAX);
+        FPscal((size_t)k * (size_t)vocab_size(), 0.0, centers_coords, 1);
 
         centers.push_back((docsSz_t)((size_t)rand() * (size_t)84619573 % (size_t)num_docs()));
-        centers_l2sq[0] = FPTYPE_dot(vocab_size(),
+        centers_l2sq[0] = FPdot(vocab_size(),
             data() + (size_t)centers[0] * (size_t)vocab_size(), 1,
             data() + (size_t)centers[0] * (size_t)vocab_size(), 1);
         memcpy(centers_coords, data() + (size_t)centers[0] * (size_t)vocab_size(), sizeof(FPTYPE) * vocab_size());
 
         pfor_static_131072(int d = 0; d < num_docs(); ++d)
-            docs_l2sq[d] = FPTYPE_dot(vocab_size(),
+            docs_l2sq[d] = FPdot(vocab_size(),
                 data() + (size_t)d * (size_t)vocab_size(), 1,
                 data() + (size_t)d * (size_t)vocab_size(), 1);
 
@@ -822,7 +822,7 @@ namespace ISLE
         auto refresh_rate = 1;
         while (centers.size() < k)
         {
-            FPTYPE_axpy(num_docs(), -1 / (2 * num_docs()), ones_vec, 1, init_prob, 1);
+            FPaxpy(num_docs(), -1 / (2 * num_docs()), ones_vec, 1, init_prob, 1);
             update_min_distsq_to_centers(vocab_size(),
                 centers.size() - num_centers_processed,
                 centers_coords + (size_t)num_centers_processed * (size_t)vocab_size(),
@@ -832,7 +832,7 @@ namespace ISLE
                 centers.size(), centers_coords, centers_l2sq,
                 num_docs(), data(), docs_l2sq,
                 init_prob);*/
-            FPTYPE_axpy(num_docs(), 1 / (2 * num_docs()), ones_vec, 1, init_prob, 1);
+            FPaxpy(num_docs(), 1 / (2 * num_docs()), ones_vec, 1, init_prob, 1);
             dist_cumul[0] = 0;
             for (docsSz_t doc = 0; doc < num_docs(); ++doc)
                 dist_cumul[doc + 1] = dist_cumul[doc] + init_prob[doc];
@@ -891,7 +891,7 @@ namespace ISLE
         std::vector<docsSz_t>&	best_seed,   // Wont be initialized if method==KMEANSBB
         FPTYPE *const			best_centers_coords) // Wont be initialized if null
     {
-        FPTYPE min_total_dist_to_centers = FPTYPE_MAX;
+        FPTYPE min_total_dist_to_centers = FP_MAX;
         int best_rep;
 
         if (method == KMEANSBB) {
@@ -967,14 +967,14 @@ namespace ISLE
         dist_cumul[0] = 0;
 
         std::fill_n(centers_coords, (size_t)k * (size_t)k, (FPTYPE)0.0);
-        std::fill_n(min_dist, num_docs(), FPTYPE_MAX);
+        std::fill_n(min_dist, num_docs(), FP_MAX);
         centers.push_back((docsSz_t)((size_t)rand() * (size_t)84619573 % (size_t)num_docs()));
-        centers_l2sq[0] = FPTYPE_dot((MKL_INT)k,
+        centers_l2sq[0] = FPdot((MKL_INT)k,
             SigmaVT + (size_t)centers[0] * (size_t)k, 1,
             SigmaVT + (size_t)centers[0] * (size_t)k, 1);
         memcpy(centers_coords, SigmaVT + (size_t)centers[0] * (size_t)k, sizeof(FPTYPE) * (size_t)k);
         for (docsSz_t d = 0; d < num_docs(); ++d)
-            docs_l2sq[d] = FPTYPE_dot((MKL_INT)k, SigmaVT + (size_t)d * (size_t)k, 1, SigmaVT + (size_t)d * (size_t)k, 1);
+            docs_l2sq[d] = FPdot((MKL_INT)k, SigmaVT + (size_t)d * (size_t)k, 1, SigmaVT + (size_t)d * (size_t)k, 1);
 
         while (centers.size() < k) {
             update_min_distsq_to_centers((MKL_INT)k,
@@ -992,7 +992,7 @@ namespace ISLE
             auto dice_throw = dist_cumul[num_docs()] * rand_fraction();
             docsSz_t new_center = (docsSz_t)(std::upper_bound(dist_cumul.begin(), dist_cumul.end(), dice_throw)
                 - 1 - dist_cumul.begin());
-            centers_l2sq[centers.size()] = FPTYPE_dot((MKL_INT)k,
+            centers_l2sq[centers.size()] = FPdot((MKL_INT)k,
                 SigmaVT + (size_t)new_center * (size_t)k, 1,
                 SigmaVT + (size_t)new_center * (size_t)k, 1);
             memcpy(centers_coords + centers.size() * (size_t)k,
@@ -1017,13 +1017,13 @@ namespace ISLE
     {
         FPTYPE *const centers_l2sq = new FPTYPE[num_centers];
         for (docsSz_t c = 0; c < num_centers; ++c)
-            centers_l2sq[c] = FPTYPE_dot(vocab_size(),
+            centers_l2sq[c] = FPdot(vocab_size(),
                 centers + (size_t)c * (size_t)vocab_size(), 1,
                 centers + (size_t)c * (size_t)vocab_size(), 1);
         distsq_alldocs_to_centers(vocab_size(), num_centers, centers, centers_l2sq,
             num_docs(), data(), docs_l2sq, dist_matrix);
         pfor_static_131072(int d = 0; d < num_docs(); ++d)
-            center_index[d] = (docsSz_t)FPTYPE_imin(num_centers, dist_matrix + (size_t)d * (size_t)num_centers, 1);
+            center_index[d] = (docsSz_t)FPimin(num_centers, dist_matrix + (size_t)d * (size_t)num_centers, 1);
         delete[] centers_l2sq;
     }
 
@@ -1033,9 +1033,9 @@ namespace ISLE
         FPTYPE* p2_coords,
         vocabSz_t dim)
     {
-        return FPTYPE_dot(dim, p1_coords, 1, p1_coords, 1)
-            + FPTYPE_dot(dim, p2_coords, 1, p2_coords, 1)
-            - 2 * FPTYPE_dot(dim, p1_coords, 1, p2_coords, 1);
+        return FPdot(dim, p1_coords, 1, p1_coords, 1)
+            + FPdot(dim, p2_coords, 1, p2_coords, 1)
+            - 2 * FPdot(dim, p1_coords, 1, p2_coords, 1);
     }
 
     template<class FPTYPE>
@@ -1043,7 +1043,7 @@ namespace ISLE
     {
         assert(docs_l2sq != NULL);
         pfor_static_131072(int d = 0; d < num_docs(); ++d)
-            docs_l2sq[d] = FPTYPE_dot(vocab_size(), data() + d*vocab_size(), 1,
+            docs_l2sq[d] = FPdot(vocab_size(), data() + d*vocab_size(), 1,
                 data() + d*vocab_size(), 1);
     }
 
@@ -1074,17 +1074,17 @@ namespace ISLE
                 closest_docs[c].clear();
         for (docsSz_t d = 0; d < num_docs(); ++d)
             closest_docs[closest_center[d]].push_back(d);
-        FPTYPE_scal((size_t)num_centers * (size_t)vocab_size(), 0.0, centers, 1);
+        FPscal((size_t)num_centers * (size_t)vocab_size(), 0.0, centers, 1);
         timer.next_time_secs("lloyds: assign pts to centers", 30);
 
         pfor_dynamic_16(int c = 0; c < num_centers; ++c)
             if (weighted)
                 for (auto iter = closest_docs[c].begin(); iter != closest_docs[c].end(); ++iter)
-                    FPTYPE_axpy(vocab_size(), (FPTYPE)(weights[*iter]) / closest_docs[c].size(),
+                    FPaxpy(vocab_size(), (FPTYPE)(weights[*iter]) / closest_docs[c].size(),
                         data() + (*iter)*vocab_size(), 1, centers + (size_t)c * (size_t)vocab_size(), 1);
             else
                 for (auto iter = closest_docs[c].begin(); iter != closest_docs[c].end(); ++iter)
-                    FPTYPE_axpy(vocab_size(), (FPTYPE)(1.0) / closest_docs[c].size(),
+                    FPaxpy(vocab_size(), (FPTYPE)(1.0) / closest_docs[c].size(),
                         data() + (*iter)*vocab_size(), 1, centers + (size_t)c * (size_t)vocab_size(), 1);
         timer.next_time_secs("lloyds: average pts ", 30);
 
