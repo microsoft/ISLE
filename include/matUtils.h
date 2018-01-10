@@ -12,7 +12,7 @@ namespace ISLE
     class MKL_SpSpTrProd
     {
         FPTYPE		*vals_CSC;
-        vocabSz_t	*rows_CSC;
+        word_id_t	*rows_CSC;
         offset_t	*offsets_CSC;
         bool		 is_offsets_CSC_alloc; // true when nrows>ncols
 
@@ -46,7 +46,7 @@ namespace ISLE
         uint64_t	num_op_calls;
     public:
         MKL_SpSpTrProd(
-            FPTYPE *vals_CSC_, vocabSz_t *rows_CSC_, offset_t *offsets_CSC_,
+            FPTYPE *vals_CSC_, word_id_t *rows_CSC_, offset_t *offsets_CSC_,
             const Eigen::Index nrows_, const Eigen::Index ncols_, const offset_t nnzs_,
             const bool split_CSR_by_cols_ = false,
             const bool split_CSR_by_rows_ = true,
@@ -58,7 +58,7 @@ namespace ISLE
             split_CSR_by_rows(split_CSR_by_rows_),
             split_CSR_by_cols(split_CSR_by_cols_)
         {
-            assert(sizeof(vocabSz_t) == sizeof(MKL_INT));
+            assert(sizeof(word_id_t) == sizeof(MKL_INT));
             assert(sizeof(offset_t) == sizeof(MKL_INT));
             assert(!(split_CSR_by_rows && split_CSR_by_cols));
 

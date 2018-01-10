@@ -18,10 +18,10 @@ int main(int argv, char **argc) {
     const std::string vocab_file = argc[2]; 
     const std::string output_dir = argc[3];
 
-    const vocabSz_t	vocab_size = atol(argc[4]);
-    const docsSz_t	num_docs = atol(argc[5]);
+    const word_id_t	vocab_size = atol(argc[4]);
+    const doc_id_t	num_docs = atol(argc[5]);
     const offset_t	max_entries = atol(argc[6]);
-    const docsSz_t	num_topics = atol(argc[7]);
+    const doc_id_t	num_topics = atol(argc[7]);
 
     const bool sample = atoi(argc[8]);
     const FPTYPE sample_rate = atoi(argc[9]);

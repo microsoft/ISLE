@@ -6,10 +6,10 @@
 namespace ISLE
 {
     ISLETrainer::ISLETrainer(
-        const vocabSz_t		vocab_size_,
-        const docsSz_t		num_docs_,
+        const word_id_t		vocab_size_,
+        const doc_id_t		num_docs_,
         const offset_t		max_entries_,
-        const docsSz_t		num_topics_,
+        const doc_id_t		num_topics_,
         const bool			flag_sample_docs_,
         const FPTYPE		sample_rate_,
         const data_ingest	how_data_loaded_,
@@ -145,8 +145,8 @@ namespace ISLE
     }
 
     void ISLETrainer::feed_data(
-            const docsSz_t doc,
-            const vocabSz_t *const words,
+            const doc_id_t doc,
+            const word_id_t *const words,
             const count_t *const counts,
             const offset_t num_words)
     {
@@ -166,7 +166,7 @@ namespace ISLE
     {
         assert(is_data_loaded == false);
 
-        std::sort(			// Sort by doc first, and word second.
+        parallel_sort(			// Sort by doc first, and word second.
             entries.begin(), entries.end(),
             [](const auto& l, const auto& r)
         {return (l.doc < r.doc) || (l.doc == r.doc && l.word < r.word); });
@@ -193,9 +193,9 @@ namespace ISLE
 
         A_sp = new SparseMatrix<A_TYPE>(vocab_size, num_docs);
         B_fl_CSC = new FloatingPointSparseMatrix<FPTYPE>(vocab_size, num_docs);
-        catchwords = new std::vector<vocabSz_t>[num_topics];
-        topwords = new std::vector<std::pair<vocabSz_t, FPTYPE> >[num_topics];
-        closest_docs = new std::vector<docsSz_t>[num_topics];
+        catchwords = new std::vector<word_id_t>[num_topics];
+        topwords = new std::vector<std::pair<word_id_t, FPTYPE> >[num_topics];
+        closest_docs = new std::vector<doc_id_t>[num_topics];
         catchword_thresholds = new A_TYPE[(size_t)vocab_size * (size_t)num_topics];
         centers = new FPTYPE[(size_t)num_topics * (size_t)vocab_size];
         Model = new DenseMatrix<FPTYPE>(vocab_size, num_topics);
@@ -217,12 +217,12 @@ namespace ISLE
         //
         //FPTYPE *wordFreq = new FPTYPE[vocab_size];
         //memset(wordFreq, 0, sizeof(FPTYPE)*vocab_size);
-        //for(docsSz_t doc=0; doc < num_docs; ++doc)
+        //for(doc_id_t doc=0; doc < num_docs; ++doc)
         //  for (auto pos = A_sp->offset_CSC(doc); pos < A_sp->offset_CSC(doc+1); pos++)
         //    wordFreq[A_sp->row_CSC(pos)] += A_sp->normalized_val_CSC(pos);
         //std::sort(wordFreq, wordFreq + vocab_size, std::greater<FPTYPE>());
         //FPTYPE total = std::accumulate(wordFreq, wordFreq + vocab_size, (FPTYPE)0.0);
-        //for (vocabSz_t batch = 0; batch < vocab_size/100; ++batch)
+        //for (word_id_t batch = 0; batch < vocab_size/100; ++batch)
         //  std::cout << batch*100 << ":" << (batch+1)*100 << "\t"
         //        << std::accumulate(wordFreq + batch*100, wordFreq + (batch+1)*100, (FPTYPE)0.0)/total << "\t"
         //            << std::accumulate(wordFreq, wordFreq + (batch+1)*100, (FPTYPE)0.0)/total << "\t"
@@ -244,7 +244,7 @@ namespace ISLE
 
     //
     // Create a multiset of top 5 words for each doc
-    // Count how many of these multi-instances occur more than x times
+    // Count the number of these multi-instances occur more than x times
     //
     void ISLETrainer::print_distinct_top_five_sets()
     {
@@ -298,7 +298,7 @@ namespace ISLE
         timer->next_time_secs("Computing thresholds");
         out_log->print_string("Number of entries above threshold: " + std::to_string(new_nnzs) + "\n");
 
-        std::vector<docsSz_t> original_cols;
+        std::vector<doc_id_t> original_cols;
         if (flag_sample_docs) {
             assert(sample_rate > 0.0 && sample_rate < 1.0);
             B_fl_CSC->sampled_threshold_and_copy<A_TYPE>(
@@ -327,9 +327,9 @@ namespace ISLE
         //
         // k-means++ on the column space (Simga*VT) of k-rank approx of B
         //
-        FloatingPointDenseMatrix<FPTYPE> B_spectraSigmaVT_d_fl((vocabSz_t)num_topics, B_fl_CSC->num_docs());
+        FloatingPointDenseMatrix<FPTYPE> B_spectraSigmaVT_d_fl((word_id_t)num_topics, B_fl_CSC->num_docs());
         B_spectraSigmaVT_d_fl.copy_spectraSigmaVT_from(*B_fl, num_topics);
-        std::vector<docsSz_t> best_kmeans_seeds;
+        std::vector<doc_id_t> best_kmeans_seeds;
         if (!ENABLE_KMEANS_ON_LOWD)
             assert(KMEANS_INIT_METHOD == KMEANSPP || KMEANS_INIT_METHOD == KMEANSMCMC);
         int num_centers_lowd = num_topics;
@@ -363,7 +363,7 @@ namespace ISLE
         // Lloyds on B with k-means++ seeds
         //
         if (!ENABLE_KMEANS_ON_LOWD)
-            for (docsSz_t d = 0; d < num_topics; ++d)
+            for (doc_id_t d = 0; d < num_topics; ++d)
                 B_fl->copy_col_to(centers + (size_t)d * (size_t)vocab_size, best_kmeans_seeds[d]);
         if (KMEANS_ALGO_FOR_SPARSE == LLOYDS_KMEANS)
             B_fl->run_lloyds(num_topics, centers, closest_docs, MAX_KMEANS_REPS);
@@ -376,7 +376,7 @@ namespace ISLE
         assert(closest_docs_sizes_sum == B_fl->num_docs());
         timer->next_time_secs("k-means on B");
 
-        for (docsSz_t topic = 0; topic != num_topics; ++topic)
+        for (doc_id_t topic = 0; topic != num_topics; ++topic)
             for (auto d = closest_docs[topic].begin(); d < closest_docs[topic].end(); ++d)
                 *d = original_cols[*d];
 
@@ -407,9 +407,9 @@ namespace ISLE
         //
         // Construct the topic model
         //
-        std::vector<std::tuple<int, int, docsSz_t> > top_topic_pairs;
-        std::vector<std::pair<vocabSz_t, int> > catchword_topics;
-        std::vector<std::tuple<docsSz_t, docsSz_t, FPTYPE> > doc_topic_sum;
+        std::vector<std::tuple<int, int, doc_id_t> > top_topic_pairs;
+        std::vector<std::pair<word_id_t, int> > catchword_topics;
+        std::vector<std::tuple<doc_id_t, doc_id_t, FPTYPE> > doc_topic_sum;
         A_sp->construct_topic_model(
             *Model, num_topics, closest_docs, catchwords,
             AVG_CLUSTER_FOR_CATCHLESS_TOPIC,
@@ -469,11 +469,11 @@ namespace ISLE
         assert(is_training_complete);
 
         DenseMatrix<FPTYPE> AvgModel(vocab_size, num_topics);
-        auto null_catchwords = new std::vector<vocabSz_t>[num_topics];
+        auto null_catchwords = new std::vector<word_id_t>[num_topics];
         A_sp->construct_topic_model(
             AvgModel, num_topics, closest_docs, null_catchwords,
             AVG_CLUSTER_FOR_CATCHLESS_TOPIC);
-        auto nl_top_words = new std::vector<std::pair<vocabSz_t, FPTYPE> >[num_topics];
+        auto nl_top_words = new std::vector<std::pair<word_id_t, FPTYPE> >[num_topics];
         A_sp->topic_coherence(num_topics, DEFAULT_COHERENCE_NUM_WORDS, AvgModel, nl_top_words, nl_coherences);
         avg_nl_coherence = std::accumulate(nl_coherences.begin(), nl_coherences.end(), 0.0) / num_topics;
         out_log->print_string(
@@ -492,7 +492,7 @@ namespace ISLE
         //
         std::ofstream out_top_words_avg;
         out_top_words_avg.open(concat_file_path(log_dir, std::string("TopWordsPerTopic_avg.txt")));
-        for (docsSz_t topic = 0; topic < num_topics; ++topic) {
+        for (doc_id_t topic = 0; topic < num_topics; ++topic) {
             for (auto iter = nl_top_words[topic].begin(); iter < nl_top_words[topic].end(); ++iter)
                 out_top_words_avg << vocab_words[iter->first] << "\t";
             out_top_words_avg << std::endl;
@@ -512,7 +512,7 @@ namespace ISLE
         assert(is_training_complete);
 
         auto avg_topic_vector = new FPTYPE[A_sp->vocab_size()];
-        for (vocabSz_t w = 0; w < Model->vocab_size(); ++w) avg_topic_vector[w] = 0.0;
+        for (word_id_t w = 0; w < Model->vocab_size(); ++w) avg_topic_vector[w] = 0.0;
         for (auto t = 0; t < num_topics; ++t)
             FPaxpy(Model->vocab_size(), 1.0 / num_topics, Model->data() + Model->vocab_size() * (size_t)t, 1,
                 avg_topic_vector, 1);
@@ -542,7 +542,7 @@ namespace ISLE
     {
         assert(is_training_complete);
 
-        for (docsSz_t t = 0; t < num_topics; ++t) {
+        for (doc_id_t t = 0; t < num_topics; ++t) {
             out_log->print_string("\n---------- Topic: " + std::to_string(t)
                 + ", Cluster_size: " + std::to_string(closest_docs[t].size()) + " -----------\n", false);
             out_log->print_catch_words<A_TYPE>(t, catchword_thresholds + (size_t)t * A_sp->vocab_size(),
@@ -592,7 +592,7 @@ namespace ISLE
 
         std::ofstream out_top_words;
         out_top_words.open(concat_file_path(log_dir, std::string("TopWordsPerTopic_catch.txt")));
-        for (docsSz_t topic = 0; topic < num_topics; ++topic) {
+        for (doc_id_t topic = 0; topic < num_topics; ++topic) {
             for (auto iter = topwords[topic].begin(); iter < topwords[topic].end(); ++iter)
                 out_top_words << vocab_words[iter->first] << "\t";
             out_top_words << std::endl;
@@ -605,16 +605,16 @@ namespace ISLE
     // Output document catchword frequencies in 1-based index
     // Output doc-topic catchword sums in 1-based index
     //
-    void ISLETrainer::output_doc_topic(std::vector<std::pair<vocabSz_t, int> >& catchword_topics,
-            std::vector<std::tuple<docsSz_t, docsSz_t, FPTYPE> >& doc_topic_sum)
+    void ISLETrainer::output_doc_topic(std::vector<std::pair<word_id_t, int> >& catchword_topics,
+            std::vector<std::tuple<doc_id_t, doc_id_t, FPTYPE> >& doc_topic_sum)
     {
         assert(is_training_complete);
 
-        /*std::vector<std::pair<vocabSz_t, docsSz_t> > catch_topic;
+        /*std::vector<std::pair<word_id_t, doc_id_t> > catch_topic;
         for (auto topic = 0; topic < num_topics; ++topic)
             for (auto iter = catchwords[topic].begin(); iter < catchwords[topic].end(); ++iter)
             catch_topic.push_back(std::make_pair(*iter, topic));*/
-        std::sort(catchword_topics.begin(), catchword_topics.end(),
+parallel_sort(catchword_topics.begin(), catchword_topics.end(),
             [](const auto& l, const auto& r) {return l.first < r.first; });
         out_log->print_string("Total number of catchwords: " + std::to_string(catchword_topics.size()) + "\n");
 
@@ -628,7 +628,7 @@ namespace ISLE
             Timer DTtimer;
             std::ofstream doc_catch_out;
             doc_catch_out.open(filename);
-            for (docsSz_t doc = 0; doc < A_sp->num_docs(); ++doc) {
+            for (doc_id_t doc = 0; doc < A_sp->num_docs(); ++doc) {
                 auto w_iter = catchword_topics.begin();
                 for (offset_t pos = A_sp->offset_CSC(doc); pos < A_sp->offset_CSC(doc + 1); ++pos) {
                     while (w_iter != catchword_topics.end() && w_iter->first < A_sp->row_CSC(pos))
@@ -654,7 +654,7 @@ namespace ISLE
             std::string filename = concat_file_path(log_dir, std::string("DocTopicCatchwordSums.tsv"));
             std::ofstream doc_topic_out;
             doc_topic_out.open(filename);
-            /*for (vocabSz_t doc = 0; doc < A_sp->num_docs(); ++doc)
+            /*for (word_id_t doc = 0; doc < A_sp->num_docs(); ++doc)
                 for (auto topic = 0; topic < num_topics; ++topic) {
                     if (DocTopic.elem(topic, doc) > 0.0) {
                         doc_topic_out << doc + 1 <<  '\t';
@@ -676,7 +676,7 @@ namespace ISLE
         {
             Timer DTtimer;
             MMappedOutput out(filename);
-            for (docsSz_t doc = 0; doc < A_sp->num_docs(); ++doc) {
+            for (doc_id_t doc = 0; doc < A_sp->num_docs(); ++doc) {
                 auto w_iter = catchword_topics.begin();
                 for (offset_t pos = A_sp->offset_CSC(doc); pos < A_sp->offset_CSC(doc + 1); ++pos) {
                     while (w_iter != catchword_topics.end() && w_iter->first < A_sp->row_CSC(pos))
@@ -701,7 +701,7 @@ namespace ISLE
 
             std::string filename = concat_file_path(log_dir, std::string("DocTopicCatchwordSums.tsv"));
             MMappedOutput out_doc_topic(filename);
-            /*for (vocabSz_t doc = 0; doc < A_sp->num_docs(); ++doc)
+            /*for (word_id_t doc = 0; doc < A_sp->num_docs(); ++doc)
                 for (auto topic = 0; topic < num_topics; ++topic) {
                     if (DocTopic.elem(topic, doc) > 0.0) {
                         out_doc_topic.concat_int(doc + 1, '\t');
@@ -739,9 +739,9 @@ namespace ISLE
     }
 
     void ISLETrainer::print_top_two_topics(
-        std::vector<std::tuple<int, int, docsSz_t> >& top_topic_pairs)
+        std::vector<std::tuple<int, int, doc_id_t> >& top_topic_pairs)
     {
-        std::sort(top_topic_pairs.begin(), top_topic_pairs.end(),
+        parallel_sort(top_topic_pairs.begin(), top_topic_pairs.end(),
             [](const auto& l, const auto& r)
         { return std::get<2>(l) < std::get<2>(r); });
 
@@ -773,9 +773,10 @@ namespace ISLE
     }
 
     void ISLETrainer::construct_edge_topics(
-        std::vector<std::tuple<int, int, docsSz_t> >& top_topic_pairs)
+        std::vector<std::tuple<int, int, doc_id_t> >& top_topic_pairs)
     {
-        std::sort(top_topic_pairs.begin(), top_topic_pairs.end(),
+
+        parallel_sort(top_topic_pairs.begin(), top_topic_pairs.end(),
             [](const auto&l, const auto&r) {return std::get<0>(l) < std::get<0>(r)
             || (std::get<0>(l) == std::get<0>(r) && std::get<1>(l) < std::get<1>(r)); });
         std::cout << "#Top topic pairs for compound topics: " << top_topic_pairs.size() << std::endl;
@@ -789,7 +790,7 @@ namespace ISLE
                 sorted_ctopics.push_back(std::make_tuple(std::get<0>(*iter), std::get<1>(*iter), next_iter - iter));
             iter = next_iter;
         }
-        std::sort(sorted_ctopics.begin(), sorted_ctopics.end(),
+        parallel_sort(sorted_ctopics.begin(), sorted_ctopics.end(),
             [](const auto& l, const auto &r) {return std::get<2>(l) > std::get<2>(r); });
         int running_count = 0; int compound_topic_threshold;
         for (auto iter = sorted_ctopics.begin(); iter != sorted_ctopics.end(); ++iter) {

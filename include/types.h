@@ -21,9 +21,9 @@ namespace ISLE {
     //#define MKL_LP64
     //#define EIGEN_USE_MKL_ALL
 
-    // vocabSz_t and docsSz_t have to be unsigned
-    typedef MKL_UINT vocabSz_t;
-    typedef MKL_UINT docsSz_t;
+    // word_id_t and doc_id_t have to be unsigned
+    typedef MKL_UINT word_id_t;
+    typedef MKL_UINT doc_id_t;
 
     typedef MKL_INT offset_t;
 

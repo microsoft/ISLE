@@ -6,8 +6,8 @@ namespace ISLE
 
     template<class T>
     SparseMatrix<T>::SparseMatrix(
-        const vocabSz_t d,
-        const docsSz_t s,
+        const word_id_t d,
+        const doc_id_t s,
         const offset_t nnzs)
         :
         _vocab_size(d),
@@ -37,7 +37,7 @@ namespace ISLE
 
         _nnzs = nnzs_;
         vals_CSC = new T[get_nnzs()];
-        rows_CSC = new vocabSz_t[get_nnzs()];
+        rows_CSC = new word_id_t[get_nnzs()];
         offsets_CSC = new offset_t[num_docs() + 1];
         // TODO: Wipes vals and normalized_vals, just in case.
     }
@@ -47,8 +47,8 @@ namespace ISLE
     {
         assert(entries.size() < (1 << 31));
         allocate((offset_t)entries.size());
-        docsSz_t doc = 0;
-        vocabSz_t words_in_doc = 0;
+        doc_id_t doc = 0;
+        word_id_t words_in_doc = 0;
         offsets_CSC[0] = 0;
 
         const auto num_entries = entries.size();
@@ -83,7 +83,7 @@ namespace ISLE
     template<class T>
     template<class FPTYPE>
     FPTYPE SparseMatrix<T>::doc_norm(
-        docsSz_t doc,
+        doc_id_t doc,
         std::function<FPTYPE(const FPTYPE&, const FPTYPE&)> norm_fn)
     {
         FPTYPE norm = 0.0;
@@ -134,7 +134,7 @@ namespace ISLE
         assert(min_distinct >= 2);
         std::vector<quintuple<T>> top_five;
         T buf[(1 << 15)];
-        for (docsSz_t doc = 0; doc < num_docs(); ++doc)
+        for (doc_id_t doc = 0; doc < num_docs(); ++doc)
             if (offsets_CSC[doc + 1] - offsets_CSC[doc] >= 5) {
                 for (offset_t pos = offsets_CSC[doc]; pos < offsets_CSC[doc + 1]; ++pos)
                     buf[pos - offsets_CSC[doc]] = normalized_vals_CSC[pos];
@@ -179,13 +179,13 @@ namespace ISLE
     template<class T>
     void SparseMatrix<T>::list_word_freqs_r(
         std::vector<T>* freqs,
-        const docsSz_t d_b,
-        const docsSz_t d_e,
-        const vocabSz_t v_b,
-        const vocabSz_t v_e)
+        const doc_id_t d_b,
+        const doc_id_t d_e,
+        const word_id_t v_b,
+        const word_id_t v_e)
     {
         if (d_e - d_b <= 16 && v_e - v_b <= 128) {
-            for (docsSz_t doc = d_b; doc < d_e; ++doc) {
+            for (doc_id_t doc = d_b; doc < d_e; ++doc) {
                 if (offsets_CSC[doc] != offsets_CSC[doc + 1]) {
                     auto row_b = std::lower_bound(rows_CSC + offsets_CSC[doc], rows_CSC + offsets_CSC[doc + 1], v_b);
                     auto row_e = std::lower_bound(rows_CSC + offsets_CSC[doc], rows_CSC + offsets_CSC[doc + 1], v_e);
@@ -215,12 +215,12 @@ namespace ISLE
     {
         Timer timer;
         assert(freqs != NULL);
-        docsSz_t CHUNK_SIZE = 131072;
+        doc_id_t CHUNK_SIZE = 131072;
         long long num_chunks = num_docs() / CHUNK_SIZE;
         if (num_docs() % CHUNK_SIZE > 0)
             num_chunks++;
         auto freqs_comp = new std::vector<T>*[num_chunks];
-        for (docsSz_t chunk = 0; chunk < num_chunks; ++chunk)
+        for (doc_id_t chunk = 0; chunk < num_chunks; ++chunk)
             freqs_comp[chunk] = new std::vector<T>[vocab_size()];
         timer.next_time_secs("list_freqs: alloc", 30);
 
@@ -232,17 +232,17 @@ namespace ISLE
         timer.next_time_secs("list_freqs: chunks", 30);
 
         //#pragma omp parallel for schedule(dynamic, 128)
-        for (vocabSz_t word = 0; word < vocab_size(); ++word)
-            for (docsSz_t chunk = 0; chunk < num_chunks; ++chunk)
+        for (word_id_t word = 0; word < vocab_size(); ++word)
+            for (doc_id_t chunk = 0; chunk < num_chunks; ++chunk)
                 freqs[word].insert(freqs[word].end(), freqs_comp[chunk][word].begin(),
                     freqs_comp[chunk][word].end());
         timer.next_time_secs("list_freqs: append", 30);
 
-        for (docsSz_t chunk = 0; chunk < num_chunks; ++chunk)
+        for (doc_id_t chunk = 0; chunk < num_chunks; ++chunk)
             delete[] freqs_comp[chunk];
         timer.next_time_secs("list_freqs: dealloc", 30);
 
-        for (vocabSz_t word = 0; word < vocab_size(); ++word)
+        for (word_id_t word = 0; word < vocab_size(); ++word)
             std::sort(freqs[word].begin(), freqs[word].end(), std::greater<>());
         timer.next_time_secs("list_freqs: sort", 30);
     }
@@ -252,7 +252,7 @@ namespace ISLE
     {
         Timer timer;
         auto entries = new DocWordEntry<A_TYPE>[get_nnzs()];
-        for (docsSz_t doc = 0; doc < num_docs(); ++doc) {
+        for (doc_id_t doc = 0; doc < num_docs(); ++doc) {
             for (offset_t pos = offsets_CSC[doc]; pos < offsets_CSC[doc + 1]; ++pos) {
                 entries[pos].count = normalized_vals_CSC[pos];
                 entries[pos].word = rows_CSC[pos];
@@ -262,8 +262,8 @@ namespace ISLE
         timer.next_time_secs("list_word_freqs: copy to arr", 30);
 
 
-        docsSz_t chunk_size = 262144;
-        docsSz_t num_chunks = num_docs() % chunk_size == 0
+        doc_id_t chunk_size = 262144;
+        doc_id_t num_chunks = num_docs() % chunk_size == 0
             ? num_docs() / chunk_size : num_docs() / chunk_size + 1;
 
         pfor_dynamic_1(int64_t chunk = 0; chunk < num_chunks; ++chunk) {
@@ -293,7 +293,7 @@ namespace ISLE
     template<class T>
     offset_t SparseMatrix<T>::compute_thresholds(
         std::vector<T>& zetas,
-        const docsSz_t num_topics)
+        const doc_id_t num_topics)
     {
         auto freqs = new std::vector<A_TYPE>[vocab_size()];
         //list_word_freqs(freqs);
@@ -303,13 +303,13 @@ namespace ISLE
         zetas.resize(vocab_size(), (T)0);
 
         offset_t new_nnzs = 0;
-        vocabSz_t freq_less_words = 0;
+        word_id_t freq_less_words = 0;
 
         // Check:  rounding down vs round to nearest
-        const docsSz_t count_gr = (docsSz_t)(w0_c * (FPTYPE)num_docs() / (2.0 * (FPTYPE)num_topics));
-        const docsSz_t count_eq = (docsSz_t)std::ceil(3.0 * eps1_c * w0_c * (FPTYPE)num_docs() / (FPTYPE)num_topics);
+        const doc_id_t count_gr = (doc_id_t)(w0_c * (FPTYPE)num_docs() / (2.0 * (FPTYPE)num_topics));
+        const doc_id_t count_eq = (doc_id_t)std::ceil(3.0 * eps1_c * w0_c * (FPTYPE)num_docs() / (FPTYPE)num_topics);
 
-        for (vocabSz_t word = 0; word < vocab_size(); ++word) {
+        for (word_id_t word = 0; word < vocab_size(); ++word) {
 
             assert(std::is_sorted(freqs[word].begin(), freqs[word].end(), std::greater<>()));
 
@@ -438,12 +438,12 @@ namespace ISLE
     template<class T>
     void SparseMatrix<T>::rth_highest_element(
         const MKL_UINT r,
-        const std::vector<docsSz_t>& doc_partition,
+        const std::vector<doc_id_t>& doc_partition,
         T *thresholds)
     {
         {
             if (doc_partition.size() == 0) {
-                for (vocabSz_t word = 0; word < vocab_size(); ++word)
+                for (word_id_t word = 0; word < vocab_size(); ++word)
                     thresholds[word] = (T)0.0;
                 return;
             }
@@ -456,7 +456,7 @@ namespace ISLE
                     freqs[rows_CSC[witer]].push_back(normalized_vals_CSC[witer]);
 
             // pfor?
-            for (vocabSz_t word = 0; word < vocab_size(); ++word) {
+            for (word_id_t word = 0; word < vocab_size(); ++word) {
                 if (freqs[word].size() > r) {
                     std::sort(freqs[word].begin(), freqs[word].end(), std::greater<>());
                     thresholds[word] = freqs[word][r - 1];
@@ -479,14 +479,14 @@ namespace ISLE
     // Output: @catchwords: list of catchwords for each topic
     template<class T>
     void SparseMatrix<T>::find_catchwords(
-        const docsSz_t num_topics,
+        const doc_id_t num_topics,
         const T *const thresholds,
-        std::vector<vocabSz_t> *catchwords)
+        std::vector<word_id_t> *catchwords)
     {
-        for (docsSz_t topic = 0; topic < num_topics; ++topic) {
-            for (vocabSz_t word = 0; word < vocab_size(); ++word) {
+        for (doc_id_t topic = 0; topic < num_topics; ++topic) {
+            for (word_id_t word = 0; word < vocab_size(); ++word) {
                 bool is_catchword = false;
-                for (docsSz_t other_topic = 0; other_topic < num_topics; ++other_topic) {
+                for (doc_id_t other_topic = 0; other_topic < num_topics; ++other_topic) {
                     if (topic != other_topic) {
                         is_catchword =
                             ((T)thresholds[word + (size_t)topic* (size_t)vocab_size()]
@@ -504,13 +504,13 @@ namespace ISLE
     template<class T>
     void SparseMatrix<T>::construct_topic_model(
         DenseMatrix<FPTYPE>& Model,
-        const docsSz_t num_topics,
-        const std::vector<docsSz_t> *const closest_docs,
-        const std::vector<vocabSz_t> *const catchwords,
+        const doc_id_t num_topics,
+        const std::vector<doc_id_t> *const closest_docs,
+        const std::vector<word_id_t> *const catchwords,
         bool avg_null_topics,
-        std::vector<std::tuple<int, int, docsSz_t> >* top_topic_pairs,
-        std::vector<std::pair<vocabSz_t, int> >* catchword_topics,
-        std::vector<std::tuple<docsSz_t, docsSz_t, FPTYPE> >*  doc_topic_sum)
+        std::vector<std::tuple<int, int, doc_id_t> >* top_topic_pairs,
+        std::vector<std::pair<word_id_t, int> >* catchword_topics,
+        std::vector<std::tuple<doc_id_t, doc_id_t, FPTYPE> >*  doc_topic_sum)
     {
         Timer timer;
         assert(Model.vocab_size() == vocab_size());
@@ -527,7 +527,7 @@ namespace ISLE
                         for (offset_t pos = offsets_CSC[*d_iter];
                             pos < offsets_CSC[(*d_iter) + 1]; ++pos)
                             Model.elem_ref(rows_CSC[pos], topic) += (FPTYPE)normalized_vals_CSC[pos];
-                    for (vocabSz_t word = 0; word < vocab_size(); ++word)
+                    for (word_id_t word = 0; word < vocab_size(); ++word)
                         Model.elem_ref(word, topic) /= closest_docs[topic].size();
                 }
             }
@@ -537,7 +537,7 @@ namespace ISLE
         bool free_catchword_topics = false;
 
         if (catchword_topics == NULL) {
-            catchword_topics = new std::vector<std::pair<vocabSz_t, int> >;
+            catchword_topics = new std::vector<std::pair<word_id_t, int> >;
             free_catchword_topics = true;
         }
         for (auto topic = 0; topic < num_topics; ++topic)
@@ -546,7 +546,7 @@ namespace ISLE
                     catchword_topics->push_back(std::make_pair(*iter, topic));
         std::sort(catchword_topics->begin(), catchword_topics->end(),
             [](const auto& l, const auto& r) {return l.first < r.first; });
-        vocabSz_t *all_catchwords = new vocabSz_t[catchword_topics->size()];
+        word_id_t *all_catchwords = new word_id_t[catchword_topics->size()];
         int *catchword_topic = new int[catchword_topics->size()];
         int num_catchwords = catchword_topics->size();
         for (auto i = 0; i < num_catchwords; ++i) {
@@ -562,7 +562,7 @@ namespace ISLE
 
         bool free_doc_topic_sum = false;
         if (doc_topic_sum == NULL) {
-            doc_topic_sum = new std::vector<std::tuple<docsSz_t, docsSz_t, FPTYPE> >;
+            doc_topic_sum = new std::vector<std::tuple<doc_id_t, doc_id_t, FPTYPE> >;
             free_doc_topic_sum = true;
         }
         std::vector<size_t> doc_start_index;
@@ -591,9 +591,9 @@ namespace ISLE
                         += normalized_vals_CSC[pos];
                 }
             }
-            for (docsSz_t doc = block * doc_block_size;
+            for (doc_id_t doc = block * doc_block_size;
                 doc < num_docs() && doc < (block + 1) * doc_block_size; ++doc) {
-                for (docsSz_t topic = 0; topic < num_topics; ++topic) {
+                for (doc_id_t topic = 0; topic < num_topics; ++topic) {
                     if (DocTopicSumArray[topic + num_topics * (doc - block*doc_block_size)])
                         doc_topic_sum->push_back(std::make_tuple(doc, topic,
                             DocTopicSumArray[topic + num_topics * (doc - block*doc_block_size)]));
@@ -604,7 +604,7 @@ namespace ISLE
         delete[] DocTopicSumArray;
         timer.next_time_secs("c TM: topic wts in doc", 30);
 
-        for (docsSz_t doc = 0; doc < num_docs(); ++doc) {
+        for (doc_id_t doc = 0; doc < num_docs(); ++doc) {
             if (top_topic_pairs != NULL) {
                 FPTYPE max = 0.0, max2 = 0.0; // second max 
                 int max_topic = -1, max2_topic = -1;
@@ -652,7 +652,7 @@ namespace ISLE
             ? num_docs() / doc_block_size : num_docs() / doc_block_size + 1;
         for (auto topic = 0; topic < num_topics; ++topic)
             for (size_t block = 0; block < num_doc_blocks; ++block)
-                for (docsSz_t doc = block*doc_block_size;
+                for (doc_id_t doc = block*doc_block_size;
                     doc < num_docs() && doc < (block + 1)*doc_block_size; ++doc)
                     sorted_doc_topic_sums[(size_t)doc + (size_t)topic * (size_t)num_docs()]
                     = DocTopicSums.elem(topic, doc);*/
@@ -664,12 +664,12 @@ namespace ISLE
         timer.next_time_secs("c TM: order by topic, value", 30);
 
 
-        const size_t rank_threshold = (docsSz_t)(eps3_c*w0_c*(FPTYPE)num_docs() / ((FPTYPE)num_topics * 2.0));
+        const size_t rank_threshold = (doc_id_t)(eps3_c*w0_c*(FPTYPE)num_docs() / ((FPTYPE)num_topics * 2.0));
         assert(rank_threshold > 0);
         //std::vector<T> model_thresholds(num_topics);
 
-        docsSz_t topic_block_size = 10;
-        docsSz_t num_topic_blocks = num_topics / topic_block_size;
+        doc_id_t topic_block_size = 10;
+        doc_id_t num_topic_blocks = num_topics / topic_block_size;
         if (num_topic_blocks * topic_block_size < num_topics)
             ++num_topic_blocks;
 
@@ -708,12 +708,12 @@ namespace ISLE
                     while (iter < end && std::get<2>(*iter) > model_threshold) {
                         ++iter;
                         ++num_cols_used;
-                        docsSz_t doc = std::get<0>(*iter);
+                        doc_id_t doc = std::get<0>(*iter);
                         for (offset_t pos = offsets_CSC[doc]; pos < offsets_CSC[doc + 1]; ++pos)
                             Model.elem_ref(rows_CSC[pos], topic) += (FPTYPE)normalized_vals_CSC[pos];
                     }
 
-                    for (vocabSz_t word = 0; word < vocab_size(); ++word)
+                    for (word_id_t word = 0; word < vocab_size(); ++word)
                         Model.elem_ref(word, topic) /= num_cols_used;
 
                     iter = end;
@@ -728,7 +728,7 @@ namespace ISLE
         /*pfor_dynamic_1(int topic = 0; topic < num_topics; ++topic) {
             if (catchwords[topic].size() > 0) {
                 int num_cols_used = 0;
-                for (docsSz_t doc = 0; doc < num_docs(); ++doc) {
+                for (doc_id_t doc = 0; doc < num_docs(); ++doc) {
                     if (DocTopicSums.elem(topic, doc) >= model_thresholds[topic]) {
                         num_cols_used++;
                         for (offset_t pos = offsets_CSC[doc]; pos < offsets_CSC[doc + 1]; ++pos)
@@ -736,7 +736,7 @@ namespace ISLE
                     }
                 }
 
-                for (vocabSz_t word = 0; word < vocab_size(); ++word)
+                for (word_id_t word = 0; word < vocab_size(); ++word)
                     Model.elem_ref(word, topic) /= num_cols_used;
             }
         }*/
@@ -755,10 +755,10 @@ namespace ISLE
 
     template<class T>
     void SparseMatrix<T>::topic_coherence(
-        const docsSz_t num_topics,
-        const vocabSz_t& M,
+        const doc_id_t num_topics,
+        const word_id_t& M,
         const DenseMatrix<FPTYPE>& model,
-        std::vector<std::pair<vocabSz_t, FPTYPE> >* top_words,
+        std::vector<std::pair<word_id_t, FPTYPE> >* top_words,
         std::vector<FPTYPE>& coherences,
         const FPTYPE coherence_eps)
     {
@@ -776,7 +776,7 @@ namespace ISLE
         for (auto topic = 0; topic < num_topics; ++topic) {
             if (top_words[topic].size() > 1)
                 pfor_dynamic_8192(long long word = 0; word < M; ++word)
-                for (vocabSz_t word2 = 0; word2 < word; ++word2) {
+                for (word_id_t word2 = 0; word2 < word; ++word2) {
                     assert(doc_freqs[topic][word2] > 0);
                     coherences[topic]
                         += (FPTYPE)std::log(joint_doc_freqs[topic][word][word2] + coherence_eps)
@@ -789,7 +789,7 @@ namespace ISLE
     template<class T>
     void SparseMatrix<T>::compute_joint_doc_frequency(
         const int num_topics,
-        const std::vector<std::pair<vocabSz_t, FPTYPE> >* top_words,
+        const std::vector<std::pair<word_id_t, FPTYPE> >* top_words,
         std::vector<std::vector<std::vector<size_t> > >& joint_counts)
         const
     {
@@ -801,7 +801,7 @@ namespace ISLE
         for (auto topic = 0; topic < num_topics; ++topic) {
             joint_counts[topic].resize(top_words[topic].size());
 
-            for (vocabSz_t word = 0; word < top_words[topic].size(); ++word) {
+            for (word_id_t word = 0; word < top_words[topic].size(); ++word) {
                 assert(joint_counts[topic][word].size() == 0);
                 joint_counts[topic][word].resize(word, 0);
             }
@@ -809,10 +809,10 @@ namespace ISLE
 
         if (!use_parallel_version)
         { // Serial version
-            for (docsSz_t doc = 0; doc < num_docs(); ++doc)
+            for (doc_id_t doc = 0; doc < num_docs(); ++doc)
                 for (auto topic = 0; topic < num_topics; ++topic)
-                    for (vocabSz_t w1 = 0; w1 < top_words[topic].size(); ++w1)
-                        for (vocabSz_t w2 = 0; w2 < w1; ++w2)
+                    for (word_id_t w1 = 0; w1 < top_words[topic].size(); ++w1)
+                        for (word_id_t w2 = 0; w2 < w1; ++w2)
                             if (normalized(top_words[topic][w1].first, doc) > 0
                                 && normalized(top_words[topic][w2].first, doc) > 0)
                                 ++joint_counts[topic][w1][w2];
@@ -831,7 +831,7 @@ namespace ISLE
                 for (auto topic = 0; topic < num_topics; ++topic) {
                     joint_counts_chunks[chunk][topic].resize(top_words[topic].size());
 
-                    for (vocabSz_t word = 0; word < top_words[topic].size(); ++word) {
+                    for (word_id_t word = 0; word < top_words[topic].size(); ++word) {
                         assert(joint_counts_chunks[chunk][topic][word].size() == 0);
                         joint_counts_chunks[chunk][topic][word].resize(word, 0);
                     }
@@ -842,22 +842,22 @@ namespace ISLE
                 for (int64_t doc = chunk*chunk_size;
                     doc < num_docs() && doc < (chunk + 1)*chunk_size; ++doc)
                     for (auto topic = 0; topic < num_topics; ++topic)
-                        for (vocabSz_t w1 = 0; w1 < top_words[topic].size(); ++w1)
-                            for (vocabSz_t w2 = 0; w2 < w1; ++w2)
+                        for (word_id_t w1 = 0; w1 < top_words[topic].size(); ++w1)
+                            for (word_id_t w2 = 0; w2 < w1; ++w2)
                                 if (normalized(top_words[topic][w1].first, doc) > 0
                                     && normalized(top_words[topic][w2].first, doc) > 0)
                                     ++joint_counts_chunks[chunk][topic][w1][w2];
 
             for (size_t chunk = 0; chunk < num_chunks; ++chunk)
                 for (auto topic = 0; topic < num_topics; ++topic)
-                    for (vocabSz_t w1 = 0; w1 < top_words[topic].size(); ++w1)
-                        for (vocabSz_t w2 = 0; w2 < w1; ++w2)
+                    for (word_id_t w1 = 0; w1 < top_words[topic].size(); ++w1)
+                        for (word_id_t w2 = 0; w2 < w1; ++w2)
                             joint_counts[topic][w1][w2]
                             += joint_counts_chunks[chunk][topic][w1][w2];
         }
 
         for (auto topic = 0; topic < num_topics; ++topic)
-            for (vocabSz_t word = 0; word < top_words[topic].size(); ++word)
+            for (word_id_t word = 0; word < top_words[topic].size(); ++word)
                 assert(joint_counts[topic][word].size() == word);
 
         /*for (auto pos = offsets_CSC[doc]; pos != offsets_CSC[doc + 1]; ++pos)
@@ -869,7 +869,7 @@ namespace ISLE
     template<class T>
     void SparseMatrix<T>::compute_doc_frequency(
         const int num_topics,
-        const std::vector<std::pair<vocabSz_t, FPTYPE> >* top_words,
+        const std::vector<std::pair<word_id_t, FPTYPE> >* top_words,
         std::vector<std::vector<size_t> >& doc_frequencies)
         const
     {
@@ -886,7 +886,7 @@ namespace ISLE
         { // Use Serial version
             for (int64_t doc = 0; doc < num_docs(); ++doc)
                 for (auto topic = 0; topic < num_topics; ++topic)
-                    for (vocabSz_t word = 0; word < top_words[topic].size(); ++word)
+                    for (word_id_t word = 0; word < top_words[topic].size(); ++word)
                         if (normalized(top_words[topic][word].first, doc) > (T)0.0)
                             doc_frequencies[topic][word]++;
         }
@@ -911,13 +911,13 @@ namespace ISLE
                 for (int64_t doc = chunk*chunk_size;
                     doc < num_docs() && doc < (chunk + 1)*chunk_size; ++doc)
                     for (auto topic = 0; topic < num_topics; ++topic)
-                        for (vocabSz_t word = 0; word < top_words[topic].size(); ++word)
+                        for (word_id_t word = 0; word < top_words[topic].size(); ++word)
                             if (normalized(top_words[topic][word].first, doc) > (T)0.0)
                                 doc_frequencies_chunks[chunk][topic][word]++;
 
             for (size_t chunk = 0; chunk < num_chunks; ++chunk)
                 for (auto topic = 0; topic < num_topics; ++topic)
-                    for (vocabSz_t word = 0; word < top_words[topic].size(); ++word)
+                    for (word_id_t word = 0; word < top_words[topic].size(); ++word)
                         doc_frequencies[topic][word] +=
                         doc_frequencies_chunks[chunk][topic][word];
         }
@@ -940,7 +940,7 @@ namespace ISLE
                 doc_word_count[doc] += (int)val_CSC(pos);
         }
         int max_words_per_doc = 0;
-        for (docsSz_t doc = 0; doc < num_docs(); ++doc) {
+        for (doc_id_t doc = 0; doc < num_docs(); ++doc) {
             if (max_words_per_doc < doc_word_count[doc])
                 max_words_per_doc = doc_word_count[doc];
         }
@@ -966,7 +966,7 @@ namespace ISLE
     // FloatingPointSparseMatrix
 
     template<class FPTYPE>
-    FloatingPointSparseMatrix<FPTYPE>::FloatingPointSparseMatrix(const vocabSz_t d, const docsSz_t s)
+    FloatingPointSparseMatrix<FPTYPE>::FloatingPointSparseMatrix(const word_id_t d, const doc_id_t s)
         : SparseMatrix<FPTYPE>(d, s),
         spectraSigmaVT(NULL)
     {}
@@ -996,7 +996,7 @@ namespace ISLE
             memcpy(vals_CSC, from.vals_CSC, (size_t)_nnzs * sizeof(FPTYPE));
             memcpy(normalized_vals_CSC, from.normalized_vals_CSC, (size_t)_nnzs * sizeof(FPTYPE));
         }
-        memcpy(rows_CSC, from.rows_CSC, (size_t)_nnzs * sizeof(vocabSz_t));
+        memcpy(rows_CSC, from.rows_CSC, (size_t)_nnzs * sizeof(word_id_t));
         memcpy(offsets_CSC, from.offsets_CSC, ((size_t)num_docs() + 1) * sizeof(offset_t));
     }
 
@@ -1016,7 +1016,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    FloatingPointSparseMatrix<FPTYPE>::WordDocPair::WordDocPair(const vocabSz_t& word_, const docsSz_t& doc_)
+    FloatingPointSparseMatrix<FPTYPE>::WordDocPair::WordDocPair(const word_id_t& word_, const doc_id_t& doc_)
     : word(word_), doc(doc_)
     {}
 
@@ -1036,7 +1036,7 @@ namespace ISLE
         assert(word_offsets.size() == 0);
 
         entries.reserve(get_nnzs());
-        for (docsSz_t doc = 0; doc < num_docs(); ++doc)
+        for (doc_id_t doc = 0; doc < num_docs(); ++doc)
             for (offset_t pos = offsets_CSC[doc]; pos < offsets_CSC[doc + 1]; ++pos)
                 entries.push_back(WordDocPair(rows_CSC[pos], doc));
         assert(entries.size() == get_nnzs());
@@ -1046,7 +1046,7 @@ namespace ISLE
         {return (l.word < r.word) || (l.word == r.word && l.doc < r.doc); });
 
         // Find word offsets
-        for (vocabSz_t word = 0; word < vocab_size(); ++word)
+        for (word_id_t word = 0; word < vocab_size(); ++word)
             word_offsets.push_back(
                 std::lower_bound(entries.begin(), entries.end(), WordDocPair(word, 0),
                     [](const auto& l, const auto& r) {return l.word < r.word; })
@@ -1055,14 +1055,14 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::initialize_for_Spectra(const docsSz_t num_topics)
+    void FloatingPointSparseMatrix<FPTYPE>::initialize_for_Spectra(const doc_id_t num_topics)
     {
         spectraSigmaVT = new FPTYPE[(size_t)num_topics * (size_t)num_docs()];
     }
 
     template<class FPTYPE>
     void FloatingPointSparseMatrix<FPTYPE>::compute_truncated_Spectra(
-        const docsSz_t num_topics,
+        const doc_id_t num_topics,
         Eigen::Matrix<FPTYPE,
         Eigen::Dynamic, 1>& evalues)
     {
@@ -1090,7 +1090,7 @@ namespace ISLE
         //FPomatcopy(CblasColMajor, 'T', vocab_size(), num_topics,
         //	1.0, U_Spectra.data(), vocab_size(), U_rowm, num_topics);
         // TODO: Improve this
-        for (vocabSz_t r = 0; r < vocab_size(); ++r)
+        for (word_id_t r = 0; r < vocab_size(); ++r)
             for (auto c = 0; c < num_topics; ++c)
                 U_rowm[(size_t)c + (size_t)r * (size_t)num_topics]
                 = U_Spectra.data()[(size_t)r + (size_t)c * (size_t)vocab_size()];
@@ -1110,7 +1110,7 @@ namespace ISLE
         FPTYPE alpha = 1.0; FPTYPE beta = 0.0;
 
         assert(sizeof(MKL_INT) == sizeof(offset_t));
-        assert(sizeof(vocabSz_t) == sizeof(MKL_INT));
+        assert(sizeof(word_id_t) == sizeof(MKL_INT));
         assert(sizeof(offset_t) == sizeof(MKL_INT));
 
         FPcsrmm(&transa, &m, &n, &k, &alpha, matdescra,
@@ -1140,7 +1140,7 @@ namespace ISLE
         const SparseMatrix<fromT>& from,
         const std::vector<fromT>& zetas,
         const offset_t nnzs,
-        std::vector<docsSz_t>& original_cols)
+        std::vector<doc_id_t>& original_cols)
     {
         assert(vocab_size() == from.vocab_size() && num_docs() == from.num_docs());
         assert(original_cols.size() == 0); assert(zetas.size() == vocab_size());
@@ -1150,9 +1150,9 @@ namespace ISLE
         allocate(nnzs + extra);
         offsets_CSC[0] = 0;
         offset_t pos = 0, this_pos = 0;
-        docsSz_t nz_docs = 0;
+        doc_id_t nz_docs = 0;
 
-        for (docsSz_t doc = 0; doc < num_docs(); ++doc) {
+        for (doc_id_t doc = 0; doc < num_docs(); ++doc) {
             for (offset_t pos = from.offsets_CSC[doc]; pos < from.offsets_CSC[doc + 1]; ++pos) {
                 fromT val;
                 if (std::is_same<fromT, FPTYPE>::value)
@@ -1196,7 +1196,7 @@ namespace ISLE
         const SparseMatrix<fromT>& from,
         const std::vector<fromT>& zetas,
         const offset_t nnzs,
-        std::vector<docsSz_t>& original_cols,
+        std::vector<doc_id_t>& original_cols,
         const FPTYPE sample_rate)
     {
         assert(vocab_size() == from.vocab_size() && num_docs() == from.num_docs());
@@ -1208,7 +1208,7 @@ namespace ISLE
         allocate(nnzs + extra);
         offsets_CSC[0] = 0;
         offset_t pos = 0, this_pos = 0;
-        docsSz_t nz_docs = 0;
+        doc_id_t nz_docs = 0;
 
         auto doc_weights = new FPTYPE[from.num_docs()];
         FPscal(from.num_docs(), 0.0, doc_weights, 1);
@@ -1239,7 +1239,7 @@ namespace ISLE
         auto pivot = dice[(size_t)(sample_rate*(FPTYPE)from.num_docs())];
         std::cout << "sampling docs: pivot: " << pivot << std::endl;
 
-        for (docsSz_t doc = 0; doc < num_docs(); ++doc) {
+        for (doc_id_t doc = 0; doc < num_docs(); ++doc) {
             if (doc_weights[doc] >= pivot) {
                 for (offset_t pos = from.offsets_CSC[doc]; pos < from.offsets_CSC[doc + 1]; ++pos) {
                     fromT val;
@@ -1279,12 +1279,12 @@ namespace ISLE
     void FloatingPointSparseMatrix<FPTYPE>::left_multiply_by_U_Spectra(
         FPTYPE *const out,
         const FPTYPE *in,
-        const docsSz_t ld_in,
-        const docsSz_t ncols)
+        const doc_id_t ld_in,
+        const doc_id_t ncols)
     {
         assert(!U_Spectra.IsRowMajor);
         assert(U_Spectra.rows() == vocab_size());
-        assert(ld_in >= (docsSz_t)U_Spectra.cols());
+        assert(ld_in >= (doc_id_t)U_Spectra.cols());
         FPgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
             (MKL_INT)vocab_size(), (MKL_INT)ncols, (MKL_INT)U_Spectra.cols(),
             (FPTYPE)1.0, U_Spectra.data(), (MKL_INT)vocab_size(), in, (MKL_INT)ld_in,
@@ -1294,7 +1294,7 @@ namespace ISLE
     template<class FPTYPE>
     void FloatingPointSparseMatrix<FPTYPE>::copy_col_to(
         FPTYPE *const dst,
-        const docsSz_t doc) const
+        const doc_id_t doc) const
     {
         FPscal(vocab_size(), 0.0, dst, 1);
         for (auto witer = offsets_CSC[doc]; witer < offsets_CSC[doc + 1]; ++witer)
@@ -1304,7 +1304,7 @@ namespace ISLE
     // pt must have at least vocab_size() entries
     template<class FPTYPE>
     inline FPTYPE FloatingPointSparseMatrix<FPTYPE>::distsq_doc_to_pt(
-        const docsSz_t doc,
+        const doc_id_t doc,
         const FPTYPE *const pt,
         const FPTYPE pt_l2sq) const
     {
@@ -1319,7 +1319,7 @@ namespace ISLE
 
     template<class FPTYPE>
     inline FPTYPE FloatingPointSparseMatrix<FPTYPE>::distsq_normalized_doc_to_pt(
-        const docsSz_t doc,
+        const doc_id_t doc,
         const FPTYPE *const pt,
         const FPTYPE pt_l2sq) const
     {
@@ -1334,8 +1334,8 @@ namespace ISLE
 
     template<class FPTYPE>
     void FloatingPointSparseMatrix<FPTYPE>::distsq_alldocs_to_centers(
-        const vocabSz_t dim,
-        docsSz_t num_centers,
+        const word_id_t dim,
+        doc_id_t num_centers,
         const FPTYPE *const centers,
         const FPTYPE *const centers_l2sq,
         const FPTYPE *const docs_l2sq,
@@ -1355,7 +1355,7 @@ namespace ISLE
 
 
             // Improve this
-        for (vocabSz_t r = 0; r < vocab_size(); ++r)
+        for (word_id_t r = 0; r < vocab_size(); ++r)
             for (auto c = 0; c < num_centers; ++c)
                 centers_tr[(size_t)c + (size_t)r * (size_t)num_centers]
                 = centers[(size_t)r + (size_t)c * (size_t)vocab_size()];
@@ -1385,15 +1385,15 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::closest_centers(const docsSz_t num_centers,
+    void FloatingPointSparseMatrix<FPTYPE>::closest_centers(const doc_id_t num_centers,
         const FPTYPE *const centers,
         const FPTYPE *const docs_l2sq,
-        docsSz_t *center_index,
+        doc_id_t *center_index,
         FPTYPE *const dist_matrix) // Initialized to num_centers*num_docs() size 
     {
         // Need to parallelize
         FPTYPE *const centers_l2sq = new FPTYPE[num_centers];
-        for (docsSz_t c = 0; c < num_centers; ++c)
+        for (doc_id_t c = 0; c < num_centers; ++c)
             centers_l2sq[c] = FPdot(vocab_size(),
                 centers + (size_t)c * (size_t)vocab_size(), 1,
                 centers + (size_t)c * (size_t)vocab_size(), 1);
@@ -1401,32 +1401,32 @@ namespace ISLE
         distsq_alldocs_to_centers(vocab_size(), num_centers, centers, centers_l2sq,
             docs_l2sq, dist_matrix);
         pfor_static_131072(int64_t d = 0; d < num_docs(); ++d)
-            center_index[d] = (docsSz_t)FPimin(num_centers, dist_matrix + (size_t)d * (size_t)num_centers, 1);
+            center_index[d] = (doc_id_t)FPimin(num_centers, dist_matrix + (size_t)d * (size_t)num_centers, 1);
         delete[] centers_l2sq;
     }
 
     template<class FPTYPE>
     FPTYPE FloatingPointSparseMatrix<FPTYPE>::lloyds_iter(
-        const docsSz_t num_centers,
+        const doc_id_t num_centers,
         FPTYPE *centers,
         const FPTYPE *const docs_l2sq,
-        std::vector<docsSz_t> *closest_docs,
+        std::vector<doc_id_t> *closest_docs,
         bool compute_residual)
     {
         Timer timer;
         bool return_doc_partition = (closest_docs != NULL);
 
         FPTYPE *dist_matrix = new FPTYPE[(size_t)num_centers * (size_t)num_docs()];
-        docsSz_t *const closest_center = new docsSz_t[num_docs()];
+        doc_id_t *const closest_center = new doc_id_t[num_docs()];
         closest_centers(num_centers, centers, docs_l2sq, closest_center, dist_matrix);
         timer.next_time_secs("lloyd: closest center", 30);
 
         if (closest_docs == NULL)
-            closest_docs = new std::vector<docsSz_t>[num_centers];
+            closest_docs = new std::vector<doc_id_t>[num_centers];
         else
-            for (docsSz_t c = 0; c < num_centers; ++c)
+            for (doc_id_t c = 0; c < num_centers; ++c)
                 closest_docs[c].clear();
-        for (docsSz_t d = 0; d < num_docs(); ++d)
+        for (doc_id_t d = 0; d < num_docs(); ++d)
             closest_docs[closest_center[d]].push_back(d);
         FPscal((size_t)num_centers * (size_t)vocab_size(), 0.0, centers, 1);
         timer.next_time_secs("lloyd: init centers", 30);
@@ -1448,7 +1448,7 @@ namespace ISLE
             std::vector<FPTYPE> residuals(nchunks*BUF_PAD, 0.0);
 
             pfor(int chunk = 0; chunk < nchunks; ++chunk)
-                for (docsSz_t d = chunk*CHUNK_SIZE; d < num_docs() && d < (chunk + 1)*CHUNK_SIZE; ++d)
+                for (doc_id_t d = chunk*CHUNK_SIZE; d < num_docs() && d < (chunk + 1)*CHUNK_SIZE; ++d)
                     residuals[chunk*BUF_PAD] += distsq_doc_to_pt(d, centers + (size_t)closest_center[d] * (size_t)vocab_size());
 
             for (int chunk = 0; chunk < nchunks; ++chunk)
@@ -1475,9 +1475,9 @@ namespace ISLE
 
     template<class FPTYPE>
     FPTYPE FloatingPointSparseMatrix<FPTYPE>::run_lloyds(
-        const docsSz_t			num_centers,
+        const doc_id_t			num_centers,
         FPTYPE					*centers,
-        std::vector<docsSz_t>	*closest_docs, // Pass NULL if you dont want closest_docs
+        std::vector<doc_id_t>	*closest_docs, // Pass NULL if you dont want closest_docs
         const int				max_reps)
     {
         FPTYPE residual;
@@ -1487,13 +1487,13 @@ namespace ISLE
             for (int center = 0; center < num_centers; ++center)
                 assert(closest_docs[center].size() == 0);
         else
-            closest_docs = new std::vector<docsSz_t>[num_centers];
+            closest_docs = new std::vector<doc_id_t>[num_centers];
 
         FPTYPE *docs_l2sq = new FPTYPE[num_docs()];
         compute_docs_l2sq(docs_l2sq);
 
         std::vector<size_t> prev_cl_sizes(num_centers, 0);
-        auto prev_closest_docs = new std::vector<docsSz_t>[num_centers];
+        auto prev_closest_docs = new std::vector<doc_id_t>[num_centers];
 
         Timer timer;
         for (int i = 0; i < max_reps; ++i) {
@@ -1537,9 +1537,9 @@ namespace ISLE
     // Output: @closest_docs: if NULL, nothing is returned; is !NULL, return partition of docs between centers
     template<class FPTYPE>
     FPTYPE FloatingPointSparseMatrix<FPTYPE>::run_elkans(
-        const docsSz_t			num_centers,
+        const doc_id_t			num_centers,
         FPTYPE					*centers,
-        std::vector<docsSz_t>	*closest_docs, // Pass NULL if you dont want closest_docs
+        std::vector<doc_id_t>	*closest_docs, // Pass NULL if you dont want closest_docs
         const int				max_reps)
     {
         Timer   timer;
@@ -1550,7 +1550,7 @@ namespace ISLE
             for (int center = 0; center < num_centers; ++center)
                 assert(closest_docs[center].size() == 0);
         else
-            closest_docs = new std::vector<docsSz_t>[num_centers];
+            closest_docs = new std::vector<doc_id_t>[num_centers];
         assert(closest_docs != NULL);
 
         /*
@@ -1564,7 +1564,7 @@ namespace ISLE
         FPTYPE   *const ub_distsq = new FPTYPE[num_docs()];
         FPTYPE   *const lb_distsq_matrix = new FPTYPE[(size_t)num_centers * (size_t)num_docs()];
         FPTYPE   *const centers_distsq = new FPTYPE[(size_t)num_centers * (size_t)num_centers];
-        docsSz_t *const closest_center = new docsSz_t[num_docs()];
+        doc_id_t *const closest_center = new doc_id_t[num_docs()];
         FPTYPE	 *const centers_l2sq = new FPTYPE[num_centers];
 
         timer.next_time_secs("Elkan: Alloc", 30);
@@ -1573,8 +1573,8 @@ namespace ISLE
         closest_centers(num_centers, centers, docs_l2sq, closest_center, lb_distsq_matrix);
         //pfor_static_131072 (auto doc = 0; doc < num_docs(); ++doc)
         //	ub_distsq[doc] = distsq_doc_to_pt(doc, centers + vocab_size() * closest_center[doc]);
-        auto nearest_docs = new std::vector<docsSz_t>[num_centers];
-        for (docsSz_t doc = 0; doc < num_docs(); ++doc)
+        auto nearest_docs = new std::vector<doc_id_t>[num_centers];
+        for (doc_id_t doc = 0; doc < num_docs(); ++doc)
             nearest_docs[closest_center[doc]].push_back(doc);
         pfor_dynamic_16(auto c = 0; c < num_centers; ++c) {
             centers_l2sq[c] = FPdot(vocab_size(),
@@ -1630,8 +1630,8 @@ namespace ISLE
             // (a) Compute d(x, c(x)) and update u(x) = d(x, c(x)).
             // (b) If d(x,c(x)) > l(x,c) or d(x,c(x)) > 1/2 * d(c(x),c), compute d(x,c).
             //              Now, if d(x,c) < d(x,c(x)), then assign c(x)=c & update u(x) = d(x,c(x)).
-            auto nearest_docs = new std::vector<docsSz_t>[num_centers];
-            for (docsSz_t doc = 0; doc < num_docs(); ++doc)
+            auto nearest_docs = new std::vector<doc_id_t>[num_centers];
+            for (doc_id_t doc = 0; doc < num_docs(); ++doc)
                 nearest_docs[closest_center[doc]].push_back(doc);
             pfor_dynamic_16(auto c = 0; c < num_centers; ++c)
                 for (auto diter = nearest_docs[c].begin(); diter != nearest_docs[c].end(); ++diter)
@@ -1640,11 +1640,11 @@ namespace ISLE
             delete[] nearest_docs;
 
 
-            auto doc_batch_size = (docsSz_t)131072;
+            auto doc_batch_size = (doc_id_t)131072;
             auto num_doc_batches = divide_round_up(num_docs(), doc_batch_size);
-            auto moving_docs = new std::vector<docsSz_t>[num_doc_batches];
+            auto moving_docs = new std::vector<doc_id_t>[num_doc_batches];
             pfor_dynamic_1(auto batch = 0; batch < num_doc_batches; ++batch)
-                for (docsSz_t doc = batch*doc_batch_size;
+                for (doc_id_t doc = batch*doc_batch_size;
                     doc < (batch + 1)*doc_batch_size && doc < num_docs(); ++doc) {
                 auto distsq_to_current_center = ub_distsq[doc];
                 auto c = closest_center[doc];
@@ -1660,7 +1660,7 @@ namespace ISLE
                     moving_docs[batch].push_back(doc);
             }
             size_t moved_docs = 0;
-            for (docsSz_t b = 0; b < num_doc_batches; ++b) moved_docs += moving_docs[b].size();
+            for (doc_id_t b = 0; b < num_doc_batches; ++b) moved_docs += moving_docs[b].size();
             std::cout << "\n#Docs moved: " << moved_docs << "\n";
             timer.next_time_secs("Elkan: Finding moving docs", 30);
 
@@ -1669,7 +1669,7 @@ namespace ISLE
                 for (auto diter = moving_docs[batch].begin(); diter != moving_docs[batch].end(); ++diter)
                     buffer_sz += offset_CSC(*diter + 1) - offset_CSC(*diter);
                 auto buffer_vals_CSC = new FPTYPE[buffer_sz];
-                auto buffer_rows_CSC = new vocabSz_t[buffer_sz];
+                auto buffer_rows_CSC = new word_id_t[buffer_sz];
                 auto buffer_offsets_CSC = new offset_t[moving_docs[batch].size() + 1];
                 auto buffer_dist_matrix = new FPTYPE[moving_docs[batch].size() * (size_t)num_centers];
                 buffer_offsets_CSC[0] = 0;
@@ -1679,7 +1679,7 @@ namespace ISLE
                     memcpy(buffer_vals_CSC + buffer_offsets_CSC[i],
                         vals_CSC + offset_CSC(doc), sizeof(FPTYPE) * (size_t)num_nnzs);
                     memcpy(buffer_rows_CSC + buffer_offsets_CSC[i],
-                        rows_CSC + offset_CSC(doc), sizeof(vocabSz_t) * (size_t)num_nnzs);
+                        rows_CSC + offset_CSC(doc), sizeof(word_id_t) * (size_t)num_nnzs);
                     buffer_offsets_CSC[i + 1] = buffer_offsets_CSC[i] + num_nnzs;
                 }
 
@@ -1694,7 +1694,7 @@ namespace ISLE
                 std::fill_n(ones_vec, m > n ? m : n, (FPTYPE)1.0);
 
                 FPTYPE *centers_tr = new FPTYPE[(size_t)n*(size_t)vocab_size()];
-                for (vocabSz_t r = 0; r < vocab_size(); ++r)
+                for (word_id_t r = 0; r < vocab_size(); ++r)
                     for (auto c = 0; c < n; ++c)
                         centers_tr[(size_t)c + (size_t)r * (size_t)n]
                         = centers[(size_t)r + (size_t)c * (size_t)vocab_size()];
@@ -1728,9 +1728,9 @@ namespace ISLE
 
 
             // 4. Let m(c) be the mean of points assigned to center c.
-            for (docsSz_t c = 0; c < num_centers; ++c)
+            for (doc_id_t c = 0; c < num_centers; ++c)
                 closest_docs[c].clear();
-            for (docsSz_t doc = 0; doc < num_docs(); ++doc)
+            for (doc_id_t doc = 0; doc < num_docs(); ++doc)
                 closest_docs[closest_center[doc]].push_back(doc);
 
             auto new_centers = new FPTYPE[(size_t)vocab_size()*(size_t)num_centers];
@@ -1793,13 +1793,13 @@ template void ISLE::FloatingPointSparseMatrix<float>::threshold_and_copy(
     const SparseMatrix<float>& from,
     const std::vector<float>& zetas,
     const offset_t nnzs,
-    std::vector<docsSz_t>& original_cols
+    std::vector<doc_id_t>& original_cols
 );
 
 template void ISLE::FloatingPointSparseMatrix<float>::sampled_threshold_and_copy(
     const SparseMatrix<float>& from,
     const std::vector<float>& zetas,
     const offset_t nnzs,
-    std::vector<docsSz_t>& original_cols,
+    std::vector<doc_id_t>& original_cols,
     const FPTYPE sample_rate
 );

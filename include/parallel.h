@@ -31,6 +31,7 @@
 
 #if defined(LINUX)
 #include <cilk/cilk.h>
+
 #define pfor			cilk_for
 #define pfor_static_256		cilk_for
 #define pfor_static_1024	cilk_for
@@ -42,6 +43,10 @@
 #define pfor_dynamic_8192	cilk_for
 #define pfor_dynamic_65536	cilk_for
 #define pfor_dynamic_131072	cilk_for
+
+#include <parallel/algorithm>
+
+#define parallel_sort __gnu_parallel::sort
 
 #elif defined(_MSC_VER)
 #include <omp.h>
@@ -58,6 +63,8 @@
 #define pfor_dynamic_131072	__pragma(omp parallel for schedule(dynamic, 131072)) for
 #define cilk_spawn
 #define cilk_sync
+
+#define parallel_sort std::sort
 
 #else
 assert(false);

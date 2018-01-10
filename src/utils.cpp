@@ -6,7 +6,7 @@
 void ISLE::create_vocab_list(
     const std::string& vocab_file,
     std::vector<std::string>& words,
-    const vocabSz_t max_words)
+    const word_id_t max_words)
 {
     assert(words.size() == 0);
     std::ifstream in(vocab_file, std::ifstream::in);
@@ -26,7 +26,7 @@ void ISLE::create_vocab_list(
 
 
 std::string ISLE::log_dir_name(
-    const docsSz_t num_topics,
+    const doc_id_t num_topics,
     const std::string& output_path_base,
     const bool& sample_docs,
     const FPTYPE& sample_rate)

@@ -20,8 +20,8 @@ namespace ISLE
 
     void load_model_from_sparse_file(
         FPTYPE* model_by_word,
-        const docsSz_t num_topics,
-        const vocabSz_t vocab_size,
+        const doc_id_t num_topics,
+        const word_id_t vocab_size,
         const std::string& model_file,
         const unsigned base = 1);
 
@@ -38,9 +38,9 @@ namespace ISLE
 
     class ISLEInfer
     {
-        vocabSz_t vocab_size;
-        docsSz_t num_topics;
-        docsSz_t num_docs;
+        word_id_t vocab_size;
+        doc_id_t num_topics;
+        doc_id_t num_docs;
 
         const SparseMatrix<FPTYPE> *const infer_data;
 
@@ -59,13 +59,13 @@ namespace ISLE
         ISLEInfer(
             const FPTYPE *const model_by_word_,
             const SparseMatrix<FPTYPE> *const infer_data_,
-            const docsSz_t num_topics_,
-            const vocabSz_t vocab_size_,
-            const docsSz_t num_docs_);
+            const doc_id_t num_topics_,
+            const word_id_t vocab_size_,
+            const doc_id_t num_docs_);
         ~ISLEInfer();
 
         FPTYPE infer_doc_in_file(
-            docsSz_t doc,
+            doc_id_t doc,
             FPTYPE* w,
             const int iters,
             const FPTYPE Lfguess);

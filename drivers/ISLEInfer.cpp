@@ -22,9 +22,9 @@ int main(int argv, char**argc)
     const std::string infer_file = std::string(argc[2]);
     const std::string output_dir = std::string(argc[3]);
 
-    const docsSz_t num_topics = atol(argc[4]);
-    const vocabSz_t vocab_size = atol(argc[5]);
-    const docsSz_t num_docs = atol(argc[6]);
+    const doc_id_t num_topics = atol(argc[4]);
+    const word_id_t vocab_size = atol(argc[5]);
+    const doc_id_t num_docs = atol(argc[6]);
     const offset_t max_entries = atol(argc[7]);
     const offset_t M_hat_catch_sparse_entries = atol(argc[8]);
 
@@ -35,9 +35,9 @@ int main(int argv, char**argc)
     const std::string infer_file = "C:\\Users\\HARSHASI\\Source\\Repos\\ISLE\\ISLETrain\\data\\Pudmed_Vocab140762_TrainDocs500k\\TrainData500K.VocabIndex1.tsvd";
     const std::string output_dir = "C:\\Users\\HARSHASI\\Source\\Repos\\ISLE\\ISLETrain\\data\\Pudmed_Vocab140762_TrainDocs500k";
 
-    const docsSz_t num_topics = 500;
-    const vocabSz_t vocab_size = 140762;
-    const docsSz_t num_docs = 500000;
+    const doc_id_t num_topics = 500;
+    const word_id_t vocab_size = 140762;
+    const doc_id_t num_docs = 500000;
     const offset_t max_entries = 22666049;
     const offset_t M_hat_catch_sparse_entries = 6204485;
 
@@ -82,10 +82,10 @@ int main(int argv, char**argc)
     infer_data->populate_CSC(entries);
     infer_data->normalize_docs(true, true);
 
-    docsSz_t doc_block_size = 100000;
+    doc_id_t doc_block_size = 100000;
     int64_t num_blocks = divide_round_up(num_docs, doc_block_size);
     auto llhs = new FPTYPE[num_docs];
-    auto nconverged = new docsSz_t[num_blocks];
+    auto nconverged = new doc_id_t[num_blocks];
 
     pfor(int64_t block = 0; block < num_blocks; ++block) {
         nconverged[block] = 0;
@@ -96,7 +96,7 @@ int main(int argv, char**argc)
             + std::string("_Lf_") + std::to_string(Lfguess))
             + std::string("_block_") + std::to_string(block));
         FPTYPE* wts = new FPTYPE[num_topics];
-        for (docsSz_t doc = block*doc_block_size; doc < (block + 1)*doc_block_size && doc < num_docs; ++doc) {
+        for (doc_id_t doc = block*doc_block_size; doc < (block + 1)*doc_block_size && doc < num_docs; ++doc) {
             if (doc % 10000 == 9999)
                 std::cout << "docs inferred: [" 
                 << (((int64_t)doc - (int64_t)10000) > (int64_t)(block*doc_block_size) ? ((int64_t)doc - (int64_t)10000) : block*doc_block_size)
@@ -106,7 +106,7 @@ int main(int argv, char**argc)
             if (llhs[doc] != 0.0)
                 nconverged[block]++;
             else std::cout << "Doc: " << doc << "failed to converge" << std::endl;
-            for (docsSz_t topic = 0; topic < num_topics; ++topic)
+            for (doc_id_t topic = 0; topic < num_topics; ++topic)
                 out.concat_float(llhs[doc] == 0.0 ? 1.0 / (FPTYPE)num_topics : wts[topic], '\t', 1, 8);
             out.add_endline();
         }

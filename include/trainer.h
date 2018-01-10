@@ -34,10 +34,10 @@ namespace ISLE
     //
     class ISLETrainer
     {
-        vocabSz_t			vocab_size;
-        docsSz_t			num_docs;
+        word_id_t			vocab_size;
+        doc_id_t			num_docs;
         const offset_t		max_entries;
-        const docsSz_t		num_topics;
+        const doc_id_t		num_topics;
         const std::string	input_file;
         const std::string	vocab_file;
         const std::string	output_path_base;
@@ -75,13 +75,13 @@ namespace ISLE
 
         std::vector<std::string> vocab_words;
 
-        std::vector<vocabSz_t>* catchwords;
-        std::vector<std::pair<vocabSz_t, FPTYPE> >* topwords;
+        std::vector<word_id_t>* catchwords;
+        std::vector<std::pair<word_id_t, FPTYPE> >* topwords;
 
         DenseMatrix<FPTYPE>* Model;
         DenseMatrix<FPTYPE>* EdgeModel;
 
-        std::vector<docsSz_t> *closest_docs;
+        std::vector<doc_id_t> *closest_docs;
         A_TYPE* catchword_thresholds;
         FPTYPE* centers;
 
@@ -89,10 +89,10 @@ namespace ISLE
         enum data_ingest { FILE_DATA_LOAD, ITERATIVE_DATA_LOAD };
 
         ISLETrainer(
-            const vocabSz_t		vocab_size_,        // If vocab_size_==0, #words initialized from dataset, keep below 2^31
-            const docsSz_t		num_docs_,          // If num_docs_==0,   #docs initialized from dataset, keep below 2^31
+            const word_id_t		vocab_size_,        // If vocab_size_==0, #words initialized from dataset, keep below 2^31
+            const doc_id_t		num_docs_,          // If num_docs_==0,   #docs initialized from dataset, keep below 2^31
             const offset_t		max_entries_,       // Maximum number of non-zero doc-word counts. If 0, read unlimited #entries
-            const docsSz_t		num_topics_,        // Number of topics you want to extract
+            const doc_id_t		num_topics_,        // Number of topics you want to extract
             const bool			sample_docs_,       // Pick a subset of documents for SVD after thresholding
             const FPTYPE		sample_rate_,       // If sampling, specify sample rate in (0, 1]
             const data_ingest	how_data_loaded_,   // Has data been loaded from file or fed point by point
@@ -120,8 +120,8 @@ namespace ISLE
         // Feed a document, i.e., list of words and their counts
         //
         inline void feed_data(
-            const docsSz_t doc,
-            const vocabSz_t *const words,
+            const doc_id_t doc,
+            const word_id_t *const words,
             const count_t *const counts,
             const offset_t num_words);
 
@@ -188,8 +188,8 @@ namespace ISLE
         // Output doc-topic catchword sums in 1-based index
         //
         void output_doc_topic(
-            std::vector<std::pair<vocabSz_t, int> >& catchword_topics,
-            std::vector<std::tuple<docsSz_t, docsSz_t,
+            std::vector<std::pair<word_id_t, int> >& catchword_topics,
+            std::vector<std::tuple<doc_id_t, doc_id_t,
             FPTYPE> >& doc_topic_sum);
 
         void get_basic_model(FPTYPE *const basicModel);
@@ -208,12 +208,12 @@ namespace ISLE
         // Find Top Two topics for each doc and print them to file
         //
         void print_top_two_topics(
-            std::vector<std::tuple<int, int, docsSz_t> >& top_topic_pairs);
+            std::vector<std::tuple<int, int, doc_id_t> >& top_topic_pairs);
 
         //
         // Compute edge topics based on the list of top-2 topics for each file
         //
         void construct_edge_topics(
-            std::vector<std::tuple<int, int, docsSz_t> >& top_topic_pairs);
+            std::vector<std::tuple<int, int, doc_id_t> >& top_topic_pairs);
     };
 }
