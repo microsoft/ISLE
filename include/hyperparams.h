@@ -55,6 +55,8 @@ namespace ISLE
 #define DEFAULT_COHERENCE_NUM_WORDS 5
 
 #define EDGE_TOPIC_MIN_DOCS 2
+
+#define EDGE_TOPIC_PRIMARY_RATIO 0.9
 }
 
 /*

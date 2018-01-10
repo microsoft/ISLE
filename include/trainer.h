@@ -47,7 +47,7 @@ namespace ISLE
         const bool	        flag_compute_distinct_top_five_sets;
         const bool	        flag_compute_avg_coherence;
         const bool	        flag_construct_edge_topics;
-        const int	        max_compound_topics;
+        const int	        max_edge_topics;
         const bool	        flag_print_doctopic;
         const bool          flag_print_top_two_topics;
 
@@ -103,7 +103,7 @@ namespace ISLE
             const bool	compute_distinct_top_five_sets_ = false, // Compute how many distinct quintuplets of words occur as top five in a doc
             const bool	compute_avg_coherence_ = false,          // Compute the average coherence of the topics, relevant constants in hyperparams.h
             const bool	construct_edge_topics_ = false,          // Construct edge topics (aka compound topics) from simple topics
-            const int	max_compound_topics_ = 100000,           // Maximum number of edge topics
+            const int	max_edge_topics_ = 100000,           // Maximum number of edge topics
             const bool	print_doctopic_ = false,                 // How many of each topic's catchwords are in a doc?
             const bool  print_top_two_topics_ = true);
 
@@ -213,7 +213,10 @@ namespace ISLE
         //
         // Compute edge topics based on the list of top-2 topics for each file
         //
-        void construct_edge_topics(
+        void construct_edge_topics_v1(
+            std::vector<std::tuple<int, int, doc_id_t> >& top_topic_pairs);
+
+        void construct_edge_topics_v2(
             std::vector<std::tuple<int, int, doc_id_t> >& top_topic_pairs);
     };
 }
