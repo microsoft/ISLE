@@ -137,7 +137,9 @@ namespace ISLE
             << std::setw(15) << std::left << "#Docs" << num_docs << "\n"
             << std::setw(15) << std::left << "#Topics" << num_topics << "\n"
             << std::setw(15) << std::left << "Sampling?" << flag_sample_docs << "\n"
-            << std::setw(15) << std::left << "Sample rate" << sample_rate << "\n";
+            << std::setw(15) << std::left << "Sample rate" << sample_rate << "\n"
+            << std::setw(15) << std::left << "Edge topics?" << flag_construct_edge_topics << "\n"
+            << std::setw(15) << std::left << "#Edge topics" << max_edge_topics << std::endl;
         out_log->print_stringstream(data_size_stream);
         timer->next_time_secs("Reading file Entries");
 
@@ -807,10 +809,10 @@ namespace ISLE
 
         parallel_sort(sorted_ctopics.begin(), sorted_ctopics.end(),
             [](const auto& l, const auto &r) {return std::get<2>(l) > std::get<2>(r); });
-        int running_count = 0; int compound_topic_threshold;
+        int running_count = 0; int edge_topic_threshold;
         for (auto iter = sorted_ctopics.begin(); iter != sorted_ctopics.end(); ++iter) {
             if (++running_count > max_edge_topics) {
-                compound_topic_threshold = std::get<2>(*iter);
+                edge_topic_threshold = std::get<2>(*iter);
                 break;
             }
         }
@@ -821,7 +823,7 @@ namespace ISLE
             auto next_iter = std::upper_bound(iter, top_topic_pairs.end(), *iter,
                 [](const auto&l, const auto&r) {return std::get<0>(l) < std::get<0>(r)
                 || (std::get<0>(l) == std::get<0>(r) && std::get<1>(l) < std::get<1>(r)); });
-            if (next_iter - iter >= EDGE_TOPIC_MIN_DOCS && next_iter - iter >= compound_topic_threshold)
+            if (next_iter - iter >= EDGE_TOPIC_MIN_DOCS && next_iter - iter >= edge_topic_threshold)
                 selected_pairs.push_back(std::make_tuple(std::get<0>(*iter), std::get<1>(*iter), next_iter - iter));
             iter = next_iter;
         }
@@ -830,7 +832,7 @@ namespace ISLE
             << "#Docs selected for edge topics: "
             << std::accumulate(selected_pairs.begin(), selected_pairs.end(), 0,
                 [](const auto& lval, const auto& iter) {return lval + std::get<2>(iter); }) << std::endl
-            << "Doc Count threshold for edge topics: " << compound_topic_threshold << std::endl;
+            << "Doc Count threshold for edge topics: " << edge_topic_threshold << std::endl;
 
         EdgeModel = new DenseMatrix<FPTYPE>(vocab_size, selected_pairs.size());
         pfor_dynamic_16(int ctopic = 0; ctopic < selected_pairs.size(); ++ctopic) {
@@ -871,40 +873,35 @@ namespace ISLE
 
         parallel_sort(selected_pairs.begin(), selected_pairs.end(),
             [](const auto& l, const auto &r) {return std::get<2>(l) > std::get<2>(r); });
-        int running_count = 0; int compound_topic_threshold;
+        int running_count = 0; 
+        int edge_topic_threshold;
         for (auto iter = selected_pairs.begin(); iter != selected_pairs.end(); ++iter) {
             if (++running_count > max_edge_topics) {
-                compound_topic_threshold = std::get<2>(*iter);
+                edge_topic_threshold = std::get<2>(*iter);
+                while (std::get<2>(*iter) == edge_topic_threshold && iter != selected_pairs.end())
+                    iter++;
+                selected_pairs.erase(iter, selected_pairs.end());
                 break;
             }
         }
 
-        std::vector<std::tuple<int, int, count_t> > selected_ctopics;
-        for (auto iter = top_topic_pairs.begin();
-            iter != top_topic_pairs.end() && selected_ctopics.size() <= max_edge_topics;) {
-            auto next_iter = std::upper_bound(iter, top_topic_pairs.end(), *iter,
-                [](const auto&l, const auto&r) {return std::get<0>(l) < std::get<0>(r)
-                || (std::get<0>(l) == std::get<0>(r) && std::get<1>(l) < std::get<1>(r)); });
-            if (next_iter - iter >= EDGE_TOPIC_MIN_DOCS && next_iter - iter >= compound_topic_threshold)
-                selected_ctopics.push_back(std::make_tuple(std::get<0>(*iter), std::get<1>(*iter), next_iter - iter));
-            iter = next_iter;
-        }
-        std::cout << "#Edge topics: " << selected_ctopics.size() << std::endl;
+        std::cout << "Edge topic threshold: " << edge_topic_threshold << std::endl;
+        std::cout << "#Edge topics: " << selected_pairs.size() << std::endl;
 
-        EdgeModel = new DenseMatrix<FPTYPE>(vocab_size, selected_ctopics.size());
+        EdgeModel = new DenseMatrix<FPTYPE>(vocab_size, selected_pairs.size());
         assert(Model != NULL);
 
-        for (auto t = 0; t < selected_ctopics.size(); ++t) {
+        for (auto t = 0; t < selected_pairs.size(); ++t) {
             FPaxpy(vocab_size, EDGE_TOPIC_PRIMARY_RATIO,
-                Model->data() + std::get<0>(selected_ctopics[t]), 1,
+                Model->data() + std::get<0>(selected_pairs[t]), 1,
                 EdgeModel->data() + t * vocab_size, 1);
             FPaxpy(vocab_size, 1 - EDGE_TOPIC_PRIMARY_RATIO,
-                Model->data() + std::get<1>(selected_ctopics[t]), 1,
+                Model->data() + std::get<1>(selected_pairs[t]), 1,
                 EdgeModel->data() + t * vocab_size, 1);
         }
 
         if (flag_print_edge_topic_composition)
-            print_edge_topic_composition(selected_ctopics);
+            print_edge_topic_composition(selected_pairs);
     }
 
     void ISLETrainer::print_edge_topic_composition(

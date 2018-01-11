@@ -28,7 +28,7 @@ int main(int argv, char **argc) {
     const FPTYPE sample_rate = atoi(argc[9]);
 
     const bool compute_edge_topics = atoi(argc[10]);
-    const bool max_edge_topics = atoi(argc[11]);
+    const int max_edge_topics = atoi(argc[11]);
 
     try {
         ISLE::ISLETrainer trainer(vocab_size, num_docs, max_entries, num_topics,
