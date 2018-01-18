@@ -458,7 +458,7 @@ namespace ISLE
             str[i++] = terminal;
             return str + i;
         }
-
+        
         template<class FPTYPE>
         void concat_float(
             FPTYPE num,

@@ -236,5 +236,9 @@ namespace ISLE
         //
         void print_edge_topic_composition(
             std::vector<std::tuple<int, int, count_t> >& edge_topics);
+
+        void print_edge_topic_top_words(
+            std::vector<std::tuple<int, int, count_t> >& topic_pairs,
+            const int num_top_words=10);
     };
 }

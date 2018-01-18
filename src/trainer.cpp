@@ -859,7 +859,6 @@ namespace ISLE
         parallel_sort(top_topic_pairs.begin(), top_topic_pairs.end(),
             [](const auto&l, const auto&r) {return std::get<0>(l) < std::get<0>(r)
             || (std::get<0>(l) == std::get<0>(r) && std::get<1>(l) < std::get<1>(r)); });
-        std::cout << "#Top topic pairs for compound topics: " << top_topic_pairs.size() << std::endl;
 
         std::vector<std::tuple<int, int, count_t> > selected_pairs;
         for (auto iter = top_topic_pairs.begin(); iter != top_topic_pairs.end(); ) {
@@ -870,16 +869,17 @@ namespace ISLE
                 selected_pairs.push_back(std::make_tuple(std::get<0>(*iter), std::get<1>(*iter), next_iter - iter));
             iter = next_iter;
         }
+        std::cout << "#Candidates for edge topics: " << selected_pairs.size() << std::endl;
 
         parallel_sort(selected_pairs.begin(), selected_pairs.end(),
             [](const auto& l, const auto &r) {return std::get<2>(l) > std::get<2>(r); });
-        int running_count = 0; 
+        int running_count = 0;
         int edge_topic_threshold;
         for (auto iter = selected_pairs.begin(); iter != selected_pairs.end(); ++iter) {
             if (++running_count > max_edge_topics) {
                 edge_topic_threshold = std::get<2>(*iter);
-                while (std::get<2>(*iter) == edge_topic_threshold && iter != selected_pairs.end())
-                    iter++;
+                // while (std::get<2>(*iter) == edge_topic_threshold && iter != selected_pairs.end())
+                //    iter++;
                 selected_pairs.erase(iter, selected_pairs.end());
                 break;
             }
@@ -900,16 +900,18 @@ namespace ISLE
                 EdgeModel->data() + t * vocab_size, 1);
         }
 
-        if (flag_print_edge_topic_composition)
+        if (flag_print_edge_topic_composition) {
             print_edge_topic_composition(selected_pairs);
+            print_edge_topic_top_words(selected_pairs, 10);
+        }
     }
 
     void ISLETrainer::print_edge_topic_composition(
         std::vector<std::tuple<int, int, count_t> >& topic_pairs)
     {
         std::string filename = concat_file_path(log_dir, std::string("EdgeTopicComposition.txt"));
-#if FILE_IO_MODE == NAIVE_FILE_IO
 
+#if FILE_IO_MODE == NAIVE_FILE_IO
         std::ofstream out;
         out.open(filename);
         for (auto iter = topic_pairs.begin(); iter != topic_pairs.end(); ++iter) {
@@ -918,9 +920,7 @@ namespace ISLE
                 << std::get<2>(*iter) << '\n';
         }
         out.close();
-
 #elif FILE_IO_MODE == WIN_MMAP_FILE_IO || FILE_IO_MODE == LINUX_MMAP_FILE_IO
-
         MMappedOutput out(filename);
         for (auto iter = topic_pairs.begin(); iter != topic_pairs.end(); ++iter) {
             out.concat_int(std::get<0>(*iter) + 1, '\t');
@@ -928,9 +928,41 @@ namespace ISLE
             out.concat_int(std::get<2>(*iter) + 1, '\n');
         }
         out.flush_and_close();
-
 #else
         assert(false);
 #endif
+    }
+
+    void ISLETrainer::print_edge_topic_top_words(
+        std::vector<std::tuple<int, int, count_t> >& topic_pairs,
+        const int num_top_words)
+    {
+        assert(is_training_complete);
+        assert(EdgeModel != NULL);
+
+        std::string filename = concat_file_path(log_dir, std::string("EdgeTopicTopWords.txt"));
+        std::ofstream out;
+        out.open(filename);
+
+
+        for (auto iter = topic_pairs.begin(); iter != topic_pairs.end(); ++iter) {
+            auto t = iter - topic_pairs.begin();
+            out << "Edge Topic: " << t
+                << "  (" << std::get<0>(*iter) << ", "
+                << std::get<1>(*iter) << "): "
+                << std::get<2>(*iter) << '\n';
+
+            std::vector<std::pair<word_id_t, FPTYPE> > weights;
+            for (word_id_t w = 0; w < EdgeModel->vocab_size(); ++w)
+                weights.push_back(std::make_pair(w, EdgeModel->elem(w, t)));
+            std::sort(weights.begin(), weights.end(),
+                [](const auto& l, const auto& r) {return l.second >= r.second; });
+
+            out << "Top words: \n";
+            for (int word = 0; word < num_top_words; ++word)
+                out << vocab_words[weights[word].first] << "\t";
+            out << "\n\n";
+        }
+        out.close();
     }
 }
