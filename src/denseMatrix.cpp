@@ -95,7 +95,8 @@ namespace ISLE
         const word_id_t nwords,
         std::vector<std::pair<word_id_t, FPTYPE> >& top_words) const
     {
-        assert(top_words.size() == 0);
+        if(top_words.size() != 0)
+            top_words.clear();
         for (word_id_t word = 0; word < vocab_size(); ++word)
             top_words.push_back(std::make_pair(word, elem(word, topic)));
         std::sort(top_words.begin(), top_words.end(),

@@ -132,7 +132,7 @@ namespace ISLE
         data_size_stream
             << "\n<<<<<<<<<<<<\t" << input_file << "\t>>>>>>>>>>>>\n\n"
             << std::setfill('.') << std::setw(10) << std::left
-            << "#Entries" << entries.size() << "\n"
+            << std::setw(15) << std::left << "#Entries" << entries.size() << "\n"
             << std::setw(15) << std::left << "#Words" << vocab_size << "\n"
             << std::setw(15) << std::left << "#Docs" << num_docs << "\n"
             << std::setw(15) << std::left << "#Topics" << num_topics << "\n"
@@ -937,7 +937,6 @@ namespace ISLE
         std::vector<std::tuple<int, int, count_t> >& topic_pairs,
         const int num_top_words)
     {
-        assert(is_training_complete);
         assert(EdgeModel != NULL);
 
         std::string filename = concat_file_path(log_dir, std::string("EdgeTopicTopWords.txt"));
@@ -952,15 +951,31 @@ namespace ISLE
                 << std::get<1>(*iter) << "): "
                 << std::get<2>(*iter) << '\n';
 
-            std::vector<std::pair<word_id_t, FPTYPE> > weights;
+            /*std::vector<std::pair<word_id_t, FPTYPE> > weights;
             for (word_id_t w = 0; w < EdgeModel->vocab_size(); ++w)
                 weights.push_back(std::make_pair(w, EdgeModel->elem(w, t)));
             std::sort(weights.begin(), weights.end(),
-                [](const auto& l, const auto& r) {return l.second >= r.second; });
+                [](const auto& l, const auto& r) {return l.second >= r.second; });*/
 
-            out << "Top words: \n";
+            std::vector<std::pair<word_id_t, FPTYPE> > top_words;
+            EdgeModel->find_n_top_words(t, num_top_words, top_words);
+            out << "Top words in edge_topic: \n";
             for (int word = 0; word < num_top_words; ++word)
-                out << vocab_words[weights[word].first] << "\t";
+                out << vocab_words[top_words[word].first] << "(" << top_words[word].second << ")\t";
+            out << "\n";
+
+            
+            Model->find_n_top_words(std::get<0>(*iter), num_top_words, top_words);
+            out << "Top words in topic: " << std::get<0>(*iter) << "\n";
+            for (int word = 0; word < num_top_words; ++word)
+                out << vocab_words[top_words[word].first] << "(" << top_words[word].second << ")\t";
+            out << "\n";
+
+            
+            EdgeModel->find_n_top_words(std::get<1>(*iter), num_top_words, top_words);
+            out << "Top words in topic: " << std::get<1>(*iter) << "\n";
+            for (int word = 0; word < num_top_words; ++word)
+                out << vocab_words[top_words[word].first] << "(" << top_words[word].second << ")\t";
             out << "\n\n";
         }
         out.close();
