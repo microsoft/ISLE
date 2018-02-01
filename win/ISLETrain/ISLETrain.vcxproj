@@ -34,6 +34,8 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="..\..\drivers\ISLETrain.cpp" />
+    <ClCompile Include="..\..\src\denseMatrix.cpp" />
+    <ClCompile Include="..\..\src\sparseMatrix.cpp" />
     <ClCompile Include="..\..\src\trainer.cpp" />
     <ClCompile Include="..\..\src\utils.cpp" />
   </ItemGroup>
@@ -111,6 +113,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <LibraryPath>C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2017\windows\mkl\lib\intel64_win;$(LibraryPath)</LibraryPath>
+    <IncludePath>C:\Users\HARSHASI\Source\Repos\Microsoft\ISLE;C:\Users\HARSHASI\Source\Repos\Microsoft\ISLE\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>

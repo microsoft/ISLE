@@ -14,9 +14,9 @@ const std::string model_file
 const std::string sparse_model_file
 = "log_t_50_eps1_0.016667_eps2_0.333333_eps3_5.000000_kMppReps_1_kMLowDReps_10_kMReps_10_sample_0\\M_hat_catch_sparse";
 const offset_t M_hat_catch_sparse_entries = 248029;
-const docsSz_t num_topics = 50;
-const vocabSz_t vocab_size = 5000;
-const docsSz_t num_docs = 30000;
+const doc_id_t num_topics = 50;
+const word_id_t vocab_size = 5000;
+const doc_id_t num_docs = 30000;
 const offset_t max_entries = 4886003;*/
 
 //const std::string dir
@@ -25,9 +25,9 @@ const offset_t max_entries = 4886003;*/
 //    = "docword.nytimes.proc.txt";
 //const std::string model_file
 //    = "log_t_100_eps1_0.016667_eps2_0.333333_eps3_5.000000_kMppReps_4_kMLowDReps_30_kMReps_10_sample_0\\M_hat_catch";
-//const docsSz_t num_topics = 100;
-//const vocabSz_t vocab_size = 5004;
-//const docsSz_t num_docs = 296784;
+//const doc_id_t num_topics = 100;
+//const word_id_t vocab_size = 5004;
+//const doc_id_t num_docs = 296784;
 //const offset_t max_entries = 47978132;
 
 //const std::string dir
@@ -36,9 +36,9 @@ const offset_t max_entries = 4886003;*/
 //    = "TrainData.VocabIndex1.tsvd";
 //const std::string model_file
 //    = "log_t_1000_eps1_0.016667_eps2_0.333333_eps3_5.000000_kMppReps_4_kMLowDReps_30_kMReps_10_sample_0\\M_hat_catch";
-//const docsSz_t num_topics = 1000;
-//const vocabSz_t vocab_size = 101504;
-//const docsSz_t num_docs = 269714;
+//const doc_id_t num_topics = 1000;
+//const word_id_t vocab_size = 101504;
+//const doc_id_t num_docs = 269714;
 //const offset_t max_entries = 57289130;
 
 //#if defined(_MSC_VER)
@@ -60,9 +60,9 @@ const offset_t max_entries = 4886003;*/
 //const std::string sparse_model_file
 //= "log_t_1000_eps1_0.016667_eps2_0.333333_eps3_5.000000_kMppReps_1_kMLowDReps_10_kMReps_10_sample_1_Rate_0.100000/M_hat_catch_sparse";
 //#endif
-//const docsSz_t num_topics = 1000;
-//const vocabSz_t vocab_size = 1562308;
-//const docsSz_t num_docs = 7415;
+//const doc_id_t num_topics = 1000;
+//const word_id_t vocab_size = 1562308;
+//const doc_id_t num_docs = 7415;
 //const offset_t max_entries = 4594436;
 ////const offset_t M_hat_catch_sparse_entries = 60447915; // 1000 topics
 //const offset_t M_hat_catch_sparse_entries = 73842125; // 2000 topics

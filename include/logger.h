@@ -57,9 +57,9 @@ namespace ISLE
         }
 
         template <class catchT>
-        void print_catch_words(const docsSz_t topic,
+        void print_catch_words(const doc_id_t topic,
             const catchT* catch_threshold,
-            const std::vector<vocabSz_t>& catchwords,
+            const std::vector<word_id_t>& catchwords,
             const std::vector<std::string>& vocab_words,
             bool print_to_terminal = true)
         {
@@ -74,17 +74,17 @@ namespace ISLE
             print_stringstream(ostr, print_to_terminal);
         }
 
-        void print_cluster_details(const docsSz_t num_topics,
+        void print_cluster_details(const doc_id_t num_topics,
             const std::vector<FPTYPE>& distsq,
-            const std::vector<vocabSz_t> *const catchwords,
-            const std::vector<docsSz_t> *const closest_docs,
+            const std::vector<word_id_t> *const catchwords,
+            const std::vector<doc_id_t> *const closest_docs,
             const std::vector<FPTYPE>& coherences,
             const std::vector<FPTYPE>& nl_coherences,
             bool print_to_terminal = true)
         {
             std::ostringstream ostr;
 
-            std::vector<std::pair<int, docsSz_t> > cluster_sizes;
+            std::vector<std::pair<int, doc_id_t> > cluster_sizes;
             for (auto t = 0; t < num_topics; ++t)
                 cluster_sizes.push_back(std::make_pair(closest_docs[t].size(), t));
             std::sort(cluster_sizes.begin(), cluster_sizes.end(),
@@ -111,17 +111,17 @@ namespace ISLE
 
         void print_eigen_data(
             Eigen::Matrix<FPTYPE, Eigen::Dynamic, 1>& evalues,
-            docsSz_t num_topics,
+            doc_id_t num_topics,
             bool print_to_terminal = true)
         {
             std::ostringstream ostr;
 
             ostr << "Eigvals:  ";
-            for (docsSz_t t = 0; t < num_topics; ++t)
+            for (doc_id_t t = 0; t < num_topics; ++t)
                 ostr << "(" << t << "): " << std::sqrt(evalues(t)) << "\t";
             ostr << std::endl;
             std::vector<FPTYPE> eig_sum_slabs(num_topics / 100 + 1, 0.0);
-            for (docsSz_t t = 0; t < num_topics; ++t)
+            for (doc_id_t t = 0; t < num_topics; ++t)
                 eig_sum_slabs[t / 100] += evalues(t);
             for (auto slab = 0; slab < num_topics / 100; ++slab)
                 ostr << "Sum of Top-" << (slab + 1) * 100 << " eig vals: "

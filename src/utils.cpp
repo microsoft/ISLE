@@ -6,7 +6,7 @@
 void ISLE::create_vocab_list(
     const std::string& vocab_file,
     std::vector<std::string>& words,
-    const vocabSz_t max_words)
+    const word_id_t max_words)
 {
     assert(words.size() == 0);
     std::ifstream in(vocab_file, std::ifstream::in);
@@ -26,7 +26,7 @@ void ISLE::create_vocab_list(
 
 
 std::string ISLE::log_dir_name(
-    const docsSz_t num_topics,
+    const doc_id_t num_topics,
     const std::string& output_path_base,
     const bool& sample_docs,
     const FPTYPE& sample_rate)
@@ -42,10 +42,10 @@ std::string ISLE::log_dir_name(
         + "_sample_" + std::to_string(sample_docs);
     if (sample_docs)
         log_subdir += "_Rate_" + std::to_string(sample_rate);
-    return fileUnderDirNameString(output_path_base, log_subdir);
+    return concat_file_path(output_path_base, log_subdir);
 }
 
-std::string ISLE::fileUnderDirNameString(const std::string& dir, const std::string& filename)
+std::string ISLE::concat_file_path(const std::string& dir, const std::string& filename)
 {
 #if defined(_MSC_VER)
     return dir + "\\" + filename;

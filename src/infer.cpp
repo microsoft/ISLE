@@ -10,10 +10,10 @@ namespace ISLE
         char* buf,
         uint64_t fileSize)
     {
-        vocabSz_t vocab_size = model->vocab_size();
-        docsSz_t num_topics = model->num_docs();
+        word_id_t vocab_size = model->vocab_size();
+        doc_id_t num_topics = model->num_docs();
 
-        docsSz_t topic = 0; vocabSz_t word = 0;
+        doc_id_t topic = 0; word_id_t word = 0;
         assert(sizeof(size_t) == 8);
 
         bool was_whitespace = false;
@@ -103,8 +103,8 @@ namespace ISLE
         {
             std::ifstream in(filename);// , ios_base::in);
             assert(in.is_open());
-            for (docsSz_t topic = 0; topic < num_topics; ++topic) {
-                for (vocabSz_t word = 0; word < vocab_size; ++word) {
+            for (doc_id_t topic = 0; topic < num_topics; ++topic) {
+                for (word_id_t word = 0; word < vocab_size; ++word) {
                     in >> model->elem_ref(word, topic);
                 }
 
@@ -114,7 +114,7 @@ namespace ISLE
                 if (std::abs(1.0 - topic_wt_sum) > 0.01)
                     std::cerr << "Topic " << topic << "  sum of weights: " << topic_wt_sum << std::endl;
 
-                for (vocabSz_t word = 0; word < vocab_size; ++word)
+                for (word_id_t word = 0; word < vocab_size; ++word)
                     model->elem_ref(word, topic) = model->elem(word, topic) / topic_wt_sum;
             }
             in.close();
@@ -124,13 +124,13 @@ namespace ISLE
 
     void read_sparse_model(
         FPTYPE* model_by_word,
-        const docsSz_t num_topics,
-        const vocabSz_t vocab_size,
+        const doc_id_t num_topics,
+        const word_id_t vocab_size,
         char* buf,
         uint64_t fileSize,
         const unsigned base)
     {
-        docsSz_t topic = 0; vocabSz_t word = 0;
+        doc_id_t topic = 0; word_id_t word = 0;
         assert(sizeof(size_t) == 8);
 
         bool was_whitespace = false;
@@ -210,8 +210,8 @@ namespace ISLE
     // Model will be loaded in word-major order
     void load_model_from_sparse_file(
         FPTYPE* model_by_word,
-        const docsSz_t num_topics,
-        const vocabSz_t vocab_size,
+        const doc_id_t num_topics,
+        const word_id_t vocab_size,
         const std::string& model_file,
         const unsigned base)
     {
@@ -235,8 +235,8 @@ namespace ISLE
         {
             std::ifstream in(model_file);// , ios_base::in);
             assert(in.is_open());
-            docsSz_t topic;
-            vocabSz_t word;
+            doc_id_t topic;
+            word_id_t word;
             FPTYPE weight;
             while (in.peek() != EOF) {
                 in >> topic >> word >> weight;
@@ -284,8 +284,8 @@ namespace ISLE
             std::ifstream in(filename);// , ios_base::in);
             assert(in.is_open());
             offset_t entries_read = 0;
-            docsSz_t previous_topic=0, topic = 0;
-            vocabSz_t word;
+            doc_id_t previous_topic=0, topic = 0;
+            word_id_t word;
             FPTYPE weight;
             while (in.peek() != EOF) {
                 in >> topic;
@@ -316,20 +316,20 @@ namespace ISLE
         auto vocab_size = model->vocab_size();
         auto num_topics = model->num_docs();
 
-        omatcopy('C', 'T', vocab_size, num_topics, 1.0,
+        FPomatcopy('C', 'T', vocab_size, num_topics, 1.0,
             model->data(), vocab_size, model_by_word, num_topics);
 
-        /*    for (vocabSz_t word = 0; word < vocab_size; ++word)
-        for (docsSz_t topic = 0; topic < num_topics; ++topic)
+        /*    for (word_id_t word = 0; word < vocab_size; ++word)
+        for (doc_id_t topic = 0; topic < num_topics; ++topic)
         model_by_word[word*num_topics + topic] = model->elem(word, topic);*/
     }
 
     ISLEInfer::ISLEInfer(
         const FPTYPE *const model_by_word_,
         const SparseMatrix<FPTYPE> *const infer_data_,
-        const docsSz_t num_topics_,
-        const vocabSz_t vocab_size_,
-        const docsSz_t num_docs_)
+        const doc_id_t num_topics_,
+        const word_id_t vocab_size_,
+        const doc_id_t num_docs_)
         :
         model_by_word(model_by_word_),
         infer_data(infer_data_),
@@ -361,7 +361,7 @@ namespace ISLE
 
     // Return 0.0 if the calculation did not converge
     FPTYPE ISLEInfer::infer_doc_in_file(
-        const docsSz_t doc,
+        const doc_id_t doc,
         FPTYPE* w,
         const int iters,
         const FPTYPE Lfguess)
@@ -443,12 +443,12 @@ namespace ISLE
         FPTYPE* w,
         const int nnzs)
     {
-        gemv(CblasRowMajor, CblasNoTrans, nnzs, num_topics,
+        FPgemv(CblasRowMajor, CblasNoTrans, nnzs, num_topics,
             1.0, M, num_topics, w, 1, 0.0, z, 1);
-        /* Equivalent to gemv above
+        /* Equivalent to FPgemv above
         for (int r = 0; r < nnzs; ++r) {
             z[r] = 0.0;
-            for (docsSz_t c = 0; c < num_topics; ++c) {
+            for (doc_id_t c = 0; c < num_topics; ++c) {
                 z[r] += M[r*num_topics + c] * w[c];
             }
         } */
@@ -456,7 +456,7 @@ namespace ISLE
         for (int d = 0; d < num_topics; ++d)
             z[d] = a[d] / z[d];
 
-        gemv(CblasRowMajor, CblasTrans, nnzs, num_topics,
+        FPgemv(CblasRowMajor, CblasTrans, nnzs, num_topics,
             1.0, M, num_topics, z, 1, 0.0, gradw, 1);
     }
 
@@ -468,7 +468,7 @@ namespace ISLE
     {
         auto z = new FPTYPE[nnzs];
 
-        gemv(CblasRowMajor, CblasNoTrans, nnzs, num_topics,
+        FPgemv(CblasRowMajor, CblasNoTrans, nnzs, num_topics,
             1.0, M, num_topics, w, 1, 0.0, z, 1);
 
         FPTYPE llh = 0.0;

@@ -69,8 +69,8 @@ namespace ISLE
     template<class COUNT_T>
     struct DocWordEntry
     {
-        vocabSz_t word; 	// Zero based indexing 
-        docsSz_t  doc;	// Zero based indexing
+        word_id_t word; 	// Zero based indexing 
+        doc_id_t  doc;	// Zero based indexing
         COUNT_T   count;
 
         DocWordEntry() :
@@ -79,7 +79,7 @@ namespace ISLE
             count((COUNT_T)0)
         {}
 
-        DocWordEntry(const vocabSz_t& word_, const docsSz_t& doc_, const COUNT_T& count_) :
+        DocWordEntry(const word_id_t& word_, const doc_id_t& doc_, const COUNT_T& count_) :
             word(word_),
             doc(doc_),
             count(count_)
@@ -161,7 +161,7 @@ namespace ISLE
             uint64_t fileSize)
         {
             entries.resize(max_entries);
-            docsSz_t doc = 0; vocabSz_t word = 0; count_t count = 0;
+            doc_id_t doc = 0; word_id_t word = 0; count_t count = 0;
             offset_t nRead = 0;
             assert(sizeof(size_t) == 8);
             int state = 1; // Are we trying to read the 1st,2nd or 3rd entry of the line
@@ -463,7 +463,7 @@ namespace ISLE
             str[i++] = terminal;
             return str + i;
         }
-
+        
         template<class FPTYPE>
         void concat_float(
             FPTYPE num,
@@ -531,10 +531,10 @@ namespace ISLE
     void create_vocab_list(
         const std::string& vocab_file,
         std::vector<std::string>& words,
-        const vocabSz_t max_words);
+        const word_id_t max_words);
 
     std::string log_dir_name(
-        const docsSz_t num_topics,
+        const doc_id_t num_topics,
         const std::string& output_path_base,
         const bool& sample_docs,
         const FPTYPE& sample_rate);
@@ -549,7 +549,7 @@ namespace ISLE
             : (num / denom) + 1;
     }
 
-    std::string fileUnderDirNameString(
+    std::string concat_file_path(
         const std::string& dir,
         const std::string& filename);
 }

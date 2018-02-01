@@ -6,23 +6,23 @@
 namespace ISLE
 {
     ISLETrainer::ISLETrainer(
-        const vocabSz_t		vocab_size_,
-        const docsSz_t		num_docs_,
+        const word_id_t		vocab_size_,
+        const doc_id_t		num_docs_,
         const offset_t		max_entries_,
-        const docsSz_t		num_topics_,
-        const bool			sample_docs_,
+        const doc_id_t		num_topics_,
+        const bool			flag_sample_docs_,
         const FPTYPE		sample_rate_,
         const data_ingest	how_data_loaded_,
         const std::string&	input_file_,
         const std::string&	vocab_file_,
         const std::string&	output_path_base_,
-        const bool			compute_log_combinatorial_,
-        const bool			compute_distinct_top_five_sets_,
-        const bool			compute_avg_coherence_,
-        const bool			construct_edge_topics_,
-        const int			max_compound_topics_,
-        const bool			print_doctopic_,
-        const bool          print_top_two_topics_)
+        const bool			flag_construct_edge_topics_,
+        const int			max_edge_topics_,
+        const bool			flag_compute_log_combinatorial_,
+        const bool			flag_compute_distinct_top_five_sets_,
+        const bool			flag_compute_avg_coherence_,
+        const bool			flag_print_doctopic_,
+        const bool          flag_print_top_two_topics_)
         :
         vocab_size(vocab_size_),
         num_docs(num_docs_),
@@ -32,15 +32,15 @@ namespace ISLE
         input_file(input_file_),
         vocab_file(vocab_file_),
         output_path_base(output_path_base_),
-        sample_docs(sample_docs_),
+        flag_sample_docs(flag_sample_docs_),
         sample_rate(sample_rate_),
-        compute_log_combinatorial(compute_log_combinatorial_),
-        compute_distinct_top_five_sets(compute_distinct_top_five_sets_),
-        compute_avg_coherence(compute_avg_coherence_),
-        construct_edge_topics(construct_edge_topics_),
-        max_compound_topics(max_compound_topics_),
-        print_doctopic(print_doctopic_),
-        print_top_two_topics(print_top_two_topics_),
+        flag_construct_edge_topics(flag_construct_edge_topics_),
+        max_edge_topics(max_edge_topics_),
+        flag_compute_log_combinatorial(flag_compute_log_combinatorial_),
+        flag_compute_distinct_top_five_sets(flag_compute_distinct_top_five_sets_),
+        flag_compute_avg_coherence(flag_compute_avg_coherence_),
+        flag_print_doctopic(flag_print_doctopic_),
+        flag_print_top_two_topics(flag_print_top_two_topics_),
         is_training_complete(false)
     {
         //
@@ -58,7 +58,7 @@ namespace ISLE
         //
         // Initialize  log directories, vocablist, and timer
         //
-        log_dir = log_dir_name(num_topics, output_path_base, sample_docs, sample_rate);
+        log_dir = log_dir_name(num_topics, output_path_base, flag_sample_docs, sample_rate);
 
 #if defined(_MSC_VER)
         log_dir_wstr = std::wstring(log_dir.begin(), log_dir.end());
@@ -80,8 +80,8 @@ namespace ISLE
         assert(false);
 #endif
 
-        out_log = new Logger(fileUnderDirNameString(log_dir, std::string("run_log.txt")));
-        timer = new Timer(fileUnderDirNameString(log_dir, std::string("time_log.txt")));
+        out_log = new Logger(concat_file_path(log_dir, std::string("run_log.txt")));
+        timer = new Timer(concat_file_path(log_dir, std::string("time_log.txt")));
 
         is_data_loaded = false;
 
@@ -122,8 +122,7 @@ namespace ISLE
     // Load a vocabulary list from file
     // convert file data to sparse data matrix 
     //
-    void
-        ISLETrainer::load_data_from_file()
+    void ISLETrainer::load_data_from_file()
     {
         assert(how_data_loaded == data_ingest::FILE_DATA_LOAD);
 
@@ -133,24 +132,25 @@ namespace ISLE
         data_size_stream
             << "\n<<<<<<<<<<<<\t" << input_file << "\t>>>>>>>>>>>>\n\n"
             << std::setfill('.') << std::setw(10) << std::left
-            << "#Entries" << entries.size() << "\n"
+            << std::setw(15) << std::left << "#Entries" << entries.size() << "\n"
             << std::setw(15) << std::left << "#Words" << vocab_size << "\n"
             << std::setw(15) << std::left << "#Docs" << num_docs << "\n"
             << std::setw(15) << std::left << "#Topics" << num_topics << "\n"
-            << std::setw(15) << std::left << "Sampling?" << sample_docs << "\n"
-            << std::setw(15) << std::left << "Sample rate" << sample_rate << "\n";
+            << std::setw(15) << std::left << "Sampling?" << flag_sample_docs << "\n"
+            << std::setw(15) << std::left << "Sample rate" << sample_rate << "\n"
+            << std::setw(15) << std::left << "Edge topics?" << flag_construct_edge_topics << "\n"
+            << std::setw(15) << std::left << "#Edge topics" << max_edge_topics << std::endl;
         out_log->print_stringstream(data_size_stream);
         timer->next_time_secs("Reading file Entries");
 
         finalize_data();
     }
 
-    void
-        ISLETrainer::feed_data(
-            const docsSz_t doc,
-            const vocabSz_t *const words,
-            const count_t *const counts,
-            const offset_t num_words)
+    void ISLETrainer::feed_data(
+        const doc_id_t doc,
+        const word_id_t *const words,
+        const count_t *const counts,
+        const offset_t num_words)
     {
         DocWordEntry<count_t> entry;
         for (auto w = 0; w < num_words; ++w) {
@@ -164,12 +164,11 @@ namespace ISLE
     //
     // Populate the data matrix and normalize it, clear DataEntries
     //
-    void
-        ISLETrainer::finalize_data()
+    void ISLETrainer::finalize_data()
     {
         assert(is_data_loaded == false);
 
-        std::sort(			// Sort by doc first, and word second.
+        parallel_sort(			// Sort by doc first, and word second.
             entries.begin(), entries.end(),
             [](const auto& l, const auto& r)
         {return (l.doc < r.doc) || (l.doc == r.doc && l.word < r.word); });
@@ -196,9 +195,9 @@ namespace ISLE
 
         A_sp = new SparseMatrix<A_TYPE>(vocab_size, num_docs);
         B_fl_CSC = new FloatingPointSparseMatrix<FPTYPE>(vocab_size, num_docs);
-        catchwords = new std::vector<vocabSz_t>[num_topics];
-        topwords = new std::vector<std::pair<vocabSz_t, FPTYPE> >[num_topics];
-        closest_docs = new std::vector<docsSz_t>[num_topics];
+        catchwords = new std::vector<word_id_t>[num_topics];
+        topwords = new std::vector<std::pair<word_id_t, FPTYPE> >[num_topics];
+        closest_docs = new std::vector<doc_id_t>[num_topics];
         catchword_thresholds = new A_TYPE[(size_t)vocab_size * (size_t)num_topics];
         centers = new FPTYPE[(size_t)num_topics * (size_t)vocab_size];
         Model = new DenseMatrix<FPTYPE>(vocab_size, num_topics);
@@ -220,12 +219,12 @@ namespace ISLE
         //
         //FPTYPE *wordFreq = new FPTYPE[vocab_size];
         //memset(wordFreq, 0, sizeof(FPTYPE)*vocab_size);
-        //for(docsSz_t doc=0; doc < num_docs; ++doc)
+        //for(doc_id_t doc=0; doc < num_docs; ++doc)
         //  for (auto pos = A_sp->offset_CSC(doc); pos < A_sp->offset_CSC(doc+1); pos++)
         //    wordFreq[A_sp->row_CSC(pos)] += A_sp->normalized_val_CSC(pos);
         //std::sort(wordFreq, wordFreq + vocab_size, std::greater<FPTYPE>());
         //FPTYPE total = std::accumulate(wordFreq, wordFreq + vocab_size, (FPTYPE)0.0);
-        //for (vocabSz_t batch = 0; batch < vocab_size/100; ++batch)
+        //for (word_id_t batch = 0; batch < vocab_size/100; ++batch)
         //  std::cout << batch*100 << ":" << (batch+1)*100 << "\t"
         //        << std::accumulate(wordFreq + batch*100, wordFreq + (batch+1)*100, (FPTYPE)0.0)/total << "\t"
         //            << std::accumulate(wordFreq, wordFreq + (batch+1)*100, (FPTYPE)0.0)/total << "\t"
@@ -233,13 +232,12 @@ namespace ISLE
         //delete[] wordFreq; 
     }
 
-    void
-        ISLETrainer::print_log_combinatorial()
+    void ISLETrainer::print_log_combinatorial()
     {
         std::vector<FPTYPE> docsLogFact;
         A_sp->compute_log_combinatorial(docsLogFact);
         std::ofstream out_comb_log;
-        out_comb_log.open(fileUnderDirNameString(log_dir, std::string("LogCombinatorial.txt")));
+        out_comb_log.open(concat_file_path(log_dir, std::string("LogCombinatorial.txt")));
         for (auto iter = docsLogFact.begin(); iter != docsLogFact.end(); ++iter)
             out_comb_log << *iter << std::endl;
         out_comb_log.close();
@@ -248,10 +246,9 @@ namespace ISLE
 
     //
     // Create a multiset of top 5 words for each doc
-    // Count how many of these multi-instances occur more than x times
+    // Count the number of these multi-instances occur more than x times
     //
-    void
-        ISLETrainer::print_distinct_top_five_sets()
+    void ISLETrainer::print_distinct_top_five_sets()
     {
         std::ostringstream ostr;
         ostr << "Distinct top five sets: "
@@ -271,8 +268,7 @@ namespace ISLE
     //
     // Computing singular vals of A_sp
     //
-    void
-        ISLETrainer::compute_input_svd()
+    void ISLETrainer::compute_input_svd()
     {
         FloatingPointSparseMatrix<FPTYPE> A_fl_CSC(*A_sp, true);
         A_fl_CSC.initialize_for_Spectra(num_topics);
@@ -281,7 +277,7 @@ namespace ISLE
         A_fl_CSC.compute_truncated_Spectra(num_topics, A_sq_svalues);
         out_log->print_string("Frob_Sq(A_sp_fl): " + std::to_string(A_fl_CSC.normalized_frobenius()) + "\n");
         std::ofstream ostr;
-        ostr.open(fileUnderDirNameString(output_path_base, std::string("A_squared_spectrum.txt")));
+        ostr.open(concat_file_path(output_path_base, std::string("A_squared_spectrum.txt")));
         ostr << "Frob_Sq(A_sp_fl): " << A_fl_CSC.normalized_frobenius() << std::endl;
         for (auto t = 0; t < num_topics; ++t)
             ostr << t + 1 << ": " << A_sq_svalues(t) << std::endl;
@@ -290,11 +286,10 @@ namespace ISLE
         timer->next_time_secs("Spectra A_sp computation");
     }
 
-    void
-        ISLETrainer::train()
+    void ISLETrainer::train()
     {
-        if (compute_log_combinatorial) print_log_combinatorial();
-        if (compute_distinct_top_five_sets) print_distinct_top_five_sets();
+        if (flag_compute_log_combinatorial) print_log_combinatorial();
+        if (flag_compute_distinct_top_five_sets) print_distinct_top_five_sets();
 
         //
         // Threshold
@@ -305,8 +300,8 @@ namespace ISLE
         timer->next_time_secs("Computing thresholds");
         out_log->print_string("Number of entries above threshold: " + std::to_string(new_nnzs) + "\n");
 
-        std::vector<docsSz_t> original_cols;
-        if (sample_docs) {
+        std::vector<doc_id_t> original_cols;
+        if (flag_sample_docs) {
             assert(sample_rate > 0.0 && sample_rate < 1.0);
             B_fl_CSC->sampled_threshold_and_copy<A_TYPE>(
                 *A_sp, thresholds, new_nnzs, original_cols, sample_rate);
@@ -334,9 +329,9 @@ namespace ISLE
         //
         // k-means++ on the column space (Simga*VT) of k-rank approx of B
         //
-        FloatingPointDenseMatrix<FPTYPE> B_spectraSigmaVT_d_fl((vocabSz_t)num_topics, B_fl_CSC->num_docs());
+        FloatingPointDenseMatrix<FPTYPE> B_spectraSigmaVT_d_fl((word_id_t)num_topics, B_fl_CSC->num_docs());
         B_spectraSigmaVT_d_fl.copy_spectraSigmaVT_from(*B_fl, num_topics);
-        std::vector<docsSz_t> best_kmeans_seeds;
+        std::vector<doc_id_t> best_kmeans_seeds;
         if (!ENABLE_KMEANS_ON_LOWD)
             assert(KMEANS_INIT_METHOD == KMEANSPP || KMEANS_INIT_METHOD == KMEANSMCMC);
         int num_centers_lowd = num_topics;
@@ -370,7 +365,7 @@ namespace ISLE
         // Lloyds on B with k-means++ seeds
         //
         if (!ENABLE_KMEANS_ON_LOWD)
-            for (docsSz_t d = 0; d < num_topics; ++d)
+            for (doc_id_t d = 0; d < num_topics; ++d)
                 B_fl->copy_col_to(centers + (size_t)d * (size_t)vocab_size, best_kmeans_seeds[d]);
         if (KMEANS_ALGO_FOR_SPARSE == LLOYDS_KMEANS)
             B_fl->run_lloyds(num_topics, centers, closest_docs, MAX_KMEANS_REPS);
@@ -383,20 +378,20 @@ namespace ISLE
         assert(closest_docs_sizes_sum == B_fl->num_docs());
         timer->next_time_secs("k-means on B");
 
-        for (docsSz_t topic = 0; topic != num_topics; ++topic)
+        for (doc_id_t topic = 0; topic != num_topics; ++topic)
             for (auto d = closest_docs[topic].begin(); d < closest_docs[topic].end(); ++d)
                 *d = original_cols[*d];
 
         FPTYPE avg_nl_coherence;
         std::vector<FPTYPE> nl_coherences(num_topics, 0.0);
-        if (compute_avg_coherence)
+        if (flag_compute_avg_coherence)
             output_avg_topic_coherence(avg_nl_coherence, nl_coherences);
 
         //
         // Identify Catchwords
         //
         MKL_UINT r;
-        if (sample_docs)
+        if (flag_sample_docs)
             r = std::floor(eps2_c*w0_c*(FPTYPE)num_docs*sample_rate / (FPTYPE)(2.0*num_topics));
         else
             r = std::floor(eps2_c*w0_c*(FPTYPE)num_docs / (FPTYPE)(2.0*num_topics));
@@ -414,13 +409,13 @@ namespace ISLE
         //
         // Construct the topic model
         //
-        std::vector<std::tuple<int, int, docsSz_t> > top_topic_pairs;
-        std::vector<std::pair<vocabSz_t, int> > catchword_topics;
-        std::vector<std::tuple<docsSz_t, docsSz_t, FPTYPE> > doc_topic_sum;
+        std::vector<std::tuple<int, int, doc_id_t> > top_topic_pairs;
+        std::vector<std::pair<word_id_t, int> > catchword_topics;
+        std::vector<std::tuple<doc_id_t, doc_id_t, FPTYPE> > doc_topic_sum;
         A_sp->construct_topic_model(
             *Model, num_topics, closest_docs, catchwords,
             AVG_CLUSTER_FOR_CATCHLESS_TOPIC,
-            construct_edge_topics || print_top_two_topics ? &top_topic_pairs : NULL,
+            flag_construct_edge_topics || flag_print_top_two_topics ? &top_topic_pairs : NULL,
             &catchword_topics,
             &doc_topic_sum);
         timer->next_time_secs("Constructing topic vectors");
@@ -429,100 +424,16 @@ namespace ISLE
         //
         // Print top 2 topics for each document to file
         //
-        if (print_top_two_topics)
-        {
-            std::sort(top_topic_pairs.begin(), top_topic_pairs.end(),
-                [](const auto& l, const auto& r)
-            { return std::get<2>(l) < std::get<2>(r); });
-
-            std::string filename = fileUnderDirNameString(log_dir, std::string("TopTwoTopicsPerDoc.txt"));
-#if FILE_IO_MODE == NAIVE_FILE_IO
-
-            std::ofstream toptwotopics_out;
-            toptwotopics_out.open(filename);
-            for (auto iter = top_topic_pairs.begin(); iter != top_topic_pairs.end(); ++iter) {
-                toptwotopics_out << std::get<2>(*iter) << '\t'
-                    << std::get<0>(*iter) << '\t'
-                    << std::get<1>(*iter) << '\t';
-            }
-            toptwotopics_out.close();
-
-#elif FILE_IO_MODE == WIN_MMAP_FILE_IO || FILE_IO_MODE == LINUX_MMAP_FILE_IO
-
-            MMappedOutput out(filename);
-            for (auto iter = top_topic_pairs.begin(); iter != top_topic_pairs.end(); ++iter) {
-                out.concat_int(std::get<2>(*iter) + 1, '\t');
-                out.concat_int(std::get<0>(*iter) + 1, '\t');
-                out.concat_int(std::get<1>(*iter) + 1, '\n');
-            }
-            out.flush_and_close();
-
-#else
-            assert(false);
-#endif
-        }
+        if (flag_print_top_two_topics)
+            print_top_two_topics(top_topic_pairs);
         timer->next_time_secs("Printing top 2 topics/doc");
 
 
         //
         // Construct edge topics
         //
-        if (construct_edge_topics)
-        {
-            std::sort(top_topic_pairs.begin(), top_topic_pairs.end(),
-                [](const auto&l, const auto&r) {return std::get<0>(l) < std::get<0>(r)
-                || (std::get<0>(l) == std::get<0>(r) && std::get<1>(l) < std::get<1>(r)); });
-            std::cout << "#Top topic pairs for compound topics: " << top_topic_pairs.size() << std::endl;
-
-            std::vector<std::tuple<int, int, count_t> > sorted_ctopics;
-            for (auto iter = top_topic_pairs.begin(); iter != top_topic_pairs.end(); ) {
-                auto next_iter = std::upper_bound(iter, top_topic_pairs.end(), *iter,
-                    [](const auto&l, const auto&r) {return std::get<0>(l) < std::get<0>(r)
-                    || (std::get<0>(l) == std::get<0>(r) && std::get<1>(l) < std::get<1>(r)); });
-                if (next_iter - iter >= EDGE_TOPIC_MIN_DOCS)
-                    sorted_ctopics.push_back(std::make_tuple(std::get<0>(*iter), std::get<1>(*iter), next_iter - iter));
-                iter = next_iter;
-            }
-            std::sort(sorted_ctopics.begin(), sorted_ctopics.end(),
-                [](const auto& l, const auto &r) {return std::get<2>(l) > std::get<2>(r); });
-            int running_count = 0; int compound_topic_threshold;
-            for (auto iter = sorted_ctopics.begin(); iter != sorted_ctopics.end(); ++iter) {
-                if (++running_count > max_compound_topics) {
-                    compound_topic_threshold = std::get<2>(*iter);
-                    break;
-                }
-            }
-
-            std::vector<std::tuple<int, int, count_t> > selected_ctopics;
-            for (auto iter = top_topic_pairs.begin();
-                iter != top_topic_pairs.end() && selected_ctopics.size() <= max_compound_topics;) {
-                auto next_iter = std::upper_bound(iter, top_topic_pairs.end(), *iter,
-                    [](const auto&l, const auto&r) {return std::get<0>(l) < std::get<0>(r)
-                    || (std::get<0>(l) == std::get<0>(r) && std::get<1>(l) < std::get<1>(r)); });
-                if (next_iter - iter >= EDGE_TOPIC_MIN_DOCS && next_iter - iter >= compound_topic_threshold)
-                    selected_ctopics.push_back(std::make_tuple(std::get<0>(*iter), std::get<1>(*iter), next_iter - iter));
-                iter = next_iter;
-            }
-            std::cout << "#Compound topics: " << selected_ctopics.size() << std::endl
-                << "#Docs selected for compound topics: "
-                << std::accumulate(selected_ctopics.begin(), selected_ctopics.end(), 0,
-                    [](const auto& lval, const auto& iter) {return lval + std::get<2>(iter); }) << std::endl
-                << "Doc Count threshold for compound topics: " << compound_topic_threshold << std::endl;
-            EdgeModel = new DenseMatrix<FPTYPE>(vocab_size, selected_ctopics.size());
-
-            pfor_dynamic_16(int ctopic = 0; ctopic < selected_ctopics.size(); ++ctopic) {
-                auto range = std::equal_range(top_topic_pairs.begin(), top_topic_pairs.end(),
-                    std::make_tuple(std::get<0>(selected_ctopics[ctopic]), std::get<1>(selected_ctopics[ctopic]), 0),
-                    [](const auto& l, const auto&r) { return std::get<0>(l) < std::get<0>(r)
-                    || (std::get<0>(l) == std::get<0>(r) && std::get<1>(l) < std::get<1>(r)); });
-                auto nDocs = std::get<2>(selected_ctopics[ctopic]);
-                for (auto iter = range.first; iter != range.second; ++iter) {
-                    auto doc = std::get<2>(*iter);
-                    for (auto pos = A_sp->offset_CSC(doc); pos < A_sp->offset_CSC(doc + 1); ++pos)
-                        EdgeModel->elem_ref(A_sp->row_CSC(pos), ctopic) += (FPTYPE)A_sp->normalized_val_CSC(pos) / nDocs;
-                }
-            }
-        }
+        if (flag_construct_edge_topics)
+            construct_edge_topics_v2(top_topic_pairs);
         timer->next_time_secs("Constructing edge topic model");
 
         //
@@ -535,16 +446,19 @@ namespace ISLE
 
         is_training_complete = true;
 
-        //output_topic_diversity();
-        output_cluster_summary(
-            coherences, avg_coherence,
-            nl_coherences, avg_nl_coherence, B_fl);
+        output_cluster_summary(coherences, avg_coherence, nl_coherences, avg_nl_coherence, B_fl);
         timer->next_time_secs("Output summary");
+
         output_model(true);
         timer->next_time_secs("Output model");
+
+        output_edge_model(true);
+        timer->next_time_secs("Output edge model");
+
         output_top_words();
         timer->next_time_secs("Output topwords");
-        if (print_doctopic) {
+
+        if (flag_print_doctopic) {
             output_doc_topic(catchword_topics, doc_topic_sum);
             timer->next_time_secs("Output doc-topic-catchword");
         }
@@ -553,19 +467,18 @@ namespace ISLE
     //
     // Calculate coherence based on cluster averages, without using catchwords
     //	
-    void
-        ISLETrainer::output_avg_topic_coherence(
-            FPTYPE& avg_nl_coherence,
-            std::vector<FPTYPE>& nl_coherences)
+    void ISLETrainer::output_avg_topic_coherence(
+        FPTYPE& avg_nl_coherence,
+        std::vector<FPTYPE>& nl_coherences)
     {
         assert(is_training_complete);
 
         DenseMatrix<FPTYPE> AvgModel(vocab_size, num_topics);
-        auto null_catchwords = new std::vector<vocabSz_t>[num_topics];
+        auto null_catchwords = new std::vector<word_id_t>[num_topics];
         A_sp->construct_topic_model(
             AvgModel, num_topics, closest_docs, null_catchwords,
             AVG_CLUSTER_FOR_CATCHLESS_TOPIC);
-        auto nl_top_words = new std::vector<std::pair<vocabSz_t, FPTYPE> >[num_topics];
+        auto nl_top_words = new std::vector<std::pair<word_id_t, FPTYPE> >[num_topics];
         A_sp->topic_coherence(num_topics, DEFAULT_COHERENCE_NUM_WORDS, AvgModel, nl_top_words, nl_coherences);
         avg_nl_coherence = std::accumulate(nl_coherences.begin(), nl_coherences.end(), 0.0) / num_topics;
         out_log->print_string(
@@ -576,15 +489,15 @@ namespace ISLE
         //
         // Output Model to File
         //
-        AvgModel.write_to_file(fileUnderDirNameString(log_dir, std::string("M_hat_avg")));
+        AvgModel.write_to_file(concat_file_path(log_dir, std::string("M_hat_avg")));
         timer->next_time_secs("Writing Mhat to file");
 
         //
         // Ouput Top Words to File
         //
         std::ofstream out_top_words_avg;
-        out_top_words_avg.open(fileUnderDirNameString(log_dir, std::string("TopWordsPerTopic_avg.txt")));
-        for (docsSz_t topic = 0; topic < num_topics; ++topic) {
+        out_top_words_avg.open(concat_file_path(log_dir, std::string("TopWordsPerTopic_avg.txt")));
+        for (doc_id_t topic = 0; topic < num_topics; ++topic) {
             for (auto iter = nl_top_words[topic].begin(); iter < nl_top_words[topic].end(); ++iter)
                 out_top_words_avg << vocab_words[iter->first] << "\t";
             out_top_words_avg << std::endl;
@@ -599,23 +512,22 @@ namespace ISLE
     //
     // Calculate Topic Diversity
     //
-    void
-        ISLETrainer::output_topic_diversity()
+    void ISLETrainer::output_topic_diversity()
     {
         assert(is_training_complete);
 
         auto avg_topic_vector = new FPTYPE[A_sp->vocab_size()];
-        for (vocabSz_t w = 0; w < Model->vocab_size(); ++w) avg_topic_vector[w] = 0.0;
+        for (word_id_t w = 0; w < Model->vocab_size(); ++w) avg_topic_vector[w] = 0.0;
         for (auto t = 0; t < num_topics; ++t)
-            axpy(Model->vocab_size(), 1.0 / num_topics, Model->data() + Model->vocab_size() * (size_t)t, 1,
+            FPaxpy(Model->vocab_size(), 1.0 / num_topics, Model->data() + Model->vocab_size() * (size_t)t, 1,
                 avg_topic_vector, 1);
         auto l2sq_dist_to_avg_topic = new FPTYPE[num_topics];
-        FPTYPE l2sq_avg_topic_vector = dot(Model->vocab_size(), avg_topic_vector, 1, avg_topic_vector, 1);
+        FPTYPE l2sq_avg_topic_vector = FPdot(Model->vocab_size(), avg_topic_vector, 1, avg_topic_vector, 1);
         for (auto t = 0; t < num_topics; ++t) {
             l2sq_dist_to_avg_topic[t] = l2sq_avg_topic_vector
-                + dot(Model->vocab_size(), Model->data() + Model->vocab_size() * (size_t)t, 1,
+                + FPdot(Model->vocab_size(), Model->data() + Model->vocab_size() * (size_t)t, 1,
                     Model->data() + Model->vocab_size() * (size_t)t, 1)
-                - 2.0 * dot(Model->vocab_size(), Model->data() + Model->vocab_size(), 1,
+                - 2.0 * FPdot(Model->vocab_size(), Model->data() + Model->vocab_size(), 1,
                     avg_topic_vector, 1);
         }
         auto avg_diversity = std::accumulate(l2sq_dist_to_avg_topic, l2sq_dist_to_avg_topic + num_topics, (FPTYPE)0.0) / num_topics;
@@ -626,17 +538,16 @@ namespace ISLE
     //
     // Output Catchwords and Dominant Words for each topic
     //
-    void
-        ISLETrainer::output_cluster_summary(
-            const std::vector<FPTYPE>& coherences,
-            const FPTYPE& avg_coherence,
-            const std::vector<FPTYPE>& nl_coherences,
-            const FPTYPE& avg_nl_coherence,
-            const FloatingPointSparseMatrix<FPTYPE> *const A_sp)
+    void ISLETrainer::output_cluster_summary(
+        const std::vector<FPTYPE>& coherences,
+        const FPTYPE& avg_coherence,
+        const std::vector<FPTYPE>& nl_coherences,
+        const FPTYPE& avg_nl_coherence,
+        const FloatingPointSparseMatrix<FPTYPE> *const A_sp)
     {
         assert(is_training_complete);
 
-        for (docsSz_t t = 0; t < num_topics; ++t) {
+        for (doc_id_t t = 0; t < num_topics; ++t) {
             out_log->print_string("\n---------- Topic: " + std::to_string(t)
                 + ", Cluster_size: " + std::to_string(closest_docs[t].size()) + " -----------\n", false);
             out_log->print_catch_words<A_TYPE>(t, catchword_thresholds + (size_t)t * A_sp->vocab_size(),
@@ -647,7 +558,7 @@ namespace ISLE
             out_log->print_string("\nCoherence: " + std::to_string(coherences[t]) + "\n", false);
         }
         out_log->print_string("\n---------------------------\n", false);
-        if (compute_avg_coherence)
+        if (flag_compute_avg_coherence)
             out_log->print_string("\n Avg coherence without catchwords : " + std::to_string(avg_nl_coherence) + "\n");
         out_log->print_string("\n Avg coherence: " + std::to_string(avg_coherence) + "\n\n");
 
@@ -665,30 +576,39 @@ namespace ISLE
     }
 
     //
-    //Output Model to File
+    // Output Model to file
     //
-    void
-        ISLETrainer::output_model(bool output_sparse)
+    void ISLETrainer::output_model(bool output_sparse)
     {
         assert(is_training_complete);
 
-        Model->write_to_file(fileUnderDirNameString(log_dir, std::string("M_hat_catch")));
-        if(output_sparse)
-            Model->write_to_file_as_sparse(fileUnderDirNameString(log_dir, std::string("M_hat_catch_sparse")));
-        timer->next_time_secs("Writing Mhat to file");
+        Model->write_to_file(concat_file_path(log_dir, std::string("M_hat_catch")));
+        if (output_sparse)
+            Model->write_to_file_as_sparse(concat_file_path(log_dir, std::string("M_hat_catch_sparse")));
+    }
+
+    //
+    // Output EdgeModel to file
+    //
+    void ISLETrainer::output_edge_model(bool output_sparse)
+    {
+        assert(is_training_complete);
+
+        EdgeModel->write_to_file(concat_file_path(log_dir, std::string("EdgeModel")));
+        if (output_sparse)
+            EdgeModel->write_to_file_as_sparse(concat_file_path(log_dir, std::string("EdgeModel_sparse")));
     }
 
     //
     // Ouput Top Words to File
     //
-    void
-        ISLETrainer::output_top_words()
+    void ISLETrainer::output_top_words()
     {
         assert(is_training_complete);
 
         std::ofstream out_top_words;
-        out_top_words.open(fileUnderDirNameString(log_dir, std::string("TopWordsPerTopic_catch.txt")));
-        for (docsSz_t topic = 0; topic < num_topics; ++topic) {
+        out_top_words.open(concat_file_path(log_dir, std::string("TopWordsPerTopic_catch.txt")));
+        for (doc_id_t topic = 0; topic < num_topics; ++topic) {
             for (auto iter = topwords[topic].begin(); iter < topwords[topic].end(); ++iter)
                 out_top_words << vocab_words[iter->first] << "\t";
             out_top_words << std::endl;
@@ -701,23 +621,22 @@ namespace ISLE
     // Output document catchword frequencies in 1-based index
     // Output doc-topic catchword sums in 1-based index
     //
-    void
-        ISLETrainer::output_doc_topic(std::vector<std::pair<vocabSz_t, int> >& catchword_topics,
-            std::vector<std::tuple<docsSz_t, docsSz_t, FPTYPE> >& doc_topic_sum)
+    void ISLETrainer::output_doc_topic(std::vector<std::pair<word_id_t, int> >& catchword_topics,
+        std::vector<std::tuple<doc_id_t, doc_id_t, FPTYPE> >& doc_topic_sum)
     {
         assert(is_training_complete);
 
-        /*std::vector<std::pair<vocabSz_t, docsSz_t> > catch_topic;
+        /*std::vector<std::pair<word_id_t, doc_id_t> > catch_topic;
         for (auto topic = 0; topic < num_topics; ++topic)
             for (auto iter = catchwords[topic].begin(); iter < catchwords[topic].end(); ++iter)
             catch_topic.push_back(std::make_pair(*iter, topic));*/
-        std::sort(catchword_topics.begin(), catchword_topics.end(),
+        parallel_sort(catchword_topics.begin(), catchword_topics.end(),
             [](const auto& l, const auto& r) {return l.first < r.first; });
         out_log->print_string("Total number of catchwords: " + std::to_string(catchword_topics.size()) + "\n");
 
         //Matrix Too big!!
         //DenseMatrix<FPTYPE> DocTopic(num_topics, num_docs);
-        std::string filename = fileUnderDirNameString(log_dir, std::string("DocCatchword.tsv"));
+        std::string filename = concat_file_path(log_dir, std::string("DocCatchword.tsv"));
 
 #if FILE_IO_MODE == NAIVE_FILE_IO
         { // Fill in code here
@@ -725,7 +644,7 @@ namespace ISLE
             Timer DTtimer;
             std::ofstream doc_catch_out;
             doc_catch_out.open(filename);
-            for (docsSz_t doc = 0; doc < A_sp->num_docs(); ++doc) {
+            for (doc_id_t doc = 0; doc < A_sp->num_docs(); ++doc) {
                 auto w_iter = catchword_topics.begin();
                 for (offset_t pos = A_sp->offset_CSC(doc); pos < A_sp->offset_CSC(doc + 1); ++pos) {
                     while (w_iter != catchword_topics.end() && w_iter->first < A_sp->row_CSC(pos))
@@ -748,10 +667,10 @@ namespace ISLE
             doc_catch_out.close();
             DTtimer.next_time_secs("DT: flush,close", 30);
 
-            std::string filename = fileUnderDirNameString(log_dir, std::string("DocTopicCatchwordSums.tsv"));
+            std::string filename = concat_file_path(log_dir, std::string("DocTopicCatchwordSums.tsv"));
             std::ofstream doc_topic_out;
             doc_topic_out.open(filename);
-            /*for (vocabSz_t doc = 0; doc < A_sp->num_docs(); ++doc)
+            /*for (word_id_t doc = 0; doc < A_sp->num_docs(); ++doc)
                 for (auto topic = 0; topic < num_topics; ++topic) {
                     if (DocTopic.elem(topic, doc) > 0.0) {
                         doc_topic_out << doc + 1 <<  '\t';
@@ -773,7 +692,7 @@ namespace ISLE
         {
             Timer DTtimer;
             MMappedOutput out(filename);
-            for (docsSz_t doc = 0; doc < A_sp->num_docs(); ++doc) {
+            for (doc_id_t doc = 0; doc < A_sp->num_docs(); ++doc) {
                 auto w_iter = catchword_topics.begin();
                 for (offset_t pos = A_sp->offset_CSC(doc); pos < A_sp->offset_CSC(doc + 1); ++pos) {
                     while (w_iter != catchword_topics.end() && w_iter->first < A_sp->row_CSC(pos))
@@ -796,9 +715,9 @@ namespace ISLE
             out.flush_and_close();
             DTtimer.next_time_secs("DT: flush,close", 30);
 
-            std::string filename = fileUnderDirNameString(log_dir, std::string("DocTopicCatchwordSums.tsv"));
+            std::string filename = concat_file_path(log_dir, std::string("DocTopicCatchwordSums.tsv"));
             MMappedOutput out_doc_topic(filename);
-            /*for (vocabSz_t doc = 0; doc < A_sp->num_docs(); ++doc)
+            /*for (word_id_t doc = 0; doc < A_sp->num_docs(); ++doc)
                 for (auto topic = 0; topic < num_topics; ++topic) {
                     if (DocTopic.elem(topic, doc) > 0.0) {
                         out_doc_topic.concat_int(doc + 1, '\t');
@@ -830,8 +749,238 @@ namespace ISLE
         return EdgeModel->num_docs();
     }
 
-    void ISLETrainer::get_edge_model(FPTYPE* edgeModel)
+    void ISLETrainer::get_edge_model(FPTYPE* edge_model)
     {
-        memcpy(edgeModel, EdgeModel->data(), (size_t)vocab_size * (size_t)EdgeModel->num_docs() * sizeof(FPTYPE));
+        memcpy(edge_model, EdgeModel->data(), (size_t)vocab_size * (size_t)EdgeModel->num_docs() * sizeof(FPTYPE));
+    }
+
+    void ISLETrainer::print_top_two_topics(
+        std::vector<std::tuple<int, int, doc_id_t> >& top_topic_pairs)
+    {
+        parallel_sort(top_topic_pairs.begin(), top_topic_pairs.end(),
+            [](const auto& l, const auto& r)
+        { return std::get<2>(l) < std::get<2>(r); });
+
+        std::string filename = concat_file_path(log_dir, std::string("TopTwoTopicsPerDoc.txt"));
+#if FILE_IO_MODE == NAIVE_FILE_IO
+
+        std::ofstream toptwotopics_out;
+        toptwotopics_out.open(filename);
+        for (auto iter = top_topic_pairs.begin(); iter != top_topic_pairs.end(); ++iter) {
+            toptwotopics_out << std::get<2>(*iter) << '\t'
+                << std::get<0>(*iter) << '\t'
+                << std::get<1>(*iter) << '\t';
+        }
+        toptwotopics_out.close();
+
+#elif FILE_IO_MODE == WIN_MMAP_FILE_IO || FILE_IO_MODE == LINUX_MMAP_FILE_IO
+
+        MMappedOutput out(filename);
+        for (auto iter = top_topic_pairs.begin(); iter != top_topic_pairs.end(); ++iter) {
+            out.concat_int(std::get<2>(*iter) + 1, '\t');
+            out.concat_int(std::get<0>(*iter) + 1, '\t');
+            out.concat_int(std::get<1>(*iter) + 1, '\n');
+        }
+        out.flush_and_close();
+
+#else
+        assert(false);
+#endif
+    }
+
+    void ISLETrainer::construct_edge_topics_v1(
+        std::vector<std::tuple<int, int, doc_id_t> >& top_topic_pairs,
+        bool flag_print_edge_topic_composition)
+    {
+        parallel_sort(top_topic_pairs.begin(), top_topic_pairs.end(),
+            [](const auto&l, const auto&r) {return std::get<0>(l) < std::get<0>(r)
+            || (std::get<0>(l) == std::get<0>(r) && std::get<1>(l) < std::get<1>(r)); });
+        std::cout << "#Top topic pairs for compound topics: " << top_topic_pairs.size() << std::endl;
+
+        std::vector<std::tuple<int, int, count_t> > sorted_ctopics;
+        for (auto iter = top_topic_pairs.begin(); iter != top_topic_pairs.end(); ) {
+            auto next_iter = std::upper_bound(iter, top_topic_pairs.end(), *iter,
+                [](const auto&l, const auto&r) {return std::get<0>(l) < std::get<0>(r)
+                || (std::get<0>(l) == std::get<0>(r) && std::get<1>(l) < std::get<1>(r)); });
+            if (next_iter - iter >= EDGE_TOPIC_MIN_DOCS)
+                sorted_ctopics.push_back(std::make_tuple(std::get<0>(*iter), std::get<1>(*iter), next_iter - iter));
+            iter = next_iter;
+        }
+
+        parallel_sort(sorted_ctopics.begin(), sorted_ctopics.end(),
+            [](const auto& l, const auto &r) {return std::get<2>(l) > std::get<2>(r); });
+        int running_count = 0; int edge_topic_threshold;
+        for (auto iter = sorted_ctopics.begin(); iter != sorted_ctopics.end(); ++iter) {
+            if (++running_count > max_edge_topics) {
+                edge_topic_threshold = std::get<2>(*iter);
+                break;
+            }
+        }
+
+        std::vector<std::tuple<int, int, count_t> > selected_pairs;
+        for (auto iter = top_topic_pairs.begin();
+            iter != top_topic_pairs.end() && selected_pairs.size() <= max_edge_topics;) {
+            auto next_iter = std::upper_bound(iter, top_topic_pairs.end(), *iter,
+                [](const auto&l, const auto&r) {return std::get<0>(l) < std::get<0>(r)
+                || (std::get<0>(l) == std::get<0>(r) && std::get<1>(l) < std::get<1>(r)); });
+            if (next_iter - iter >= EDGE_TOPIC_MIN_DOCS && next_iter - iter >= edge_topic_threshold)
+                selected_pairs.push_back(std::make_tuple(std::get<0>(*iter), std::get<1>(*iter), next_iter - iter));
+            iter = next_iter;
+        }
+
+        std::cout << "#Edge topics: " << selected_pairs.size() << std::endl
+            << "#Docs selected for edge topics: "
+            << std::accumulate(selected_pairs.begin(), selected_pairs.end(), 0,
+                [](const auto& lval, const auto& iter) {return lval + std::get<2>(iter); }) << std::endl
+            << "Doc Count threshold for edge topics: " << edge_topic_threshold << std::endl;
+
+        EdgeModel = new DenseMatrix<FPTYPE>(vocab_size, selected_pairs.size());
+        pfor_dynamic_16(int ctopic = 0; ctopic < selected_pairs.size(); ++ctopic) {
+            auto range = std::equal_range(top_topic_pairs.begin(), top_topic_pairs.end(),
+                std::make_tuple(std::get<0>(selected_pairs[ctopic]), std::get<1>(selected_pairs[ctopic]), 0),
+                [](const auto& l, const auto&r) { return std::get<0>(l) < std::get<0>(r)
+                || (std::get<0>(l) == std::get<0>(r) && std::get<1>(l) < std::get<1>(r)); });
+            auto nDocs = std::get<2>(selected_pairs[ctopic]);
+            for (auto iter = range.first; iter != range.second; ++iter) {
+                auto doc = std::get<2>(*iter);
+                for (auto pos = A_sp->offset_CSC(doc); pos < A_sp->offset_CSC(doc + 1); ++pos)
+                    EdgeModel->elem_ref(A_sp->row_CSC(pos), ctopic) += (FPTYPE)A_sp->normalized_val_CSC(pos) / nDocs;
+            }
+        }
+
+        if (flag_print_edge_topic_composition)
+            print_edge_topic_composition(selected_pairs);
+    }
+
+    void ISLETrainer::construct_edge_topics_v2(
+        std::vector<std::tuple<int, int, doc_id_t> >& top_topic_pairs,
+        bool flag_print_edge_topic_composition)
+    {
+        parallel_sort(top_topic_pairs.begin(), top_topic_pairs.end(),
+            [](const auto&l, const auto&r) {return std::get<0>(l) < std::get<0>(r)
+            || (std::get<0>(l) == std::get<0>(r) && std::get<1>(l) < std::get<1>(r)); });
+
+        std::vector<std::tuple<int, int, count_t> > selected_pairs;
+        for (auto iter = top_topic_pairs.begin(); iter != top_topic_pairs.end(); ) {
+            auto next_iter = std::upper_bound(iter, top_topic_pairs.end(), *iter,
+                [](const auto&l, const auto&r) {return std::get<0>(l) < std::get<0>(r)
+                || (std::get<0>(l) == std::get<0>(r) && std::get<1>(l) < std::get<1>(r)); });
+            if (next_iter - iter >= EDGE_TOPIC_MIN_DOCS)
+                selected_pairs.push_back(std::make_tuple(std::get<0>(*iter), std::get<1>(*iter), next_iter - iter));
+            iter = next_iter;
+        }
+        std::cout << "#Candidates for edge topics: " << selected_pairs.size() << std::endl;
+
+        parallel_sort(selected_pairs.begin(), selected_pairs.end(),
+            [](const auto& l, const auto &r) {return std::get<2>(l) > std::get<2>(r); });
+        int running_count = 0;
+        int edge_topic_threshold;
+        for (auto iter = selected_pairs.begin(); iter != selected_pairs.end(); ++iter) {
+            if (++running_count > max_edge_topics) {
+                edge_topic_threshold = std::get<2>(*iter);
+                // while (std::get<2>(*iter) == edge_topic_threshold && iter != selected_pairs.end())
+                //    iter++;
+                selected_pairs.erase(iter, selected_pairs.end());
+                break;
+            }
+        }
+
+        std::cout << "Edge topic threshold: " << edge_topic_threshold << std::endl;
+        std::cout << "#Edge topics: " << selected_pairs.size() << std::endl;
+
+        EdgeModel = new DenseMatrix<FPTYPE>(vocab_size, selected_pairs.size());
+        assert(Model != NULL);
+
+        for (auto t = 0; t < selected_pairs.size(); ++t) {
+            FPaxpy(vocab_size, EDGE_TOPIC_PRIMARY_RATIO,
+                Model->data() + std::get<0>(selected_pairs[t]), 1,
+                EdgeModel->data() + t * vocab_size, 1);
+            FPaxpy(vocab_size, 1 - EDGE_TOPIC_PRIMARY_RATIO,
+                Model->data() + std::get<1>(selected_pairs[t]), 1,
+                EdgeModel->data() + t * vocab_size, 1);
+        }
+
+        if (flag_print_edge_topic_composition) {
+            print_edge_topic_composition(selected_pairs);
+            print_edge_topic_top_words(selected_pairs, 10);
+        }
+    }
+
+    void ISLETrainer::print_edge_topic_composition(
+        std::vector<std::tuple<int, int, count_t> >& topic_pairs)
+    {
+        std::string filename = concat_file_path(log_dir, std::string("EdgeTopicComposition.txt"));
+
+#if FILE_IO_MODE == NAIVE_FILE_IO
+        std::ofstream out;
+        out.open(filename);
+        for (auto iter = topic_pairs.begin(); iter != topic_pairs.end(); ++iter) {
+            out << std::get<0>(*iter) << '\t'
+                << std::get<1>(*iter) << '\t'
+                << std::get<2>(*iter) << '\n';
+        }
+        out.close();
+#elif FILE_IO_MODE == WIN_MMAP_FILE_IO || FILE_IO_MODE == LINUX_MMAP_FILE_IO
+        MMappedOutput out(filename);
+        for (auto iter = topic_pairs.begin(); iter != topic_pairs.end(); ++iter) {
+            out.concat_int(std::get<0>(*iter) + 1, '\t');
+            out.concat_int(std::get<1>(*iter) + 1, '\t');
+            out.concat_int(std::get<2>(*iter) + 1, '\n');
+        }
+        out.flush_and_close();
+#else
+        assert(false);
+#endif
+    }
+
+    void ISLETrainer::print_edge_topic_top_words(
+        std::vector<std::tuple<int, int, count_t> >& topic_pairs,
+        const int num_top_words)
+    {
+        assert(EdgeModel != NULL);
+
+        std::string filename = concat_file_path(log_dir, std::string("EdgeTopicTopWords.txt"));
+        std::ofstream out;
+        out.open(filename);
+
+
+        for (auto iter = topic_pairs.begin(); iter != topic_pairs.end(); ++iter) {
+            auto t = iter - topic_pairs.begin();
+            out << "Edge Topic: " << t
+                << "  (" << std::get<0>(*iter) << ", "
+                << std::get<1>(*iter) << "): "
+                << std::get<2>(*iter) << '\n';
+
+            /*std::vector<std::pair<word_id_t, FPTYPE> > weights;
+            for (word_id_t w = 0; w < EdgeModel->vocab_size(); ++w)
+                weights.push_back(std::make_pair(w, EdgeModel->elem(w, t)));
+            std::sort(weights.begin(), weights.end(),
+                [](const auto& l, const auto& r) {return l.second >= r.second; });*/
+
+            std::vector<std::pair<word_id_t, FPTYPE> > top_words;
+            EdgeModel->find_n_top_words(t, num_top_words, top_words);
+            out << "Top words in edge_topic: \n";
+            for (int word = 0; word < num_top_words; ++word)
+                out << vocab_words[top_words[word].first]
+                << "(" << top_words[word].first << "," << top_words[word].second << ")\t";
+            out << "\n";
+
+            
+            Model->find_n_top_words(std::get<0>(*iter), num_top_words, top_words);
+            out << "Top words in topic: " << std::get<0>(*iter) << "\n";
+            for (int word = 0; word < num_top_words; ++word)
+                out << vocab_words[top_words[word].first] 
+                << "(" << top_words[word].first << "," << top_words[word].second << ")\t";
+            out << "\n";
+
+            
+            EdgeModel->find_n_top_words(std::get<1>(*iter), num_top_words, top_words);
+            out << "Top words in topic: " << std::get<1>(*iter) << "\n";
+            for (int word = 0; word < num_top_words; ++word)
+                out << vocab_words[top_words[word].first] 
+                << "(" << top_words[word].first << "," << top_words[word].second << ")\t";
+            out << "\n\n";
+        }
+        out.close();
     }
 }
