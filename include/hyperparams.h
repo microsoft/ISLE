@@ -57,6 +57,9 @@ namespace ISLE
 #define EDGE_TOPIC_MIN_DOCS 1
 
 #define EDGE_TOPIC_PRIMARY_RATIO 0.9
+
+#define INFER_ITERS_DEFAULT 15
+#define INFER_LF_DEAFULT 10.0
 }
 
 /*

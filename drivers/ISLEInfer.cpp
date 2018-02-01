@@ -29,7 +29,9 @@ int main(int argv, char**argc)
     const offset_t M_hat_catch_sparse_entries = atol(argc[8]);
 
     int iters = atol(argc[9]);
+    if (iters == 0) iters = INFER_ITERS_DEFAULT;
     FPTYPE Lfguess = atof(argc[10]);
+    if (Lfguess == 0.0) Lfguess = INFER_LF_DEAFULT;
 
     /*const std::string sparse_model_file = "C:\\Users\\HARSHASI\\Source\\Repos\\ISLE\\ISLETrain\\data\\Pudmed_Vocab140762_TrainDocs500k\\log_t_500_eps1_0.016667_eps2_0.333333_eps3_5.000000_kMppReps_1_kMLowDReps_10_kMReps_10_sample_0\\M_hat_catch_sparse";
     const std::string infer_file = "C:\\Users\\HARSHASI\\Source\\Repos\\ISLE\\ISLETrain\\data\\Pudmed_Vocab140762_TrainDocs500k\\TrainData500K.VocabIndex1.tsvd";
