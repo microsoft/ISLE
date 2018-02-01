@@ -50,11 +50,12 @@ If there is a problem with this, you could configure project file properties as 
 
 3. Run 
  ```
- ISLETrain <tdf_file> <vocab_file> <output_dir> <vocab_size> <num_docs> <max_entries> <num_topics> <sample(0/1)> <sample_rate>
+ ISLETrain <tdf_file> <vocab_file> <output_dir> <vocab_size> <num_docs> <max_entries> <num_topics> <sample(0/1)> <sample_rate> <edge topics(0/1) <max_edge_topics>
  ```
    * `<num_topics>` is the number of topics you want to recover from the `<tdf_file>`.
    * If the dataset is too large and you wish to use importance sampling, set `<sample>` to 1 (otherwise 0).
    * When `<sample>` is enabled by setting it to 1, you can specify the sampling rate with `<sample_rate>`. For example, 0.1.
+   * when `<edge topic>` is set to one, a larger "edge" topic model with up to `<max_edge_topics>` will be computed.
    * The output will be stored in a log directory under `<output_dir>`
 
 # Inference for a dataset using the trained model
