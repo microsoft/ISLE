@@ -1,5 +1,3 @@
-This repository provides code for SVD and Importance sampling-based algorithms for large scale topic modeling.
-
 # Build
 
 Both Linux and Windows 10 builds use Intel(R) MKL(R) library. We used 2017 version; other versions might work as well.
