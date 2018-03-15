@@ -11,6 +11,7 @@
 
 #include "Eigen/Core"
 
+#include "logger.h"
 #include "types.h"
 #include "hyperparams.h"
 
@@ -18,40 +19,29 @@ namespace ISLE
 {
     class LogUtils
     {
-        std::ofstream out_log;
-
     public:
-        LogUtils(const std::string& filename)
+        LogUtils(const std::string& log_dir)
         {
-            try {
-                out_log.open(filename);
-            }
-            catch (std::ios_base::failure& e) {
-                std::cerr << e.what() << '\n';
-                exit(-1);
-            }
+            global_openDiagnosticLogFile(log_dir);
         }
         ~LogUtils()
         {
-            out_log.close();
         }
 
         void print_string(
             const std::string& str,
             const bool print_to_terminal = true)
         {
-            out_log << str << std::flush;
-            if (print_to_terminal)
-                std::cout << str << std::flush;
+            LOG_DIAGNOSTIC(str);
+            LOG_INFO(str);
         }
 
         void print_stringstream(
             const std::ostringstream& stream,
             const bool print_to_terminal = true)
         {
-            out_log << stream.str() << std::flush;
-            if (print_to_terminal)
-                std::cout << stream.str() << std::flush;
+            LOG_DIAGNOSTIC(stream.str());
+            LOG_INFO(stream.str());
         }
 
         template <class catchT>

@@ -21,7 +21,7 @@ ISLE::Logger::Logger(std::string fnName)
   fn = fnName;
   level_ = level;
   //level += 1;
-#ifdef LIGHT_LOGGER
+#ifdef LOGGER
   std::string msg;
   for (int i = 0; i < level_; ++i) msg += "\t";
   msg += "Logging in " + fn;
@@ -125,13 +125,14 @@ bool ISLE::Logger::openTimerLogFile(const std::string& dir)
 
 bool ISLE::Logger::openDiagnosticLogFile(const std::string& dir)
 {
+#ifdef LOGGER
   assert(!diagnosticLogStream.is_open());
   assert(!isDiagnosticFileOpen);
 
   diagnosticLogStream.open(dir + "/diagnosticLog.txt", std::ofstream::out);
   if (diagnosticLogStream.is_open())
     isDiagnosticFileOpen = true;
-
+#endif
   return isDiagnosticFileOpen;
 }
 
@@ -141,10 +142,9 @@ void ISLE::Logger::log_diagnostic(
   const std::string& fnName,
   int lineNo)
 {
-#ifdef LIGHT_LOGGER
+#ifdef LOGGER
   std::string str;
   for (int i = 0; i < level_; ++i) str += "\t";
-  str += fileName + "(" + fnName + ":" + std::to_string(lineNo) + "): " + msg;
   if (isDiagnosticFileOpen)
     diagnosticLogStream << str << std::endl;
 #endif
@@ -169,7 +169,7 @@ void ISLE::Logger::log_diagnostic(
 
 ISLE::Logger::~Logger()
 {
-#ifdef LIGHT_LOGGER
+#ifdef LOGGER
   std::string msg;
   for (int i = 0; i < level_; ++i) msg += "\t";
   msg += "Done logging in " + fn;

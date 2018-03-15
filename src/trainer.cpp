@@ -61,7 +61,7 @@ namespace ISLE
         log_dir = log_dir_name(num_topics, output_path_base, flag_sample_docs, sample_rate);
         create_dir(log_dir);
 
-        out_log = new LogUtils(concat_file_path(log_dir, std::string("run_log.txt")));
+        out_log = new LogUtils(log_dir);
         timer = new Timer(concat_file_path(log_dir, std::string("time_log.txt")));
 
         is_data_loaded = false;

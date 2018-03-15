@@ -3,9 +3,8 @@
 
 #pragma once
 
-#ifdef LOGGER
-#define LIGHT_LOGGER
-#endif
+#define LOGGER
+//#define VERBOSE
 
 #include <iostream>
 #include <fstream>
