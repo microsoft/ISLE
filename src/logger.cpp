@@ -116,7 +116,7 @@ bool ISLE::Logger::openTimerLogFile(const std::string& dir)
   assert(!timerLogStream.is_open());
   assert(!isTimerFileOpen);
 
-  timerLogStream.open(dir + "/timerLog", std::ofstream::out);
+  timerLogStream.open(dir + "/timerLog.txt", std::ofstream::out);
   if (timerLogStream.is_open())
     isTimerFileOpen = true;
 
@@ -128,7 +128,7 @@ bool ISLE::Logger::openDiagnosticLogFile(const std::string& dir)
   assert(!diagnosticLogStream.is_open());
   assert(!isDiagnosticFileOpen);
 
-  diagnosticLogStream.open(dir + "/diagnosticLog", std::ofstream::out);
+  diagnosticLogStream.open(dir + "/diagnosticLog.txt", std::ofstream::out);
   if (diagnosticLogStream.is_open())
     isDiagnosticFileOpen = true;
 

@@ -22,7 +22,7 @@
 //  5. DestrotTrainer
 //
 //  ToDo:
-//	1. Logger callback
+//	1. LogUtils callback
 //	2. Other statistics
 //
 

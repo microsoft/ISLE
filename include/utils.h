@@ -17,7 +17,7 @@
 
 #include "Eigen/Core"
 
-#include "logger.h"
+#include "logUtils.h"
 #include "types.h"
 #include "hyperparams.h"
 
@@ -538,6 +538,8 @@ namespace ISLE
         const std::string& output_path_base,
         const bool& sample_docs,
         const FPTYPE& sample_rate);
+
+    void create_dir(const std::string& dir_name);
 
     template <class T>
     inline T divide_round_up(

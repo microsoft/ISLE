@@ -21,7 +21,7 @@
 
 #include "types.h"
 #include "timer.h"
-#include "logger.h"
+#include "logUtils.h"
 #include "utils.h"
 #include "hyperparams.h"
 #include "denseMatrix.h"
@@ -52,16 +52,8 @@ namespace ISLE
         const bool          flag_print_top_two_topics;
 
         std::string			log_dir;
-#ifdef _MSC_VER
-        std::wstring		log_dir_wstr;
-        LPCWSTR				log_dir_lpcwstr;
-#endif
-#ifdef LINUX
-        std::string         log_dir_wstr;
-        char*               log_dir_lpcwstr;
-#endif
 
-        Logger*				out_log;
+        LogUtils*			out_log;
         Timer*				timer;
 
         bool				is_data_loaded;

@@ -24,7 +24,7 @@
     <ClInclude Include="..\..\include\denseMatrix.h" />
     <ClInclude Include="..\..\include\hyperparams.h" />
     <ClInclude Include="..\..\include\infer.h" />
-    <ClInclude Include="..\..\include\logger.h" />
+    <ClInclude Include="..\..\include\logUtils.h" />
     <ClInclude Include="..\..\include\matUtils.h" />
     <ClInclude Include="..\..\include\parallel.h" />
     <ClInclude Include="..\..\include\sparseMatrix.h" />

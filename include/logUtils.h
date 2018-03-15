@@ -16,10 +16,8 @@
 
 namespace ISLE
 {
-
     class LogUtils
     {
-
         std::ofstream out_log;
 
     public:
