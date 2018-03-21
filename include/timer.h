@@ -10,31 +10,36 @@
 #include <iomanip>
 #include <chrono>
 
+#include "logger.h"
+
 namespace ISLE
 {
     class Timer {
         clock_t usert_begin, usert_before, usert_after, usert_last;
         std::chrono::time_point<std::chrono::high_resolution_clock> syst_begin, syst_before, syst_after, syst_last;
         std::ofstream time_log;
-        bool log;
+        bool is_log_file_open;
     public:
         Timer()
-            : usert_last(0), log(false)
+            : usert_last(0), is_log_file_open(false)
         {
             usert_before = usert_after = usert_begin = std::clock();
             syst_before = syst_after = syst_begin = std::chrono::high_resolution_clock::now();
         }
-        Timer(const std::string& log_path)
-            : usert_last(0), log(true)
+
+        Timer(const std::string& log_dir)
+            : usert_last(0), is_log_file_open(true)
         {
             usert_before = usert_after = usert_begin = std::clock();
             syst_before = syst_after = syst_begin = std::chrono::high_resolution_clock::now();
-            time_log.open(log_path);
+            global_open_timer_log_file(log_dir);
+            /*time_log.open(log_path);
             if (time_log.fail()) {
                 std::cerr << "open failure error no: " << strerror(errno) << std::endl;
                 exit(-1);
-            }
+            }*/
         }
+
         ~Timer()
         {
             time_log.close();
@@ -72,9 +77,10 @@ namespace ISLE
             double syst_secs = next_sys_time().count();
             std::ostringstream ostr;
             ostr << "Time for " << std::setfill('.') << std::setw(fill_len) << std::left << text
-                << usert_secs << "s(user)  " << syst_secs << "s(sys)" << "\n";
-            std::cout << ostr.str() << std::flush;
-            if (log)	time_log << ostr.str() << std::flush;
+                << usert_secs << "s(user)  " << syst_secs << "s(sys)" ;
+            std::cout << ostr.str() << std::endl;
+            if (is_log_file_open)	
+                LOG_TIMER(ostr.str());
             return std::make_pair(usert_secs, syst_secs);
         }
 
@@ -107,10 +113,10 @@ namespace ISLE
             std::ostringstream ostr;
             ostr << "Total time for "
                 << std::setfill('.') << std::setw(50) << std::left
-                << text << user_secs << "s(user)  " << sys_secs << "s(secs)" << std::endl;
-            std::cout << ostr.str() << std::flush;
-            if (log)
-                time_log << ostr.str() << std::flush;
+                << text << user_secs << "s(user)  " << sys_secs << "s(secs)";
+            std::cout << ostr.str() << std::endl;
+            if (is_log_file_open)
+                LOG_TIMER(ostr.str());
             return std::make_pair(user_secs, sys_secs);
         }
     };

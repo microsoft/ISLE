@@ -45,7 +45,32 @@ std::string ISLE::log_dir_name(
     return concat_file_path(output_path_base, log_subdir);
 }
 
-std::string ISLE::concat_file_path(const std::string& dir, const std::string& filename)
+void ISLE::create_dir(const std::string& dir_name)
+{
+#if defined(_MSC_VER)
+    std::wstring log_dir_wstr = std::wstring(dir_name.begin(), dir_name.end());
+    LPCWSTR log_dir_lpcwstr = log_dir_wstr.c_str();
+    if (!(CreateDirectory(log_dir_lpcwstr, NULL) ||
+        ERROR_ALREADY_EXISTS == GetLastError()))
+        std::cerr << "Subdir creation error" << std::endl;
+#elif defined(LINUX)
+    std::string log_dir_wstr = std::string(dir_name.begin(), dir_name.end());
+    char* log_dir_lpcwstr = new char[4000];
+    strcpy(log_dir_lpcwstr, log_dir_wstr.c_str());
+    struct stat st = { 0 };
+    if (stat(log_dir_lpcwstr, &st) == -1)
+        mkdir(log_dir_lpcwstr, S_IRWXU);
+    else
+        std::cerr << "Subdir exists already" << std::endl;
+    delete log_dir_lpcwstr;
+#else
+    assert(false);
+#endif
+}
+
+std::string ISLE::concat_file_path(
+    const std::string& dir, 
+    const std::string& filename)
 {
 #if defined(_MSC_VER)
     return dir + "\\" + filename;

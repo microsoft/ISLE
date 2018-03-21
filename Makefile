@@ -28,7 +28,7 @@ CC=g++-5
 IFLAGS= -I . -I spectra-master -I $(INCLUDE_DIR) -I$(MKL_ROOT)/include
 CFLAGS= -ggdb -O3 -std=c++14 -DLINUX $(DEBUGGING_FLAGS) $(CONFIG_FLAGS) $(MKL_EIGEN_FLAGS) $(CILK_FLAGS)
 
-INCLUDES =  $(INCLUDE_DIR)/timer.h $(INCLUDE_DIR)/logger.h \
+INCLUDES =  $(INCLUDE_DIR)/timer.h $(INCLUDE_DIR)/logUtils.h \
 	    $(INCLUDE_DIR)/matUtils.h $(INCLUDE_DIR)/hyperparams.h \
 	    $(INCLUDE_DIR)/sparseMatrix.h $(INCLUDE_DIR)/denseMatrix.h \
 	    $(INCLUDE_DIR)/utils.h $(INCLUDE_DIR)/types.h \

@@ -56,32 +56,13 @@ namespace ISLE
         }
 
         //
-        // Initialize  log directories, vocablist, and timer
+        // Initialize  is_log_file_open directories, vocablist, and timer
         //
         log_dir = log_dir_name(num_topics, output_path_base, flag_sample_docs, sample_rate);
+        create_dir(log_dir);
 
-#if defined(_MSC_VER)
-        log_dir_wstr = std::wstring(log_dir.begin(), log_dir.end());
-        log_dir_lpcwstr = log_dir_wstr.c_str();
-        if (!(CreateDirectory(log_dir_lpcwstr, NULL) ||
-            ERROR_ALREADY_EXISTS == GetLastError()))
-            std::cerr << "Subdir creation error" << std::endl;
-#elif defined(LINUX)
-        log_dir_wstr = std::string(log_dir.begin(), log_dir.end());
-        log_dir_lpcwstr = new char[4000];
-        strcpy(log_dir_lpcwstr, log_dir_wstr.c_str());
-        struct stat st = { 0 };
-        if (stat(log_dir_lpcwstr, &st) == -1)
-            mkdir(log_dir_lpcwstr, S_IRWXU);
-        else
-            std::cerr << "Subdir exists already" << std::endl;
-        delete log_dir_lpcwstr;
-#else
-        assert(false);
-#endif
-
-        out_log = new Logger(concat_file_path(log_dir, std::string("run_log.txt")));
-        timer = new Timer(concat_file_path(log_dir, std::string("time_log.txt")));
+        out_log = new LogUtils(log_dir);
+        timer = new Timer(log_dir);
 
         is_data_loaded = false;
 
@@ -452,8 +433,10 @@ namespace ISLE
         output_model(true);
         timer->next_time_secs("Output model");
 
-        output_edge_model(true);
-        timer->next_time_secs("Output edge model");
+        if (flag_construct_edge_topics) {
+            output_edge_model(true);
+            timer->next_time_secs("Output edge model");
+        }
 
         output_top_words();
         timer->next_time_secs("Output topwords");

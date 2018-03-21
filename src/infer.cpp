@@ -389,7 +389,7 @@ namespace ISLE
         return llh;
     }
 
-    // Returns llh = \sum_d a[d] * log{(M*w)[d]}
+    // Returns llh = \sum_d a[d] * is_log_file_open{(M*w)[d]}
     bool ISLEInfer::mwu(
         const FPTYPE *const a,
         const FPTYPE *const M,
