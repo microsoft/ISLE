@@ -106,7 +106,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Debug|x64'">
     <LinkIncremental>true</LinkIncremental>
-    <IncludePath>C:\Program Files %28x86%29\IntelSWTools\compilers_and_libraries_2017\windows\mkl\include;C:\Users\HARSHASI\Source\Repos\Microsoft\ISLE;C:\Users\HARSHASI\Source\Repos\Microsoft\ISLE\include;.;$(IncludePath)</IncludePath>
+    <IncludePath>C:\Program Files %28x86%29\IntelSWTools\compilers_and_libraries_2017\windows\mkl\include;$(SolutionDir)..;$(SolutionDir)..\include;.;$(IncludePath)</IncludePath>
     <LibraryPath>C:\Program Files %28x86%29\IntelSWTools\compilers_and_libraries_2017\windows\mkl\lib\intel64_win;$(LibraryPath)</LibraryPath>
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|Win32'">
@@ -115,7 +115,7 @@
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
     <LibraryPath>C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2017\windows\mkl\lib\intel64_win;$(LibraryPath)</LibraryPath>
-    <IncludePath>C:\Users\HARSHASI\Source\Repos\Microsoft\ISLE;C:\Users\HARSHASI\Source\Repos\Microsoft\ISLE\include;$(IncludePath)</IncludePath>
+    <IncludePath>$(SolutionDir)..;$(SolutionDir)..\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">
     <ClCompile>
