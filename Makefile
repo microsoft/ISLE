@@ -33,8 +33,8 @@ INCLUDES =  $(INCLUDE_DIR)/timer.h $(INCLUDE_DIR)/logUtils.h \
 	    $(INCLUDE_DIR)/sparseMatrix.h $(INCLUDE_DIR)/denseMatrix.h \
 	    $(INCLUDE_DIR)/utils.h $(INCLUDE_DIR)/types.h \
 	    $(INCLUDE_DIR)/trainer.h $(INCLUDE_DIR)/parallel.h \
-	    $(INCLUDE_DIR)/infer.h
-
+	    $(INCLUDE_DIR)/infer.h $(INCLUDE_DIR)/logger.h
+ 
 all: ISLETrain ISLEInfer
 
 trainer.o: $(SRC_DIR)/trainer.cpp $(INCLUDES)
@@ -52,11 +52,14 @@ denseMatrix.o : $(SRC_DIR)/denseMatrix.cpp $(INCLUDES)
 sparseMatrix.o : $(SRC_DIR)/sparseMatrix.cpp $(INCLUDES)
 	$(CC) -c -o $@ $< $(IFLAGS) $(CFLAGS) $(MKL_PAR_LDFLAGS) $(CILK_LDFLAGS)
 
-ISLETrain:  $(DRIVER_DIR)/ISLETrain.cpp trainer.o utils.o denseMatrix.o sparseMatrix.o $(INCLUDES)
-	$(CC) -o $@ $< trainer.o utils.o denseMatrix.o sparseMatrix.o $(IFLAGS) $(CFLAGS) $(MKL_PAR_LDFLAGS) $(CILK_LDFLAGS)
+logger.o : $(SRC_DIR)/logger.cpp $(INCLUDES)
+	$(CC) -c -o $@ $< $(IFLAGS) $(CFLAGS) $(MKL_PAR_LDFLAGS) $(CILK_LDFLAGS)
 
-ISLEInfer: $(DRIVER_DIR)/ISLEInfer.cpp infer.o utils.o denseMatrix.o sparseMatrix.o $(INCLUDES)
-	$(CC) -o $@ $< infer.o utils.o denseMatrix.o sparseMatrix.o $(IFLAGS) $(CFLAGS) $(MKL_SEQ_LDFLAGS) $(CILK_LDFLAGS)
+ISLETrain:  $(DRIVER_DIR)/ISLETrain.cpp trainer.o utils.o denseMatrix.o sparseMatrix.o logger.o $(INCLUDES)
+	$(CC) -o $@ $< trainer.o utils.o denseMatrix.o sparseMatrix.o logger.o $(IFLAGS) $(CFLAGS) $(MKL_PAR_LDFLAGS) $(CILK_LDFLAGS)
+
+ISLEInfer: $(DRIVER_DIR)/ISLEInfer.cpp infer.o utils.o denseMatrix.o sparseMatrix.o logger.o $(INCLUDES)
+	$(CC) -o $@ $< infer.o utils.o denseMatrix.o sparseMatrix.o logger.o $(IFLAGS) $(CFLAGS) $(MKL_SEQ_LDFLAGS) $(CILK_LDFLAGS)
 
 .PHONY: clean cleanest
 
