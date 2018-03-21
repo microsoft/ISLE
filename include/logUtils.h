@@ -22,7 +22,7 @@ namespace ISLE
     public:
         LogUtils(const std::string& log_dir)
         {
-            global_openDiagnosticLogFile(log_dir);
+            global_open_diagnostic_log_file(log_dir);
         }
         ~LogUtils()
         {

@@ -93,7 +93,7 @@ namespace ISLE
             const std::string&	output_path_base_ = std::string(""), // Logs and output are written in a subdir under this directory
             const bool	construct_edge_topics_ = false,          // Construct edge topics (aka compound topics) from simple topics
             const int	max_edge_topics_ = 100000,           // Maximum number of edge topics
-            const bool	compute_log_combinatorial_ = false,      // Compute log(#TotalWordsInDoc)/\prod_{word \in doc}log(freq(word)) for each doc in input
+            const bool	compute_log_combinatorial_ = false,      // Compute is_log_file_open(#TotalWordsInDoc)/\prod_{word \in doc}is_log_file_open(freq(word)) for each doc in input
             const bool	compute_distinct_top_five_sets_ = false, // Compute how many distinct quintuplets of words occur as top five in a doc
             const bool	compute_avg_coherence_ = false,          // Compute the average coherence of the topics, relevant constants in hyperparams.h
             const bool	print_doctopic_ = false,                 // How many of each topic's catchwords are in a doc?

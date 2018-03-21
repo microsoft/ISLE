@@ -56,13 +56,13 @@ namespace ISLE
         }
 
         //
-        // Initialize  log directories, vocablist, and timer
+        // Initialize  is_log_file_open directories, vocablist, and timer
         //
         log_dir = log_dir_name(num_topics, output_path_base, flag_sample_docs, sample_rate);
         create_dir(log_dir);
 
         out_log = new LogUtils(log_dir);
-        timer = new Timer(concat_file_path(log_dir, std::string("time_log.txt")));
+        timer = new Timer(log_dir);
 
         is_data_loaded = false;
 
@@ -433,8 +433,10 @@ namespace ISLE
         output_model(true);
         timer->next_time_secs("Output model");
 
-        output_edge_model(true);
-        timer->next_time_secs("Output edge model");
+        if (flag_construct_edge_topics) {
+            output_edge_model(true);
+            timer->next_time_secs("Output edge model");
+        }
 
         output_top_words();
         timer->next_time_secs("Output topwords");

@@ -62,12 +62,12 @@ namespace ISLE
 #define LOG_WARNING(msg)	global_log_warning	  (msg, __FILE__, __func__, __LINE__)
 #define LOG_ERROR(msg)		global_log_error	  (msg, __FILE__, __func__, __LINE__)
 
-#define LOG_DIAGNOSTIC(var)			 global_log_diagnostic       (var, #var, __FILE__, __LINE__)
-#define LOG_DIAGNOSTIC_MSG(msg)		 global_log_diagnostic       (msg, __FILE__, __func__, __LINE__)
-#define OPEN_DIAGNOSTIC_LOGFILE(dir) global_openDiagnosticLogFile(dir)
+#define LOG_DIAGNOSTIC(var)			 global_log_diagnostic(var, #var, __FILE__, __LINE__)
+#define LOG_DIAGNOSTIC_MSG(msg)		 global_log_diagnostic(msg, __FILE__, __func__, __LINE__)
+#define OPEN_DIAGNOSTIC_LOGFILE(dir) global_open_diagnostic_log_file(dir)
 
-#define LOG_TIMER(msg)          global_log_timer          (msg, __FILE__, __func__, __LINE__)
-#define OPEN_TIMER_LOGFILE(dir) global_openTimerLogFile   (dir)
+#define LOG_TIMER(msg)          global_log_timer(msg, __FILE__, __func__, __LINE__)
+#define OPEN_TIMER_LOGFILE(dir) global_open_timer_log_file(dir)
 
 #define NAME(var) (#var)
 
@@ -82,11 +82,11 @@ namespace ISLE
   void global_log_error(const std::string& msg, const std::string& fileName, const std::string& fnName, int lineNo);
 
   void global_log_timer(const std::string& msg, const std::string& fileName, const std::string& fnName, int lineNo);
-  bool global_openTimerLogFile(const std::string& outDir);
+  bool global_open_timer_log_file(const std::string& outDir);
 
   void global_log_diagnostic(const std::string& msg, const std::string& fileName, const std::string& fnName, int lineNo);
   void global_log_diagnostic(const int& num, const std::string& num_name, const std::string& fileName, int lineNo);
-  bool global_openDiagnosticLogFile(const std::string& outDir);
+  bool global_open_diagnostic_log_file(const std::string& outDir);
 
   void global_set_trace_func(ChannelFunc func_);
   void global_set_info_func(ChannelFunc func_);

@@ -206,7 +206,7 @@ void ISLE::global_log_timer(const std::string& msg, const std::string& fileName,
 {
   GlobalLogger.log_timer(msg, fileName, fnName, lineNo);
 }
-bool ISLE::global_openTimerLogFile(const std::string& dir)
+bool ISLE::global_open_timer_log_file(const std::string& dir)
 {
   return GlobalLogger.openTimerLogFile(dir);
 }
@@ -219,7 +219,7 @@ void ISLE::global_log_diagnostic(const int& num, const std::string& numName, con
 {
   GlobalLogger.log_diagnostic(num, numName, fnName, lineNo);
 }
-bool ISLE::global_openDiagnosticLogFile(const std::string& dir)
+bool ISLE::global_open_diagnostic_log_file(const std::string& dir)
 {
   return GlobalLogger.openDiagnosticLogFile(dir);
 }
