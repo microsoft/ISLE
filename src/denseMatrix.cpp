@@ -211,7 +211,7 @@ namespace ISLE
         U(NULL),
         VT(NULL),
         Sigma(NULL),
-        spectraSigmaVT(NULL)
+        SigmaVT(NULL)
     {
         num_singular_vals = num_docs() > vocab_size() ? vocab_size() : num_docs();
     }
@@ -289,9 +289,9 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::initialize_for_Spectra(const doc_id_t num_topics)
+    void FloatingPointDenseMatrix<FPTYPE>::initialize_for_eigensolver(const doc_id_t num_topics)
     {
-        spectraSigmaVT = new FPTYPE[(size_t)num_topics*(size_t)num_docs()];
+        SigmaVT = new FPTYPE[(size_t)num_topics*(size_t)num_docs()];
 
         // Construct BBT = this * (this)^T, defaults to col-major
         BBT.resize(vocab_size(), vocab_size());
@@ -302,7 +302,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::compute_truncated_Spectra(const doc_id_t num_topics)
+    void FloatingPointDenseMatrix<FPTYPE>::compute_Spectra(const doc_id_t num_topics)
     {
         // Call truncated Symm Eigensolve on BBT to get squared singular vals and U_trunc
         /*Spectra::DenseSymMatProd<FPTYPE> op(BBT);
@@ -320,7 +320,7 @@ namespace ISLE
         assert(nconv >= (int)num_topics); // Number of converged eig vals >= #topics
         assert(eigs.info() == Spectra::SUCCESSFUL);
 
-        // Set this->spectraSigmaVT by U^T*this
+        // Set this->SigmaVT by U^T*this
         auto evalues = eigs.eigenvalues();
         assert(evalues(num_topics - 1) > 0.0);
 
@@ -339,7 +339,7 @@ namespace ISLE
         FPgemm(CblasColMajor, CblasTrans, CblasNoTrans,
             num_topics, num_docs(), vocab_size(),
             (FPTYPE)1.0, U_Spectra.data(), vocab_size(), this->data(), vocab_size(),
-            (FPTYPE)0.0, spectraSigmaVT, num_topics);
+            (FPTYPE)0.0, SigmaVT, num_topics);
     }
 
     template<class FPTYPE>
@@ -348,12 +348,12 @@ namespace ISLE
         const doc_id_t k,
         bool hardCopy) // true for memcpy, false for alias
     {
-        assert(from.spectraSigmaVT != NULL);
+        assert(from.SigmaVT != NULL);
         assert(from.num_docs() == num_docs() && vocab_size() == k);
 
         if (hardCopy) {
             assert(_alloc && data() != NULL);
-            memcpy(data(), from.spectraSigmaVT, sizeof(FPTYPE) * (size_t)k * (size_t)num_docs());
+            memcpy(data(), from.SigmaVT, sizeof(FPTYPE) * (size_t)k * (size_t)num_docs());
         }
         else {
             if (_alloc) {
@@ -361,7 +361,7 @@ namespace ISLE
                 delete[] A;
                 _alloc = false;
             }
-            A = from.spectraSigmaVT;
+            A = from.SigmaVT;
         }
     }
 
@@ -371,12 +371,12 @@ namespace ISLE
         const doc_id_t k,
         bool hardCopy)
     {
-        assert(from.spectraSigmaVT != NULL);
+        assert(from.SigmaVT != NULL);
         assert(from.num_docs() == num_docs() && vocab_size() == k);
 
         if (hardCopy) {
             assert(_alloc && data() != NULL);
-            memcpy(data(), from.spectraSigmaVT, sizeof(FPTYPE) * (size_t)k * (size_t)num_docs());
+            memcpy(data(), from.SigmaVT, sizeof(FPTYPE) * (size_t)k * (size_t)num_docs());
         }
         else {
             if (_alloc) {
@@ -384,7 +384,7 @@ namespace ISLE
                 delete[] A;
                 _alloc = false;
             }
-            A = from.spectraSigmaVT;
+            A = from.SigmaVT;
         }
     }
 
@@ -407,7 +407,7 @@ namespace ISLE
     template<class FPTYPE>
     FPTYPE* FloatingPointDenseMatrix<FPTYPE>::get_ptr_to_spectraSigmaVT()
     {
-        return spectraSigmaVT;
+        return SigmaVT;
     }
 
     template<class FPTYPE>
@@ -420,7 +420,7 @@ namespace ISLE
             << " (U: " << U_TOLERANCE << ")  (VT: " << VT_TOLERANCE << ")" << std::endl;
         assert(U != NULL);
         assert(U_Spectra.data() != NULL);
-        assert(Sigma != NULL);	assert(spectraSigmaVT != NULL);
+        assert(Sigma != NULL);	assert(SigmaVT != NULL);
         assert(U_Spectra.IsRowMajor == false);
         for (doc_id_t topic = 0; topic < num_topics; ++topic)
             for (word_id_t word = 0; word < vocab_size(); ++word)
@@ -440,18 +440,18 @@ namespace ISLE
 
         assert(VT != NULL);
         assert(Sigma != NULL);
-        assert(spectraSigmaVT != NULL);
+        assert(SigmaVT != NULL);
         for (doc_id_t doc = 0; doc < num_docs(); ++doc)
             for (doc_id_t topic = 0; topic < num_topics; ++topic)
-                if (!(std::abs(spectraSigmaVT[doc*num_topics + topic]
+                if (!(std::abs(SigmaVT[doc*num_topics + topic]
                     - VT[(size_t)doc * (size_t)num_singular_vals + (size_t)topic] * Sigma[topic])
                     < VT_TOLERANCE
-                    || std::abs(spectraSigmaVT[(size_t)doc*(size_t)num_topics + (size_t)topic]
+                    || std::abs(SigmaVT[(size_t)doc*(size_t)num_topics + (size_t)topic]
                         + VT[(size_t)doc*(size_t)num_singular_vals + (size_t)topic] * Sigma[topic])
                     < VT_TOLERANCE))
                     std::cout << "Topic: " << topic << " Doc: " << doc
                     << std::setw(15) << std::right
-                    << "Spectra> SigVT: " << spectraSigmaVT[(size_t)doc*(size_t)num_topics + (size_t)topic]
+                    << "Spectra> SigVT: " << SigmaVT[(size_t)doc*(size_t)num_topics + (size_t)topic]
                     << std::setw(10) << std::right
                     << "\tMKL> Sig*VT: " << VT[(size_t)doc*(size_t)num_singular_vals + (size_t)topic] * Sigma[topic]
                     << std::setw(10) << std::right
@@ -461,11 +461,11 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::cleanup_Spectra()
+    void FloatingPointDenseMatrix<FPTYPE>::cleanup_after_eigensolver()
     {
-        assert(spectraSigmaVT != NULL);
-        delete[] spectraSigmaVT;
-        spectraSigmaVT = NULL;
+        assert(SigmaVT != NULL);
+        delete[] SigmaVT;
+        SigmaVT = NULL;
     }
 
     template<class FPTYPE>
@@ -957,7 +957,7 @@ namespace ISLE
                     SigmaVT[(size_t)doc * (size_t)k + topic] = Sigma[topic] * VT[(size_t)doc * (size_t)num_singular_vals + topic];
         }
         else if (spectrum_source == EIGEN_SOURCE_SPECTRA) {
-            SigmaVT = spectraSigmaVT;
+            SigmaVT = SigmaVT;
         }
 
         FPTYPE *const centers_l2sq = new FPTYPE[k];

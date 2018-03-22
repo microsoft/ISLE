@@ -170,7 +170,7 @@ namespace ISLE
     {
         Eigen::MatrixX BBT;				// For Spectra EigenSolve
         Eigen::MatrixX U_Spectra;		// first few eig vectors of this*this^T
-        FPTYPE *spectraSigmaVT;			// Sigma * VT obtained from truncatated Spectra solve
+        FPTYPE *SigmaVT;			    // Sigma * VT obtained from eigensolvers 
         MKL_INT num_singular_vals;		// Number of Singular values
 
     public:
@@ -215,13 +215,13 @@ namespace ISLE
             std::vector<WordDocPair>& entries,
             std::vector<offset_t>& word_offsets);
 
-        void initialize_for_Spectra(const doc_id_t num_topics);
+        void initialize_for_eigensolver(const doc_id_t num_topics);
 
-        void compute_truncated_Spectra(
+        void cleanup_after_eigensolver();
+
+        void compute_Spectra(
             const doc_id_t num_topics,
             std::vector<FPTYPE>& evalues);
-
-        void cleanup_Spectra();
 
         void compute_block_ks(
             const doc_id_t num_topics,

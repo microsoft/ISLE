@@ -119,7 +119,7 @@ namespace ISLE
         FPTYPE	*U;
         FPTYPE	*VT;
         FPTYPE	*Sigma;             // Pointers for full SVD calculation, A=U*Sigma*VT
-        FPTYPE	*spectraSigmaVT;	// Sigma * VT obtained from truncatated Spectra solve
+        FPTYPE	*SigmaVT;	// Sigma * VT obtained from truncatated Spectra solve
 
         Eigen::MatrixX BBT;
         Eigen::MatrixX U_Spectra;	// first few eig vectors of this*this^T
@@ -149,9 +149,9 @@ namespace ISLE
 
         void cleanup_full_svd();
 
-        void initialize_for_Spectra(const doc_id_t num_topics);
+        void initialize_for_eigensolver(const doc_id_t num_topics);
 
-        void compute_truncated_Spectra(const doc_id_t num_topics);
+        void compute_Spectra(const doc_id_t num_topics);
 
         void copy_spectraSigmaVT_from(
             FloatingPointDenseMatrix<FPTYPE>& from,
@@ -176,7 +176,7 @@ namespace ISLE
             const double U_TOLERANCE,
             const double VT_TOLERANCE);
 
-        void cleanup_Spectra();
+        void cleanup_after_eigensolver();
 
         void populate_with_topk_singulars(
             const doc_id_t k,

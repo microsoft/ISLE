@@ -969,13 +969,13 @@ namespace ISLE
     template<class FPTYPE>
     FloatingPointSparseMatrix<FPTYPE>::FloatingPointSparseMatrix(const word_id_t d, const doc_id_t s)
         : SparseMatrix<FPTYPE>(d, s),
-        spectraSigmaVT(NULL)
+        SigmaVT(NULL)
     {}
 
     template<class FPTYPE>
     FloatingPointSparseMatrix<FPTYPE>::~FloatingPointSparseMatrix()
     {
-        if (spectraSigmaVT) delete[] spectraSigmaVT;
+        if (SigmaVT) delete[] SigmaVT;
     }
 
     template<class FPTYPE>
@@ -983,7 +983,7 @@ namespace ISLE
         const SparseMatrix<FPTYPE>& from,
         const bool copy_normalized)
         : SparseMatrix<FPTYPE>(from.vocab_size(), from.num_docs()),
-        spectraSigmaVT(NULL)
+        SigmaVT(NULL)
     {
         allocate(from.get_nnzs());
         if (from.normalized_vals_CSC != NULL)
@@ -1056,13 +1056,13 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::initialize_for_Spectra(const doc_id_t num_topics)
+    void FloatingPointSparseMatrix<FPTYPE>::initialize_for_eigensolver(const doc_id_t num_topics)
     {
-        spectraSigmaVT = new FPTYPE[(size_t)num_topics * (size_t)num_docs()];
+        SigmaVT = new FPTYPE[(size_t)num_topics * (size_t)num_docs()];
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::compute_truncated_Spectra(
+    void FloatingPointSparseMatrix<FPTYPE>::compute_Spectra(
         const doc_id_t num_topics,
         std::vector<FPTYPE>& evalues)
     {
@@ -1082,10 +1082,10 @@ namespace ISLE
         evalues_mat = eigs.eigenvalues();
         assert(evalues_mat(num_topics - 1) > 0.0);
         for (auto i = 0; i < num_topics; ++i)
-            evalues.push_back(evalues[i]);
+            evalues.push_back(evalues_mat(i));
 
 
-        // this->spectraSigmaVT  = U^T*this
+        // this->SigmaVT  = U^T*this
         U_Spectra = eigs.eigenvectors(num_topics);
         assert(U_Spectra.IsRowMajor == false);
         assert(U_Spectra.rows() == vocab_size() && U_Spectra.cols() == num_topics);
@@ -1120,17 +1120,17 @@ namespace ISLE
         FPcsrmm(&transa, &m, &n, &k, &alpha, matdescra,
             vals_CSC, (const MKL_INT*)rows_CSC, (const MKL_INT*)offsets_CSC, (const MKL_INT*)(offsets_CSC + 1),
             U_rowm, &n,
-            &beta, spectraSigmaVT, &n);
+            &beta, SigmaVT, &n);
 
         delete[] U_rowm;
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::cleanup_Spectra()
+    void FloatingPointSparseMatrix<FPTYPE>::cleanup_after_eigensolver()
     {
-        assert(spectraSigmaVT != NULL);
-        delete[] spectraSigmaVT;
-        spectraSigmaVT = NULL;
+        assert(SigmaVT != NULL);
+        delete[] SigmaVT;
+        SigmaVT = NULL;
     }
     
     template<class FPTYPE>
