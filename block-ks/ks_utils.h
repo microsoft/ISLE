@@ -2,9 +2,14 @@
 // Licensed under the MIT license.
 
 #pragma once
+
 #include <fstream>
 #include <iostream>
+
+//#include "types.h"
 #include "ks_types.h"
+
+typedef float ARMA_FPTYPE;
 
 #ifdef DEBUG
 #define PRINT(X) \
@@ -48,13 +53,13 @@ namespace utils {
     arma::mat Q = arma::zeros<arma::mat>(A.n_rows, A.n_cols);
     arma::mat R = arma::zeros<arma::mat>(A.n_cols, A.n_cols);
     // idxs contains pivoting column indices
-    IDXVEC idxs(A.n_cols);
+    ARMA_IDXVEC idxs(A.n_cols);
     // disc_idxs contains discarded/zeroed-out column indices
-    IDXVEC disc_idxs(A.n_cols);
+    ARMA_IDXVEC disc_idxs(A.n_cols);
     uint64_t    cur_rank = 0;
     for (uint64_t i = 0; i < A.n_cols; i++) {
       arma::vec v = a.col(i);
-      FPTYPE    v_norm = arma::norm(v);
+      ARMA_FPTYPE    v_norm = arma::norm(v);
       // Test if column is almost zero
       if (v_norm < 1e-6) {
         disc_idxs(i - cur_rank) = i;
@@ -153,138 +158,7 @@ for(uint64_t j=i;j<A.n_cols;j++){
     return;
   }
 
-  // Assume n_rows == n_cols; Make sure tsvd_matrix_reader returns it that way.
-  class TSVDMatrix {
-    MKL_INT *ia, *ja, *ia2, *ja2;
-    FPTYPE * a;
-    uint64_t     n_dims, n_temp_dim, n_nzs;
-    uint64_t     n_rows, n_cols;
-    uint64_t     n_mms, n_mvs;
-    bool     trans_first;  // we compute eigs(A*A^T) if [true] else eigs(A^T*A)
-   public:
-    TSVDMatrix(std::string &filename, uint64_t n_rows, uint64_t n_cols, uint64_t n_nzs) {
-      n_dims = std::min(n_rows, n_cols);
-      n_temp_dim = std::max(n_rows, n_cols);
-      this->n_rows = n_rows;
-      this->n_cols = n_cols;
-      if (n_cols > n_rows)
-        trans_first = true;
-      else
-        trans_first = false;
-      ia = new MKL_INT[n_rows + 1];
-      std::memset(ia, 0, (n_dims + 1) * sizeof(MKL_INT));
-      ia2 = new MKL_INT[n_rows + 1];
-      std::memset(ia, 0, (n_dims + 1) * sizeof(MKL_INT));
-      ja = new MKL_INT[n_nzs];
-      std::memset(ja, 0, n_nzs * sizeof(MKL_INT));
-      ja2 = new MKL_INT[n_nzs];
-      std::memset(ja, 0, n_nzs * sizeof(MKL_INT));
-      a = new FPTYPE[n_nzs];
-      std::memset(a, 0, n_nzs * sizeof(FPTYPE));
-      n_nzs = n_nzs;
-      tsvd_matrix_reader(filename, n_rows, n_nzs, ia, ja, a);
-      for (uint64_t i = 0; i <= n_rows; i++)
-        ia2[i] = ia[i] - 1;
-      for (uint64_t i = 0; i < n_nzs; i++)
-        ja2[i] = ja[i] - 1;
-      std::cout << "ia[n_dims] :: " << ia[n_rows] << std::endl;
-      std::cout << "nnzs :: " << n_nzs << std::endl;
-      assert((uint64_t) ia[n_rows] == (n_nzs + 1));
-      n_mms = 0;
-      n_mvs = 0;
-    }
-
-    // Computes (A^T*(A*m_in)) if trans_first is false
-    // Computes (A*(A^T*m_in)) if trans_first is true
-    ARMA_FPMAT multiply(ARMA_FPMAT m_in) {
-      ARMA_FPMAT m_temp(n_temp_dim, m_in.n_cols);
-      ARMA_FPMAT m_out(n_dims, m_in.n_cols);
-      m_temp.zeros();
-      m_out.zeros();
-      // Only start and end elements are useful
-      // matdescra[3] = 'F' -> 1-based indexing, dense matrix in column major
-      // form
-      const char matdescra[] = {'G', 'L', 'N', 'F'};
-      MKL_INT    m, n, k;
-      m = (MKL_INT) n_rows;
-      n = (MKL_INT) m_in.n_cols;
-      k = (MKL_INT) n_cols;
-      FPTYPE alpha = 1.0, beta = 0.0;
-      if (trans_first) {
-        // Perform A^T*m_in using MKL
-        mkl_scsrmm("T", &m, &n, &k, &alpha, matdescra, a, ja, ia, ia + 1,
-                   m_in.memptr(), &m, &beta, m_temp.memptr(), &k);
-        // Perform A*m_temp using MKL
-        mkl_scsrmm("N", &m, &n, &k, &alpha, matdescra, a, ja, ia, ia + 1,
-                   m_temp.memptr(), &k, &beta, m_out.memptr(), &m);
-
-      } else {
-        // Perform A*m_in using MKL
-        mkl_scsrmm("N", &m, &n, &k, &alpha, matdescra, a, ja, ia, ia + 1,
-                   m_in.memptr(), &k, &beta, m_temp.memptr(), &m);
-        // Perform A^T*m_temp using MKL
-        mkl_scsrmm("T", &m, &n, &k, &alpha, matdescra, a, ja, ia, ia + 1,
-                   m_temp.memptr(), &m, &beta, m_out.memptr(), &k);
-      }
-      n_mms++;
-      return m_out;
-    }
-
-    // Spectra op function
-    // NOTE :: WORKS only when n_rows > n_cols
-    // If n_cols > n_rows, ia2 array must be modified to become a n_cols X
-    // n_cols matrix.
-    void perform_op(FPTYPE *v_in, FPTYPE *v_out) {
-      MKL_INT m = (MKL_INT) n_rows;
-      // auto destructed after perform_op()
-      ARMA_FPVEC v_temp(n_rows);
-      ARMA_FPVEC v_in_extended(n_rows);
-      memset(v_in_extended.memptr(), 0, n_rows * sizeof(FPTYPE));
-      memcpy(v_in_extended.memptr(), v_in, n_dims * sizeof(FPTYPE));
-      ARMA_FPVEC v_temp2(n_rows);
-      if (trans_first) {
-        // Perform A^T*v_temp using MKL
-        mkl_cspblas_scsrgemv("T", &m, a, ia2, ja2, v_in_extended.memptr(),
-                             v_temp.memptr());
-        // Perform A*v using MKL
-        mkl_cspblas_scsrgemv("N", &m, a, ia2, ja2, v_temp.memptr(),
-                             v_temp2.memptr());
-      } else {
-        // Perform A*v using MKL
-        mkl_cspblas_scsrgemv("N", &m, a, ia2, ja2, v_in_extended.memptr(),
-                             v_temp.memptr());
-        // Perform A^T*v_temp using MKL
-        mkl_cspblas_scsrgemv("T", &m, a, ia2, ja2, v_temp.memptr(),
-                             v_temp2.memptr());
-      }
-      memcpy(v_out, v_temp2.memptr(), n_dims * sizeof(FPTYPE));
-      n_mvs++;
-    }
-
-    ~TSVDMatrix() {
-      delete[] ia;
-      delete[] ja;
-      delete[] a;
-    }
-
-    // Spectra functions
-    MKL_INT rows() {
-      return (MKL_INT) n_dims;
-    }
-    MKL_INT cols() {
-      return (MKL_INT) n_dims;
-    }
-
-    // Status functions
-    uint64_t get_num_matprods() {
-      return n_mms;
-    }
-    uint64_t get_num_matvecs() {
-      return n_mvs;
-    }
-  };
-
-  // BlockKs ProdOp class for Dense Armadillo matrices
+   // BlockKs ProdOp class for Dense Armadillo matrices
   class ArmaMatProdOp {
     ARMA_FPMAT m;
 

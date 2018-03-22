@@ -1,4 +1,5 @@
 #include "sparseMatrix.h"
+#include "restarted_block_ks.h"
 
 namespace ISLE
 {
@@ -1063,8 +1064,7 @@ namespace ISLE
     template<class FPTYPE>
     void FloatingPointSparseMatrix<FPTYPE>::compute_truncated_Spectra(
         const doc_id_t num_topics,
-        Eigen::Matrix<FPTYPE,
-        Eigen::Dynamic, 1>& evalues)
+        std::vector<FPTYPE>& evalues)
     {
 
         MKL_SpSpTrProd<FPTYPE> op(vals_CSC, rows_CSC, offsets_CSC,
@@ -1072,13 +1072,17 @@ namespace ISLE
         Spectra::SymEigsSolver<FPTYPE, Spectra::LARGEST_ALGE, MKL_SpSpTrProd<FPTYPE> >
             eigs(&op, (MKL_INT)num_topics, 2 * (MKL_INT)num_topics + 1);
 
+        Eigen::Matrix<FPTYPE, Eigen::Dynamic, 1> evalues_mat;
+
         eigs.init();
         int nconv = eigs.compute();
         assert(nconv >= (int)num_topics); // Number of converged eig vals >= #topics
         assert(eigs.info() == Spectra::SUCCESSFUL);
 
-        evalues = eigs.eigenvalues();
-        assert(evalues(num_topics - 1) > 0.0);
+        evalues_mat = eigs.eigenvalues();
+        assert(evalues_mat(num_topics - 1) > 0.0);
+        for (auto i = 0; i < num_topics; ++i)
+            evalues.push_back(evalues[i]);
 
 
         // this->spectraSigmaVT  = U^T*this
@@ -1127,6 +1131,30 @@ namespace ISLE
         assert(spectraSigmaVT != NULL);
         delete[] spectraSigmaVT;
         spectraSigmaVT = NULL;
+    }
+    
+    template<class FPTYPE>
+    void FloatingPointSparseMatrix<FPTYPE>::compute_block_ks(
+        const doc_id_t num_topics,
+        std::vector<FPTYPE>& evalues)
+    {
+        MKL_SpSpTrProd<FPTYPE> op(vals_CSC, rows_CSC, offsets_CSC,
+            vocab_size(), num_docs(), get_nnzs());
+        std::cout << "Op init done" << std::endl;
+        BlockKs<MKL_SpSpTrProd<FPTYPE> > eigensolver(&op,
+            num_topics, 2 * num_topics + 1,
+            BLOCK_KS_MAX_ITERS, BLOCK_KS_BLOCK_SIZE, BLOCK_KS_TOLERANCE);
+        std::cout << "Block KS constructor done" << std::endl;
+        eigensolver.init();
+        std::cout << "eigensolver init done" << std::endl;
+        eigensolver.compute();      
+        assert(eigensolver.num_converged() == num_topics);
+
+        ARMA_FPMAT sevecs = eigensolver.eigenvectors();
+        ARMA_FPVEC sevs = eigensolver.eigenvalues();
+
+        for (int i = 0; i < num_topics; ++i)
+            evalues.push_back(sevs[i]);
     }
 
     // Input: @from: Copy from here

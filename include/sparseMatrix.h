@@ -219,10 +219,14 @@ namespace ISLE
 
         void compute_truncated_Spectra(
             const doc_id_t num_topics,
-            Eigen::Matrix<FPTYPE,
-            Eigen::Dynamic, 1>& evalues);
+            std::vector<FPTYPE>& evalues);
 
         void cleanup_Spectra();
+
+        void compute_block_ks(
+            const doc_id_t num_topics,
+            std::vector<FPTYPE>& evalues);
+
 
         // Input: @from: Copy from here
         // Input: @zetas: zetas[word] indicates the threshold for each word

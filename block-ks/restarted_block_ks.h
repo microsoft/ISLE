@@ -2,7 +2,7 @@
 // Licensed under the MIT license.
 
 #pragma once
-
+#define ARMA_DONT_USE_WRAPPER
 #include <cmath>
 #include <csignal>
 #include <cstdio>
@@ -20,7 +20,7 @@ class BlockKs {
   // Problem Parameters
   ProdOp *op;
   uint64_t    nev, ncv, maxit, blk_size, dim;
-  FPTYPE  tol;
+  ARMA_FPTYPE  tol;
 
   // Problem Status
   ARMA_FPMAT V, H;
@@ -31,28 +31,37 @@ class BlockKs {
   void truncate();
 
  public:
-  BlockKs(ProdOp *op, uint64_t nev, uint64_t ncv, uint64_t maxit, uint64_t blk_size,
-          FPTYPE tol);
+  BlockKs(
+      ProdOp *op,
+      uint64_t nev, 
+      uint64_t ncv, 
+      uint64_t maxit, 
+      uint64_t blk_size,
+      ARMA_FPTYPE tol);
 
   void init();
   void compute();
 
-  ARMA_FPVEC eigenvalues(uint64_t num_evs = 0) {
+  ARMA_FPVEC eigenvalues(uint64_t num_evs = 0) const 
+  {
     ARMA_FPVEC evs = arma::diagvec(H);
     return ((num_evs == 0) ? evs.head(nev) : evs.head(num_evs));
   }
 
-  ARMA_FPMAT eigenvectors(uint64_t num_evecs = 0) {
+  ARMA_FPMAT eigenvectors(uint64_t num_evecs = 0) const 
+  {
     return ((num_evecs == 0) ? V.head_cols(nev) : V.head_cols(num_evecs));
   }
 
-  uint64_t num_converged() {
+  uint64_t num_converged() const 
+  {
     return nconv;
   }
 };
 
 template<class ProdOp>
-void BlockKs<ProdOp>::expand() {
+void BlockKs<ProdOp>::expand()
+{
   Timer timer;
 
   ARMA_FPMAT Vk, Hk, Ck, F, P, Q, R;
@@ -127,7 +136,8 @@ void BlockKs<ProdOp>::expand() {
 }
 
 template<class ProdOp>
-void BlockKs<ProdOp>::truncate() {
+void BlockKs<ProdOp>::truncate()
+{
   PRINT_SIZE(V);
   PRINT_SIZE(H);
   PRINT(nconv);
@@ -178,8 +188,10 @@ void BlockKs<ProdOp>::truncate() {
 }
 
 template<class ProdOp>
-BlockKs<ProdOp>::BlockKs(ProdOp *op, uint64_t nev, uint64_t ncv, uint64_t maxit,
-                         uint64_t blk_size, FPTYPE tol) {
+BlockKs<ProdOp>::BlockKs(
+    ProdOp *op, uint64_t nev, uint64_t ncv, uint64_t maxit,
+    uint64_t blk_size, ARMA_FPTYPE tol) 
+{
   this->op = op;
   this->nev = nev;
   this->ncv = ncv;
@@ -190,7 +202,8 @@ BlockKs<ProdOp>::BlockKs(ProdOp *op, uint64_t nev, uint64_t ncv, uint64_t maxit,
 }
 
 template<class ProdOp>
-void BlockKs<ProdOp>::init() {
+void BlockKs<ProdOp>::init() 
+{
   ARMA_FPMAT V_1, P, Q, R, C, alpha, blk, r1;
   ARMA_FPRVEC norms;
   uint64_t   rank;
@@ -207,13 +220,17 @@ void BlockKs<ProdOp>::init() {
 
   // 1-step Block Arnoldi expansion (with 1-step DGKS correction)
   V = Q;
+
+  std::cout << "KS: block0 computed" << std::endl;
   V_1 = this->op->multiply(V);
+  std::cout << "KS: A*block0 computed" << std::endl;
   H = (V.t() * V_1);
   V_1 = V_1 - (V * H);
   C = (V.t() * V_1);
   H = H + C;
   V_1 = V_1 - (V * C);
   utils::compute_qr(V_1, P, Q, R, &rank);
+  std::cout << "KS:qr(block1)" << std::endl;
   R = arma::join_cols(R, arma::zeros<ARMA_FPMAT>(blk_size - rank, R.n_cols));
   H = arma::join_cols(H, R);
   V = arma::join_rows(V, Q);
@@ -243,7 +260,8 @@ void BlockKs<ProdOp>::init() {
 }
 
 template<class ProdOp>
-void BlockKs<ProdOp>::compute() {
+void BlockKs<ProdOp>::compute()
+{
   ARMA_FPMAT residual_blk;
   ARMA_FPRVEC norms;
   ARMA_IDXVEC idxs;

@@ -23,6 +23,17 @@ namespace ISLE
     ///	or else drop this data.Another variant not programmed "<=" instead of "<".
 #define BAD_THRESHOLD_DROP false
 
+    enum EIGENSOLVER_OPTIONS {
+        SPECTRA,
+        BLOCK_KS
+    };
+
+#define EIGENSOLVER BLOCK_KS
+
+#define BLOCK_KS_MAX_ITERS   20
+#define BLOCK_KS_BLOCK_SIZE  25
+#define BLOCK_KS_TOLERANCE   1e-5
+
     enum KMEANS_INIT_OPTIONS {
         KMEANSPP,
         KMEANSBB,
