@@ -251,10 +251,10 @@ namespace ISLE
             // NOTE :: matdescra[3] = 'F' => column major storage & 1-based indexing
             char matdescra[5] = { 'G', 'X', 'X', 'C', 'X' };
             // execute csrmm
-
+						/*
             std::cout << "M: " << m << "N: " << n << "K: " << k
                 << "ldb: " << n << "ldc: " << n << std::endl;
-
+						*/
             FPcsrmm(&trans_a,
                 &m, &n, &k, &alpha, &matdescra[0],
                 a, ja, ia, ia + 1,
@@ -268,12 +268,9 @@ namespace ISLE
             ARMA_FPMAT m_temp(m_in.n_cols, this->max_dim);
             ARMA_FPMAT m_out(m_in.n_cols, m_in.n_rows);
 
-            std::cout << "A X done" << std::endl;
-
             perform_csrmm((MKL_INT*)this->offsets_CSC, (MKL_INT*)this->rows_CSC,
                 this->vals_CSC, rm_in.memptr(), m_temp.memptr(), 
                 this->ncols, this->nrows, m_in.n_cols, 1.0f, 0.0f);
-            std::cout << "A^T X done" << std::endl;
 
             perform_csrmm(this->offsets_CSR, this->cols_CSR, 
                 this->vals_CSR, m_temp.memptr(), m_out.memptr(),

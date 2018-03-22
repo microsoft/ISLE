@@ -1142,7 +1142,7 @@ namespace ISLE
             vocab_size(), num_docs(), get_nnzs());
         std::cout << "Op init done" << std::endl;
         BlockKs<MKL_SpSpTrProd<FPTYPE> > eigensolver(&op,
-            num_topics, 2 * num_topics + 1,
+            num_topics, 2 * num_topics,
             BLOCK_KS_MAX_ITERS, BLOCK_KS_BLOCK_SIZE, BLOCK_KS_TOLERANCE);
         std::cout << "Block KS constructor done" << std::endl;
         eigensolver.init();
