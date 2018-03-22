@@ -1101,12 +1101,10 @@ namespace ISLE
             vocab_size(), num_docs(), get_nnzs());
         std::cout << "Op init done" << std::endl;
         BlockKs<MKL_SpSpTrProd<FPTYPE> > eigensolver(&op,
-            num_topics, 2 * num_topics,
+            num_topics, 2 * num_topics + BLOCK_KS_BLOCK_SIZE,
             BLOCK_KS_MAX_ITERS, BLOCK_KS_BLOCK_SIZE, BLOCK_KS_TOLERANCE);
-        std::cout << "Block KS constructor done" << std::endl;
         eigensolver.init();
-        std::cout << "eigensolver init done" << std::endl;
-        eigensolver.compute();
+        eigensolver.compute();      
         assert(eigensolver.num_converged() == num_topics);
 
         ARMA_FPMAT sevecs = eigensolver.eigenvectors();
@@ -1117,6 +1115,7 @@ namespace ISLE
 
         compute_sigmaVT(sevecs.memptr() , num_topics);
     }
+
 
     template<class FPTYPE>
     void FloatingPointSparseMatrix<FPTYPE>::compute_sigmaVT(
