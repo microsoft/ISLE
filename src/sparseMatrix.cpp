@@ -1089,7 +1089,42 @@ namespace ISLE
         U_Spectra = eigs.eigenvectors(num_topics);
         assert(U_Spectra.IsRowMajor == false);
         assert(U_Spectra.rows() == vocab_size() && U_Spectra.cols() == num_topics);
+        compute_sigmaVT(U_Spectra.data(), num_topics);
+    }
+
+    template<class FPTYPE>
+    void FloatingPointSparseMatrix<FPTYPE>::compute_block_ks(
+        const doc_id_t num_topics,
+        std::vector<FPTYPE>& evalues)
+    {
+        MKL_SpSpTrProd<FPTYPE> op(vals_CSC, rows_CSC, offsets_CSC,
+            vocab_size(), num_docs(), get_nnzs());
+        std::cout << "Op init done" << std::endl;
+        BlockKs<MKL_SpSpTrProd<FPTYPE> > eigensolver(&op,
+            num_topics, 2 * num_topics,
+            BLOCK_KS_MAX_ITERS, BLOCK_KS_BLOCK_SIZE, BLOCK_KS_TOLERANCE);
+        std::cout << "Block KS constructor done" << std::endl;
+        eigensolver.init();
+        std::cout << "eigensolver init done" << std::endl;
+        eigensolver.compute();
+        assert(eigensolver.num_converged() == num_topics);
+
+        ARMA_FPMAT sevecs = eigensolver.eigenvectors();
+        ARMA_FPVEC sevs = eigensolver.eigenvalues();
+
+        for (int i = 0; i < num_topics; ++i)
+            evalues.push_back(sevs[i]);
+
+        compute_sigmaVT(sevecs.memptr() , num_topics);
+    }
+
+    template<class FPTYPE>
+    void FloatingPointSparseMatrix<FPTYPE>::compute_sigmaVT(
+        FPTYPE *U_colmajor,
+        const doc_id_t num_topics)
+    {
         FPTYPE *U_rowm = new FPTYPE[(size_t)num_topics*(size_t)vocab_size()];
+
         // MKl_?FPomatcopy does not seem to work
         //FPomatcopy(CblasColMajor, 'T', vocab_size(), num_topics,
         //	1.0, U_Spectra.data(), vocab_size(), U_rowm, num_topics);
@@ -1097,10 +1132,10 @@ namespace ISLE
         for (word_id_t r = 0; r < vocab_size(); ++r)
             for (auto c = 0; c < num_topics; ++c)
                 U_rowm[(size_t)c + (size_t)r * (size_t)num_topics]
-                = U_Spectra.data()[(size_t)r + (size_t)c * (size_t)vocab_size()];
+                = U_colmajor[(size_t)r + (size_t)c * (size_t)vocab_size()];
 
         auto tr_diff = std::abs(FPdot((size_t)vocab_size() * (size_t)num_topics,
-            U_Spectra.data(), 1, U_Spectra.data(), 1))
+            U_colmajor, 1, U_colmajor, 1))
             - FPdot((size_t)vocab_size()*(size_t)num_topics, U_rowm, 1, U_rowm, 1);
         if (tr_diff > 0.01)
             std::cout << "\n === WARNING : Diff between marix and transpose is "
@@ -1121,7 +1156,6 @@ namespace ISLE
             vals_CSC, (const MKL_INT*)rows_CSC, (const MKL_INT*)offsets_CSC, (const MKL_INT*)(offsets_CSC + 1),
             U_rowm, &n,
             &beta, SigmaVT, &n);
-
         delete[] U_rowm;
     }
 
@@ -1133,29 +1167,6 @@ namespace ISLE
         SigmaVT = NULL;
     }
     
-    template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::compute_block_ks(
-        const doc_id_t num_topics,
-        std::vector<FPTYPE>& evalues)
-    {
-        MKL_SpSpTrProd<FPTYPE> op(vals_CSC, rows_CSC, offsets_CSC,
-            vocab_size(), num_docs(), get_nnzs());
-        std::cout << "Op init done" << std::endl;
-        BlockKs<MKL_SpSpTrProd<FPTYPE> > eigensolver(&op,
-            num_topics, 2 * num_topics,
-            BLOCK_KS_MAX_ITERS, BLOCK_KS_BLOCK_SIZE, BLOCK_KS_TOLERANCE);
-        std::cout << "Block KS constructor done" << std::endl;
-        eigensolver.init();
-        std::cout << "eigensolver init done" << std::endl;
-        eigensolver.compute();      
-        assert(eigensolver.num_converged() == num_topics);
-
-        ARMA_FPMAT sevecs = eigensolver.eigenvectors();
-        ARMA_FPVEC sevs = eigensolver.eigenvalues();
-
-        for (int i = 0; i < num_topics; ++i)
-            evalues.push_back(sevs[i]);
-    }
 
     // Input: @from: Copy from here
     // Input: @zetas: zetas[word] indicates the threshold for each word

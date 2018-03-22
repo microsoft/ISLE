@@ -31,7 +31,7 @@ namespace ISLE
 #define EIGENSOLVER BLOCK_KS
 
 #define BLOCK_KS_MAX_ITERS   20
-#define BLOCK_KS_BLOCK_SIZE  25
+#define BLOCK_KS_BLOCK_SIZE  10
 #define BLOCK_KS_TOLERANCE   1e-5
 
     enum KMEANS_INIT_OPTIONS {
