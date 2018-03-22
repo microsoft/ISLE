@@ -71,13 +71,13 @@
 // #define ARMA_BLAS_LONG
 //// Uncomment the above line if your BLAS and LAPACK libraries use "long" instead of "int"
 
-// #define ARMA_BLAS_LONG_LONG
+#define ARMA_BLAS_LONG_LONG
 //// Uncomment the above line if your BLAS and LAPACK libraries use "long long" instead of "int"
 
 // #define ARMA_USE_TBB_ALLOC
 //// Uncomment the above line if you want to use Intel TBB scalable_malloc() and scalable_free() instead of standard malloc() and free()
 
-// #define ARMA_USE_MKL_ALLOC
+#define ARMA_USE_MKL_ALLOC
 //// Uncomment the above line if you want to use Intel MKL mkl_malloc() and mkl_free() instead of standard malloc() and free()
 
 // #define ARMA_USE_ATLAS
@@ -87,19 +87,19 @@
 //// Make sure the directory has a trailing /
 
 #if !defined(ARMA_USE_CXX11)
-// #define ARMA_USE_CXX11
+#define ARMA_USE_CXX11
 //// Uncomment the above line to forcefully enable use of C++11 features (eg. initialiser lists).
 //// Note that ARMA_USE_CXX11 is automatically enabled when a C++11 compiler is detected.
 #endif
 
 #if !defined(ARMA_USE_OPENMP)
-// #define ARMA_USE_OPENMP
+#define ARMA_USE_OPENMP
 //// Uncomment the above line to forcefully enable use of OpenMP for parallelisation.
-//// Note that ARMA_USE_OPENMP is automatically enabled when a compiler supporting OpenMP 3.1 is detected.
+//// Note that ARMA_USE_OPENMP is automatically enabled when a compiler supporting OpenMP 3.0 is detected.
 #endif
 
 #if !defined(ARMA_64BIT_WORD)
-// #define ARMA_64BIT_WORD
+#define ARMA_64BIT_WORD
 //// Uncomment the above line if you require matrices/vectors capable of holding more than 4 billion elements.
 //// Your machine and compiler must have support for 64 bit integers (eg. via "long" or "long long").
 //// Note that ARMA_64BIT_WORD is automatically enabled when a C++11 compiler is detected.
@@ -129,7 +129,7 @@
 //// change the number to the size of your vectors.
 
 #if !defined(ARMA_OPENMP_THRESHOLD)
-  #define ARMA_OPENMP_THRESHOLD 320
+  #define ARMA_OPENMP_THRESHOLD 384
 #endif
 //// The minimum number of elements in a matrix to allow OpenMP based parallelisation;
 //// it must be an integer that is at least 1.
@@ -269,3 +269,4 @@
 // Do not use these unless you know what you are doing.
 #define ARMA_AUX_LIBS
 #define ARMA_AUX_INCDIRS
+

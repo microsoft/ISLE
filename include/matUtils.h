@@ -243,13 +243,13 @@ namespace ISLE
         void perform_csrmm(
             MKL_INT* ia, MKL_INT* ja, FPTYPE* a, FPTYPE* b, FPTYPE* c,
             MKL_INT a_nrows, MKL_INT a_ncols, MKL_INT b_ncols,
-            FPTYPE alpha, FPTYPE beta, CHAR trans_a = 'N') const
+            FPTYPE alpha, FPTYPE beta, char trans_a = 'N') const
         {
             MKL_INT m = (MKL_INT)a_nrows;
             MKL_INT n = (MKL_INT)b_ncols;
             MKL_INT k = (MKL_INT)a_ncols;
             // NOTE :: matdescra[3] = 'F' => column major storage & 1-based indexing
-            CHAR matdescra[5] = { 'G', 'X', 'X', 'C', 'X' };
+            char matdescra[5] = { 'G', 'X', 'X', 'C', 'X' };
             // execute csrmm
 
             std::cout << "M: " << m << "N: " << n << "K: " << k

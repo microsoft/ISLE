@@ -23,9 +23,11 @@ CILK_FLAGS = -fcilkplus -DCILK
 INCLUDE_DIR = include
 SRC_DIR = src
 DRIVER_DIR = drivers
+ARMA_DIR = armadillo-8.400.0
+BLOCK_KS_DIR = block-ks
 
 CC=g++-5
-IFLAGS= -I . -I spectra-master -I $(INCLUDE_DIR) -I$(MKL_ROOT)/include
+IFLAGS= -I . -I spectra-master -I $(INCLUDE_DIR) -I$(MKL_ROOT)/include -I$(ARMA_DIR)/include -I$(BLOCK_KS_DIR)
 CFLAGS= -ggdb -O3 -std=c++14 -DLINUX $(DEBUGGING_FLAGS) $(CONFIG_FLAGS) $(MKL_EIGEN_FLAGS) $(CILK_FLAGS)
 
 INCLUDES =  $(INCLUDE_DIR)/timer.h $(INCLUDE_DIR)/logUtils.h \
