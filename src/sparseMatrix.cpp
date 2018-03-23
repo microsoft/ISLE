@@ -1,4 +1,5 @@
 #include "sparseMatrix.h"
+#include "restarted_block_ks.h"
 
 namespace ISLE
 {
@@ -967,14 +968,19 @@ namespace ISLE
 
     template<class FPTYPE>
     FloatingPointSparseMatrix<FPTYPE>::FloatingPointSparseMatrix(const word_id_t d, const doc_id_t s)
-        : SparseMatrix<FPTYPE>(d, s),
-        spectraSigmaVT(NULL)
+        :
+        SparseMatrix<FPTYPE>(d, s),
+        U_colmajor(NULL),
+        U_rows(0),
+        U_cols(0),
+        SigmaVT(NULL)
     {}
 
     template<class FPTYPE>
     FloatingPointSparseMatrix<FPTYPE>::~FloatingPointSparseMatrix()
     {
-        if (spectraSigmaVT) delete[] spectraSigmaVT;
+        if (SigmaVT) delete[] SigmaVT;
+        if (U_colmajor) delete[] U_colmajor;
     }
 
     template<class FPTYPE>
@@ -982,7 +988,7 @@ namespace ISLE
         const SparseMatrix<FPTYPE>& from,
         const bool copy_normalized)
         : SparseMatrix<FPTYPE>(from.vocab_size(), from.num_docs()),
-        spectraSigmaVT(NULL)
+        SigmaVT(NULL)
     {
         allocate(from.get_nnzs());
         if (from.normalized_vals_CSC != NULL)
@@ -1055,16 +1061,18 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::initialize_for_Spectra(const doc_id_t num_topics)
+    void FloatingPointSparseMatrix<FPTYPE>::initialize_for_eigensolver(const doc_id_t num_topics)
     {
-        spectraSigmaVT = new FPTYPE[(size_t)num_topics * (size_t)num_docs()];
+        U_rows = vocab_size();
+        U_cols = num_topics;
+        U_colmajor = new FPTYPE[(size_t)num_topics * (size_t)vocab_size()];
+        SigmaVT = new FPTYPE[(size_t)num_topics * (size_t)num_docs()];
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::compute_truncated_Spectra(
+    void FloatingPointSparseMatrix<FPTYPE>::compute_Spectra(
         const doc_id_t num_topics,
-        Eigen::Matrix<FPTYPE,
-        Eigen::Dynamic, 1>& evalues)
+        std::vector<FPTYPE>& evalues)
     {
 
         MKL_SpSpTrProd<FPTYPE> op(vals_CSC, rows_CSC, offsets_CSC,
@@ -1072,20 +1080,57 @@ namespace ISLE
         Spectra::SymEigsSolver<FPTYPE, Spectra::LARGEST_ALGE, MKL_SpSpTrProd<FPTYPE> >
             eigs(&op, (MKL_INT)num_topics, 2 * (MKL_INT)num_topics + 1);
 
+        Eigen::Matrix<FPTYPE, Eigen::Dynamic, 1> evalues_mat;
+
         eigs.init();
         int nconv = eigs.compute();
         assert(nconv >= (int)num_topics); // Number of converged eig vals >= #topics
         assert(eigs.info() == Spectra::SUCCESSFUL);
 
-        evalues = eigs.eigenvalues();
-        assert(evalues(num_topics - 1) > 0.0);
+        evalues_mat = eigs.eigenvalues();
+        assert(evalues_mat(num_topics - 1) > 0.0);
+        for (auto i = 0; i < num_topics; ++i)
+            evalues.push_back(evalues_mat(i));
 
 
-        // this->spectraSigmaVT  = U^T*this
-        U_Spectra = eigs.eigenvectors(num_topics);
+        // this->SigmaVT  = U^T*this
+        auto U_Spectra = eigs.eigenvectors(num_topics);
         assert(U_Spectra.IsRowMajor == false);
         assert(U_Spectra.rows() == vocab_size() && U_Spectra.cols() == num_topics);
+        memcpy(U_colmajor, U_Spectra.data(), U_rows * U_cols * sizeof(FPTYPE));
+        compute_sigmaVT(num_topics);
+    }
+
+    template<class FPTYPE>
+    void FloatingPointSparseMatrix<FPTYPE>::compute_block_ks(
+        const doc_id_t num_topics,
+        std::vector<FPTYPE>& evalues)
+    {
+        MKL_SpSpTrProd<FPTYPE> op(vals_CSC, rows_CSC, offsets_CSC,
+            vocab_size(), num_docs(), get_nnzs());
+        std::cout << "Op init done" << std::endl;
+        BlockKs<MKL_SpSpTrProd<FPTYPE> > eigensolver(&op,
+            num_topics, 2 * num_topics + BLOCK_KS_BLOCK_SIZE,
+            BLOCK_KS_MAX_ITERS, BLOCK_KS_BLOCK_SIZE, BLOCK_KS_TOLERANCE);
+        eigensolver.init();
+        eigensolver.compute();      
+        assert(eigensolver.num_converged() == num_topics);
+
+        ARMA_FPMAT sevecs = eigensolver.eigenvectors();
+        ARMA_FPVEC sevs = eigensolver.eigenvalues();
+
+        for (int i = 0; i < num_topics; ++i)
+            evalues.push_back(sevs[i]);
+        memcpy(U_colmajor, sevecs.memptr(), U_rows * U_cols * sizeof(FPTYPE));
+        compute_sigmaVT(num_topics);
+    }
+
+
+    template<class FPTYPE>
+    void FloatingPointSparseMatrix<FPTYPE>::compute_sigmaVT(const doc_id_t num_topics)
+    {
         FPTYPE *U_rowm = new FPTYPE[(size_t)num_topics*(size_t)vocab_size()];
+
         // MKl_?FPomatcopy does not seem to work
         //FPomatcopy(CblasColMajor, 'T', vocab_size(), num_topics,
         //	1.0, U_Spectra.data(), vocab_size(), U_rowm, num_topics);
@@ -1093,10 +1138,10 @@ namespace ISLE
         for (word_id_t r = 0; r < vocab_size(); ++r)
             for (auto c = 0; c < num_topics; ++c)
                 U_rowm[(size_t)c + (size_t)r * (size_t)num_topics]
-                = U_Spectra.data()[(size_t)r + (size_t)c * (size_t)vocab_size()];
+                = U_colmajor[(size_t)r + (size_t)c * (size_t)vocab_size()];
 
         auto tr_diff = std::abs(FPdot((size_t)vocab_size() * (size_t)num_topics,
-            U_Spectra.data(), 1, U_Spectra.data(), 1))
+            U_colmajor, 1, U_colmajor, 1))
             - FPdot((size_t)vocab_size()*(size_t)num_topics, U_rowm, 1, U_rowm, 1);
         if (tr_diff > 0.01)
             std::cout << "\n === WARNING : Diff between marix and transpose is "
@@ -1116,18 +1161,22 @@ namespace ISLE
         FPcsrmm(&transa, &m, &n, &k, &alpha, matdescra,
             vals_CSC, (const MKL_INT*)rows_CSC, (const MKL_INT*)offsets_CSC, (const MKL_INT*)(offsets_CSC + 1),
             U_rowm, &n,
-            &beta, spectraSigmaVT, &n);
-
+            &beta, SigmaVT, &n);
         delete[] U_rowm;
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::cleanup_Spectra()
+    void FloatingPointSparseMatrix<FPTYPE>::cleanup_after_eigensolver()
     {
-        assert(spectraSigmaVT != NULL);
-        delete[] spectraSigmaVT;
-        spectraSigmaVT = NULL;
+        assert(U_colmajor != NULL);
+        delete[] U_colmajor;
+        U_colmajor = NULL;
+
+        assert(SigmaVT != NULL);
+        delete[] SigmaVT;
+        SigmaVT = NULL;
     }
+    
 
     // Input: @from: Copy from here
     // Input: @zetas: zetas[word] indicates the threshold for each word
@@ -1282,13 +1331,12 @@ namespace ISLE
         const doc_id_t ld_in,
         const doc_id_t ncols)
     {
-        assert(!U_Spectra.IsRowMajor);
-        assert(U_Spectra.rows() == vocab_size());
-        assert(ld_in >= (doc_id_t)U_Spectra.cols());
+        assert(U_rows == vocab_size());
+        assert(ld_in >= (doc_id_t)U_cols);
         FPgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
-            (MKL_INT)vocab_size(), (MKL_INT)ncols, (MKL_INT)U_Spectra.cols(),
-            (FPTYPE)1.0, U_Spectra.data(), (MKL_INT)vocab_size(), in, (MKL_INT)ld_in,
-            (FPTYPE)0.0, out, (MKL_INT)U_Spectra.rows());
+            (MKL_INT)vocab_size(), (MKL_INT)ncols, (MKL_INT)U_cols,
+            (FPTYPE)1.0, U_colmajor, (MKL_INT)vocab_size(), in, (MKL_INT)ld_in,
+            (FPTYPE)0.0, out, (MKL_INT)U_rows);
     }
 
     template<class FPTYPE>

@@ -169,8 +169,11 @@ namespace ISLE
     class FloatingPointSparseMatrix : public SparseMatrix<FPTYPE>
     {
         Eigen::MatrixX BBT;				// For Spectra EigenSolve
-        Eigen::MatrixX U_Spectra;		// first few eig vectors of this*this^T
-        FPTYPE *spectraSigmaVT;			// Sigma * VT obtained from truncatated Spectra solve
+        //Eigen::MatrixX U_Spectra;		// first few eig vectors of this*this^T
+        FPTYPE *U_colmajor;             // First num_topics eigenvectors of this*this^T
+        MKL_INT U_rows;
+        MKL_INT U_cols;
+        FPTYPE *SigmaVT;			    // Sigma * VT obtained from eigensolvers 
         MKL_INT num_singular_vals;		// Number of Singular values
 
     public:
@@ -215,14 +218,20 @@ namespace ISLE
             std::vector<WordDocPair>& entries,
             std::vector<offset_t>& word_offsets);
 
-        void initialize_for_Spectra(const doc_id_t num_topics);
+        void initialize_for_eigensolver(const doc_id_t num_topics);
 
-        void compute_truncated_Spectra(
+        void cleanup_after_eigensolver();
+
+        void compute_Spectra(
             const doc_id_t num_topics,
-            Eigen::Matrix<FPTYPE,
-            Eigen::Dynamic, 1>& evalues);
+            std::vector<FPTYPE>& evalues);
 
-        void cleanup_Spectra();
+        void compute_block_ks(
+            const doc_id_t num_topics,
+            std::vector<FPTYPE>& evalues);
+
+       
+        void FloatingPointSparseMatrix::compute_sigmaVT(const doc_id_t num_topics);
 
         // Input: @from: Copy from here
         // Input: @zetas: zetas[word] indicates the threshold for each word
@@ -253,24 +262,10 @@ namespace ISLE
             const FPTYPE *in,
             const doc_id_t ld_in,
             const doc_id_t ncols);
-        // {
-        //     assert(!U_Spectra.IsRowMajor);
-        //     assert(U_Spectra.rows() == vocab_size());
-        //     assert(ld_in >= (doc_id_t)U_Spectra.cols());
-        //     FPgemm(CblasColMajor, CblasNoTrans, CblasNoTrans,
-        //         (MKL_INT)vocab_size(), (MKL_INT)ncols, (MKL_INT)U_Spectra.cols(),
-        //         (FPTYPE)1.0, U_Spectra.data(), (MKL_INT)vocab_size(), in, (MKL_INT)ld_in,
-        //         (FPTYPE)0.0, out, (MKL_INT)U_Spectra.rows());
-        // }
 
         void copy_col_to(
             FPTYPE *const dst,
             const doc_id_t doc) const;
-        // {
-        //     FPscal(vocab_size(), 0.0, dst, 1);
-        //     for (auto witer = offsets_CSC[doc]; witer < offsets_CSC[doc + 1]; ++witer)
-        //         *(dst + rows_CSC[witer]) = vals_CSC[witer];
-        // }
 
         // pt must have at least vocab_size() entries
         inline FPTYPE distsq_doc_to_pt(

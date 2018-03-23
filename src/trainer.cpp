@@ -252,18 +252,16 @@ namespace ISLE
     void ISLETrainer::compute_input_svd()
     {
         FloatingPointSparseMatrix<FPTYPE> A_fl_CSC(*A_sp, true);
-        A_fl_CSC.initialize_for_Spectra(num_topics);
+        A_fl_CSC.initialize_for_eigensolver(num_topics);
         timer->next_time_secs("Spectra A_sp init");
-        Eigen::Matrix<FPTYPE, Eigen::Dynamic, 1> A_sq_svalues;
-        A_fl_CSC.compute_truncated_Spectra(num_topics, A_sq_svalues);
+        std::vector<FPTYPE> A_sq_svalues;
+        A_fl_CSC.compute_Spectra(num_topics, A_sq_svalues);
         out_log->print_string("Frob_Sq(A_sp_fl): " + std::to_string(A_fl_CSC.normalized_frobenius()) + "\n");
         std::ofstream ostr;
         ostr.open(concat_file_path(output_path_base, std::string("A_squared_spectrum.txt")));
         ostr << "Frob_Sq(A_sp_fl): " << A_fl_CSC.normalized_frobenius() << std::endl;
-        for (auto t = 0; t < num_topics; ++t)
-            ostr << t + 1 << ": " << A_sq_svalues(t) << std::endl;
-        ostr.close();
-        A_fl_CSC.cleanup_Spectra();
+        out_log->print_eigen_data(A_sq_svalues, num_topics);
+        A_fl_CSC.cleanup_after_eigensolver();
         timer->next_time_secs("Spectra A_sp computation");
     }
 
@@ -295,13 +293,18 @@ namespace ISLE
 
 
         //
-        // Truncated SVD with Spectra from sparse matrix (ARPACK)
+        // Truncated SVD with Spectra (ARPACK) or Block KS
         //
-        B_fl_CSC->initialize_for_Spectra(num_topics);
         out_log->print_string("Frob(B_fl_CSC): " + std::to_string(B_fl_CSC->frobenius()) + "\n");
-        timer->next_time_secs("Spectra init");
-        Eigen::Matrix<FPTYPE, Eigen::Dynamic, 1> evalues;
-        B_fl_CSC->compute_truncated_Spectra(num_topics, evalues);
+        std::vector<FPTYPE> evalues;
+        B_fl_CSC->initialize_for_eigensolver(num_topics);
+        timer->next_time_secs("eigen solver init");
+        if (EIGENSOLVER == SPECTRA)
+            B_fl_CSC->compute_Spectra(num_topics, evalues);     
+        else if (EIGENSOLVER == BLOCK_KS)
+            B_fl_CSC->compute_block_ks(num_topics, evalues);
+        else
+            assert(false);
         out_log->print_eigen_data(evalues, num_topics);
         auto &B_fl = B_fl_CSC;
         timer->next_time_secs("Spectra eigen solve");
@@ -340,7 +343,7 @@ namespace ISLE
             delete[] centers_lowd;
             timer->next_time_secs("Converging LLoyds k-means on B_k");
         }
-        B_fl->cleanup_Spectra();
+        B_fl->cleanup_after_eigensolver();
 
         //
         // Lloyds on B with k-means++ seeds

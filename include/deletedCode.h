@@ -596,12 +596,12 @@ timer.next_time_secs("Writing document-topic catchword sums");
 //	}
 //}
 
-//	// Initialize spectraSigmaVT for num_topics columns, each of vocab_size
+//	// Initialize SigmaVT for num_topics columns, each of vocab_size
 //	void initialize_for_Spectra_via_dns(
 //		const doc_id_t num_topics,
 //		const bool normalized = false)
 //	{
-//		spectraSigmaVT = new FPTYPE[num_topics*num_docs()];
+//		SigmaVT = new FPTYPE[num_topics*num_docs()];
 //
 //		// Construct BBT = this * (this)^T, defaults to col-major
 //#if USE_DENSE_BBT
@@ -615,7 +615,7 @@ timer.next_time_secs("Writing document-topic catchword sums");
 //		const doc_id_t num_topics,
 //		std::vector<A_TYPE>& thresholds = NULL)
 //	{
-//		spectraSigmaVT = new FPTYPE[num_topics*num_docs()];
+//		SigmaVT = new FPTYPE[num_topics*num_docs()];
 //
 //		// Construct BBT = this * (this)^T, defaults to col-major
 //		assert(USE_DENSE_BBT);

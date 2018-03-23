@@ -4,6 +4,7 @@
 #pragma once
 
 #include "types.h"
+#include "ks_types.h"
 #include "timer.h"
 
 namespace ISLE
@@ -16,10 +17,10 @@ namespace ISLE
         offset_t	*offsets_CSC;
         bool		 is_offsets_CSC_alloc; // true when nrows>ncols
 
-        const Eigen::Index nrows;
-        const Eigen::Index ncols;
-        const Eigen::Index max_dim;
-        const offset_t	   nnzs;
+        const MKL_UINT nrows;
+        const MKL_UINT ncols;
+        const MKL_UINT max_dim;
+        const offset_t nnzs;
 
         bool		split_CSR_by_rows;
         bool		split_CSR_by_cols;
@@ -47,7 +48,7 @@ namespace ISLE
     public:
         MKL_SpSpTrProd(
             FPTYPE *vals_CSC_, word_id_t *rows_CSC_, offset_t *offsets_CSC_,
-            const Eigen::Index nrows_, const Eigen::Index ncols_, const offset_t nnzs_,
+            const MKL_UINT nrows_, const MKL_UINT ncols_, const offset_t nnzs_,
             const bool split_CSR_by_cols_ = false,
             const bool split_CSR_by_rows_ = true,
             const bool check = true)
@@ -236,8 +237,47 @@ namespace ISLE
             delete op_timer;
         }
 
-        Eigen::Index rows() const { return nrows; }
-        Eigen::Index cols() const { return ncols; }
+        MKL_UINT rows() const { return nrows; }
+        MKL_UINT cols() const { return ncols; }
+
+        void perform_csrmm(
+            MKL_INT* ia, MKL_INT* ja, FPTYPE* a, FPTYPE* b, FPTYPE* c,
+            MKL_INT a_nrows, MKL_INT a_ncols, MKL_INT b_ncols,
+            FPTYPE alpha, FPTYPE beta, char trans_a = 'N') const
+        {
+            MKL_INT m = (MKL_INT)a_nrows;
+            MKL_INT n = (MKL_INT)b_ncols;
+            MKL_INT k = (MKL_INT)a_ncols;
+            // NOTE :: matdescra[3] = 'F' => column major storage & 1-based indexing
+            char matdescra[5] = { 'G', 'X', 'X', 'C', 'X' };
+            // execute csrmm
+						/*
+            std::cout << "M: " << m << "N: " << n << "K: " << k
+                << "ldb: " << n << "ldc: " << n << std::endl;
+						*/
+            FPcsrmm(&trans_a,
+                &m, &n, &k, &alpha, &matdescra[0],
+                a, ja, ia, ia + 1,
+                b, &n, &beta, c, &n);
+            return;
+        }
+
+        ARMA_FPMAT multiply(const ARMA_FPMAT m_in) const
+        {
+            ARMA_FPMAT rm_in = arma::trans(m_in);
+            ARMA_FPMAT m_temp(m_in.n_cols, this->max_dim);
+            ARMA_FPMAT m_out(m_in.n_cols, m_in.n_rows);
+
+            perform_csrmm((MKL_INT*)this->offsets_CSC, (MKL_INT*)this->rows_CSC,
+                this->vals_CSC, rm_in.memptr(), m_temp.memptr(), 
+                this->ncols, this->nrows, m_in.n_cols, 1.0f, 0.0f);
+
+            perform_csrmm(this->offsets_CSR, this->cols_CSR, 
+                this->vals_CSR, m_temp.memptr(), m_out.memptr(),
+                this->nrows, this->ncols, m_in.n_cols, 1.0f, 0.0f);
+
+            return arma::trans(m_out);
+        }
 
         void perform_op(
             FPTYPE *x_in,
@@ -246,7 +286,7 @@ namespace ISLE
             op_timer->next_time_secs_silent();
             ++num_op_calls;
             const char no_trans = 'N';
-            FPcsrgemv(	// Pretend CSC_transpose is CSR.
+            FPcsrgemv(	// Pretend CSC is CSR_transpose
                 &no_trans, (MKL_INT*)&max_dim,
                 vals_CSC, (MKL_INT*)offsets_CSC, (MKL_INT*)rows_CSC,
                 x_in, temp);
@@ -298,7 +338,7 @@ namespace ISLE
     class MKL_DenseGenMatProd
     {
         const FPTYPE *data;
-        const Eigen::Index nrows, ncols;
+        const MKL_UINT nrows, ncols;
         const bool IsRowMajor;
 
     public:
@@ -309,8 +349,8 @@ namespace ISLE
             IsRowMajor(mat.IsRowMajor)
         {}
 
-        Eigen::Index rows() const { return nrows; }
-        Eigen::Index cols() const { return ncols; }
+        MKL_UINT rows() const { return nrows; }
+        MKL_UINT cols() const { return ncols; }
 
         void perform_op(FPTYPE *x_in, FPTYPE *y_out) const
         {
@@ -325,7 +365,7 @@ namespace ISLE
     class MKL_DenseSymMatProd
     {
         const FPTYPE *data;
-        const Eigen::Index nrows; // Same as ncols
+        const MKL_UINT nrows; // Same as ncols
         const bool IsRowMajor;
 
     public:
@@ -336,7 +376,7 @@ namespace ISLE
         {
             assert(mat.rows() == mat.cols());
         }
-        Eigen::Index rows() const { return nrows; }
+        MKL_UINT rows() const { return nrows; }
 
         void perform_op(FPTYPE *x_in, FPTYPE *y_out) const
         {

@@ -8,6 +8,7 @@
 #include <iostream>
 #include <algorithm>
 #include <numeric>
+#include <vector>
 
 #include "Eigen/Core"
 
@@ -97,8 +98,9 @@ namespace ISLE
             print_stringstream(ostr, print_to_terminal);
         }
 
+        template<class FPTYPE>
         void print_eigen_data(
-            Eigen::Matrix<FPTYPE, Eigen::Dynamic, 1>& evalues,
+            std::vector<FPTYPE>& evalues,
             doc_id_t num_topics,
             bool print_to_terminal = true)
         {
@@ -106,11 +108,11 @@ namespace ISLE
 
             ostr << "Eigvals:  ";
             for (doc_id_t t = 0; t < num_topics; ++t)
-                ostr << "(" << t << "): " << std::sqrt(evalues(t)) << "\t";
+                ostr << "(" << t << "): " << std::sqrt(evalues[t]) << "\t";
             ostr << std::endl;
             std::vector<FPTYPE> eig_sum_slabs(num_topics / 100 + 1, 0.0);
             for (doc_id_t t = 0; t < num_topics; ++t)
-                eig_sum_slabs[t / 100] += evalues(t);
+                eig_sum_slabs[t / 100] += evalues[t];
             for (auto slab = 0; slab < num_topics / 100; ++slab)
                 ostr << "Sum of Top-" << (slab + 1) * 100 << " eig vals: "
                 << std::accumulate(eig_sum_slabs.begin(), eig_sum_slabs.begin() + 1 + slab, (FPTYPE)0.0)
