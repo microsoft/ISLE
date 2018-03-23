@@ -169,7 +169,10 @@ namespace ISLE
     class FloatingPointSparseMatrix : public SparseMatrix<FPTYPE>
     {
         Eigen::MatrixX BBT;				// For Spectra EigenSolve
-        Eigen::MatrixX U_Spectra;		// first few eig vectors of this*this^T
+        //Eigen::MatrixX U_Spectra;		// first few eig vectors of this*this^T
+        FPTYPE *U_colmajor;             // First num_topics eigenvectors of this*this^T
+        MKL_INT U_rows;
+        MKL_INT U_cols;
         FPTYPE *SigmaVT;			    // Sigma * VT obtained from eigensolvers 
         MKL_INT num_singular_vals;		// Number of Singular values
 
@@ -228,9 +231,7 @@ namespace ISLE
             std::vector<FPTYPE>& evalues);
 
        
-        void FloatingPointSparseMatrix::compute_sigmaVT(
-            FPTYPE *U_colmajor,
-            const doc_id_t num_topics);
+        void FloatingPointSparseMatrix::compute_sigmaVT(const doc_id_t num_topics);
 
         // Input: @from: Copy from here
         // Input: @zetas: zetas[word] indicates the threshold for each word
