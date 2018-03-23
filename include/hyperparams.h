@@ -30,6 +30,11 @@ namespace ISLE
 
 #define EIGENSOLVER BLOCK_KS
 
+// For large problem sizes, use BLOCK_KS_BLOCK_SIZE = 20, 25
+// For small problem sizes, use BLOCK_KS_BLOCK_SIZE = 10
+// If BLOCK_KS_BLOCK_SIZE = k, QR time increases as O(k^2), 
+// while matrix-matrix product time decreases as O(k)
+// Choose an optimal block size that works as a compromise
 #define BLOCK_KS_MAX_ITERS   20
 #define BLOCK_KS_BLOCK_SIZE  10
 #define BLOCK_KS_TOLERANCE   1e-5

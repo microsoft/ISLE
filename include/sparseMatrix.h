@@ -231,7 +231,7 @@ namespace ISLE
             std::vector<FPTYPE>& evalues);
 
        
-        void FloatingPointSparseMatrix::compute_sigmaVT(const doc_id_t num_topics);
+        void compute_sigmaVT(const doc_id_t num_topics);
 
         // Input: @from: Copy from here
         // Input: @zetas: zetas[word] indicates the threshold for each word
