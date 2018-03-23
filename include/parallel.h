@@ -9,13 +9,13 @@
 //#define NO_PAR
 
 #if defined(NO_PAR)
-#define pfor			    for
+#define pfor for
 #define pfor_static_256		for
 #define pfor_static_1024	for
 #define pfor_static_131072	for
-#define pfor_dynamic_1		for
-#define pfor_dynamic_16		for
-#define pfor_dynamic_512	for
+#define pfor_dynamic_1 for
+#define pfor_dynamic_16 for
+#define pfor_dynamic_512 for
 #define pfor_dynamic_1024	for
 #define pfor_dynamic_8192	for
 #define pfor_dynamic_65536	for
@@ -32,17 +32,17 @@
 #if defined(LINUX)
 #include <cilk/cilk.h>
 
-#define pfor			cilk_for
-#define pfor_static_256		cilk_for
-#define pfor_static_1024	cilk_for
-#define pfor_static_131072	cilk_for
-#define pfor_dynamic_1		cilk_for
-#define pfor_dynamic_16		cilk_for
-#define pfor_dynamic_512	cilk_for
-#define pfor_dynamic_1024	cilk_for
-#define pfor_dynamic_8192	cilk_for
-#define pfor_dynamic_65536	cilk_for
-#define pfor_dynamic_131072	cilk_for
+#define pfor cilk_for
+#define pfor_static_256 cilk_for
+#define pfor_static_1024 cilk_for
+#define pfor_static_131072 cilk_for
+#define pfor_dynamic_1 cilk_for
+#define pfor_dynamic_16 cilk_for
+#define pfor_dynamic_512 cilk_for
+#define pfor_dynamic_1024 cilk_for
+#define pfor_dynamic_8192 cilk_for
+#define pfor_dynamic_65536 cilk_for
+#define pfor_dynamic_131072 cilk_for
 
 #include <parallel/algorithm>
 

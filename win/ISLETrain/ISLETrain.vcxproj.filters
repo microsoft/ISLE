@@ -9,10 +9,10 @@
     </Filter>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="..\..\include\deletedCode.h">
+    <ClInclude Include="..\..\deprecated\deletedCode.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\denseMatrix.h">
+    <ClInclude Include="..\..\include\dense_matrix.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\hyperparams.h">
@@ -21,13 +21,13 @@
     <ClInclude Include="..\..\include\logger.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\matUtils.h">
+    <ClInclude Include="..\..\include\mat_utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\parallel.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\sparseMatrix.h">
+    <ClInclude Include="..\..\include\sparse_matrix.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\include\timer.h">
@@ -42,10 +42,10 @@
     <ClInclude Include="..\..\include\trainer.h">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\drivers\sampleTrainInstances.h">
+    <ClInclude Include="..\..\deprecated\sampleTrainInstances.h">
       <Filter>Source Files</Filter>
     </ClInclude>
-    <ClInclude Include="..\..\include\logUtils.h">
+    <ClInclude Include="..\..\include\log_utils.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="..\..\block-ks\ks_types.h">
@@ -65,13 +65,13 @@
     <ClCompile Include="..\..\src\trainer.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\drivers\ISLETrain.cpp">
+    <ClCompile Include="..\..\drivers\train.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\denseMatrix.cpp">
+    <ClCompile Include="..\..\src\dense_matrix.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
-    <ClCompile Include="..\..\src\sparseMatrix.cpp">
+    <ClCompile Include="..\..\src\sparse_matrix.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
     <ClCompile Include="..\..\src\logger.cpp">

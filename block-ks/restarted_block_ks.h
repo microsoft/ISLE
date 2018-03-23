@@ -3,24 +3,24 @@
 
 #pragma once
 #define ARMA_DONT_USE_WRAPPER
+#include <cassert>
 #include <cmath>
-#include <csignal>
 #include <cstdio>
 #include <functional>
 #include <stdexcept>
 #include "armadillo"
 #include "ks_types.h"
-#include "timer.h"
 #include "ks_utils.h"
+#include "timer.h"
 
 using ISLE::Timer;
 
 template<class ProdOp>
 class BlockKs {
   // Problem Parameters
-  ProdOp *op;
+  ProdOp *    op;
   uint64_t    nev, ncv, maxit, blk_size, dim;
-  ARMA_FPTYPE  tol;
+  ARMA_FPTYPE tol;
 
   // Problem Status
   ARMA_FPMAT V, H;
@@ -31,37 +31,28 @@ class BlockKs {
   void truncate();
 
  public:
-  BlockKs(
-      ProdOp *op,
-      uint64_t nev, 
-      uint64_t ncv, 
-      uint64_t maxit, 
-      uint64_t blk_size,
-      ARMA_FPTYPE tol);
+  BlockKs(ProdOp *op, uint64_t nev, uint64_t ncv, uint64_t maxit,
+          uint64_t blk_size, ARMA_FPTYPE tol);
 
   void init();
   void compute();
 
-  ARMA_FPVEC eigenvalues(uint64_t num_evs = 0) const 
-  {
+  ARMA_FPVEC eigenvalues(uint64_t num_evs = 0) const {
     ARMA_FPVEC evs = arma::diagvec(H);
     return ((num_evs == 0) ? evs.head(nev) : evs.head(num_evs));
   }
 
-  ARMA_FPMAT eigenvectors(uint64_t num_evecs = 0) const 
-  {
+  ARMA_FPMAT eigenvectors(uint64_t num_evecs = 0) const {
     return ((num_evecs == 0) ? V.head_cols(nev) : V.head_cols(num_evecs));
   }
 
-  uint64_t num_converged() const 
-  {
+  uint64_t num_converged() const {
     return nconv;
   }
 };
 
 template<class ProdOp>
-void BlockKs<ProdOp>::expand()
-{
+void BlockKs<ProdOp>::expand() {
   Timer timer;
 
   ARMA_FPMAT Vk, Hk, Ck, F, P, Q, R;
@@ -136,23 +127,21 @@ void BlockKs<ProdOp>::expand()
 }
 
 template<class ProdOp>
-void BlockKs<ProdOp>::truncate()
-{
+void BlockKs<ProdOp>::truncate() {
   PRINT_SIZE(V);
   PRINT_SIZE(H);
   PRINT(nconv);
 
-  ARMA_FPMAT vH, subH;
-  ARMA_FPVEC    eH;
+  ARMA_FPMAT  vH, subH;
+  ARMA_FPVEC  eH;
   ARMA_IDXVEC idxeH;
 
   // Compute EVD of `H` & rearrange
   subH = H.submat(nconv, nconv, H.n_cols - 1, H.n_cols - 1);
   bool success = arma::eig_sym(eH, vH, subH);
-  // PRINT(arma::norm(arma::imag(vvH)));
-  // PRINT(arma::norm(arma::imag(eeH)));
   PRINT(arma::norm((vH.t() * subH * vH) - arma::diagmat(eH)));
-  PRINT(arma::norm((vH.t() * vH) - arma::eye<ARMA_FPMAT>(vH.n_cols, vH.n_cols)));
+  PRINT(
+      arma::norm((vH.t() * vH) - arma::eye<ARMA_FPMAT>(vH.n_cols, vH.n_cols)));
 
   if (!success)
     throw std::runtime_error("evd(H) failed");
@@ -188,25 +177,24 @@ void BlockKs<ProdOp>::truncate()
 }
 
 template<class ProdOp>
-BlockKs<ProdOp>::BlockKs(
-    ProdOp *op, uint64_t nev, uint64_t ncv, uint64_t maxit,
-    uint64_t blk_size, ARMA_FPTYPE tol) 
-{
+BlockKs<ProdOp>::BlockKs(ProdOp *op, uint64_t nev, uint64_t ncv, uint64_t maxit,
+                         uint64_t blk_size, ARMA_FPTYPE tol) {
   this->op = op;
   this->nev = nev;
   this->ncv = ncv;
   this->maxit = maxit;
   this->blk_size = blk_size;
+  assert(this->nev % blk_size == 0);
+  assert(this->ncv % blk_size == 0);
   this->tol = tol;
   this->dim = op->rows();
 }
 
 template<class ProdOp>
-void BlockKs<ProdOp>::init() 
-{
-  ARMA_FPMAT V_1, P, Q, R, C, alpha, blk, r1;
+void BlockKs<ProdOp>::init() {
+  ARMA_FPMAT  V_1, P, Q, R, C, alpha, blk, r1;
   ARMA_FPRVEC norms;
-  uint64_t   rank;
+  uint64_t    rank;
   ARMA_IDXVEC start;
 
   // Start with random basis
@@ -221,16 +209,13 @@ void BlockKs<ProdOp>::init()
   // 1-step Block Arnoldi expansion (with 1-step DGKS correction)
   V = Q;
 
-  std::cout << "KS: block0 computed" << std::endl;
   V_1 = this->op->multiply(V);
-  std::cout << "KS: A*block0 computed" << std::endl;
   H = (V.t() * V_1);
   V_1 = V_1 - (V * H);
   C = (V.t() * V_1);
   H = H + C;
   V_1 = V_1 - (V * C);
   utils::compute_qr(V_1, P, Q, R, &rank);
-  std::cout << "KS:qr(block1)" << std::endl;
   R = arma::join_cols(R, arma::zeros<ARMA_FPMAT>(blk_size - rank, R.n_cols));
   H = arma::join_cols(H, R);
   V = arma::join_rows(V, Q);
@@ -260,12 +245,11 @@ void BlockKs<ProdOp>::init()
 }
 
 template<class ProdOp>
-void BlockKs<ProdOp>::compute()
-{
-  ARMA_FPMAT residual_blk;
+void BlockKs<ProdOp>::compute() {
+  ARMA_FPMAT  residual_blk;
   ARMA_FPRVEC norms;
   ARMA_IDXVEC idxs;
-  uint64_t   n_restarts = 0;
+  uint64_t    n_restarts = 0;
   this->nconv = 0;
 
   // Expand to a `ncv` size decomposition
@@ -317,6 +301,6 @@ void BlockKs<ProdOp>::compute()
   }
   nconv = (nconv >= nev ? nev : nconv);
 
-  std::printf("Completed with %llu restarts, nconv = %llu\n", n_restarts,
-              nconv);
+  std::cout << "Completed with " << n_restarts << " restarts, nconv = " << nconv
+            << std::endl;
 }

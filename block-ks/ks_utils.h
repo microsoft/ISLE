@@ -36,8 +36,8 @@ namespace utils {
    * R - NxR upper-triangular matrix
    * rank - optional, to obtain rank of matrix
    */
-  void compute_qr(ARMA_FPMAT A, ARMA_FPMAT &P, ARMA_FPMAT &Q_out, ARMA_FPMAT &R_out,
-                  uint64_t *rank = nullptr) {
+  void compute_qr(ARMA_FPMAT A, ARMA_FPMAT &P, ARMA_FPMAT &Q_out,
+                  ARMA_FPMAT &R_out, uint64_t *rank = nullptr) {
     if (A.n_cols == A.n_rows && A.n_cols == 1) {
       P = {1};
       Q_out = {1};
@@ -58,8 +58,8 @@ namespace utils {
     ARMA_IDXVEC disc_idxs(A.n_cols);
     uint64_t    cur_rank = 0;
     for (uint64_t i = 0; i < A.n_cols; i++) {
-      arma::vec v = a.col(i);
-      ARMA_FPTYPE    v_norm = arma::norm(v);
+      arma::vec   v = a.col(i);
+      ARMA_FPTYPE v_norm = arma::norm(v);
       // Test if column is almost zero
       if (v_norm < 1e-6) {
         disc_idxs(i - cur_rank) = i;
@@ -158,7 +158,7 @@ for(uint64_t j=i;j<A.n_cols;j++){
     return;
   }
 
-   // BlockKs ProdOp class for Dense Armadillo matrices
+  // BlockKs ProdOp class for Dense Armadillo matrices
   class ArmaMatProdOp {
     ARMA_FPMAT m;
 
