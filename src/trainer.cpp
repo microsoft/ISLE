@@ -193,24 +193,7 @@ namespace ISLE
         is_data_loaded = true;
         entries.clear();
         entries.shrink_to_fit(); // Remove allocated memory
-        entries.swap(entries); // More paranoia to force deallocation of memory
-
-        //
-        // Print word frequency histogram
-        //
-        //FPTYPE *wordFreq = new FPTYPE[vocab_size];
-        //memset(wordFreq, 0, sizeof(FPTYPE)*vocab_size);
-        //for(doc_id_t doc=0; doc < num_docs; ++doc)
-        //  for (auto pos = A_sp->offset_CSC(doc); pos < A_sp->offset_CSC(doc+1); pos++)
-        //    wordFreq[A_sp->row_CSC(pos)] += A_sp->normalized_val_CSC(pos);
-        //std::sort(wordFreq, wordFreq + vocab_size, std::greater<FPTYPE>());
-        //FPTYPE total = std::accumulate(wordFreq, wordFreq + vocab_size, (FPTYPE)0.0);
-        //for (word_id_t batch = 0; batch < vocab_size/100; ++batch)
-        //  std::cout << batch*100 << ":" << (batch+1)*100 << "\t"
-        //        << std::accumulate(wordFreq + batch*100, wordFreq + (batch+1)*100, (FPTYPE)0.0)/total << "\t"
-        //            << std::accumulate(wordFreq, wordFreq + (batch+1)*100, (FPTYPE)0.0)/total << "\t"
-        //        << std::endl;
-        //delete[] wordFreq; 
+        entries.swap(entries);   // force deallocation of memory
     }
 
     void ISLETrainer::print_log_combinatorial()
@@ -300,7 +283,7 @@ namespace ISLE
         B_fl_CSC->initialize_for_eigensolver(num_topics);
         timer->next_time_secs("eigen solver init");
         if (EIGENSOLVER == SPECTRA)
-            B_fl_CSC->compute_Spectra(num_topics, evalues);     
+            B_fl_CSC->compute_Spectra(num_topics, evalues);
         else if (EIGENSOLVER == BLOCK_KS)
             B_fl_CSC->compute_block_ks(num_topics, evalues);
         else
@@ -951,19 +934,19 @@ namespace ISLE
                 << "(" << top_words[word].first << "," << top_words[word].second << ")\t";
             out << "\n";
 
-            
+
             Model->find_n_top_words(std::get<0>(*iter), num_top_words, top_words);
             out << "Top words in topic: " << std::get<0>(*iter) << "\n";
             for (int word = 0; word < num_top_words; ++word)
-                out << vocab_words[top_words[word].first] 
+                out << vocab_words[top_words[word].first]
                 << "(" << top_words[word].first << "," << top_words[word].second << ")\t";
             out << "\n";
 
-            
+
             EdgeModel->find_n_top_words(std::get<1>(*iter), num_top_words, top_words);
             out << "Top words in topic: " << std::get<1>(*iter) << "\n";
             for (int word = 0; word < num_top_words; ++word)
-                out << vocab_words[top_words[word].first] 
+                out << vocab_words[top_words[word].first]
                 << "(" << top_words[word].first << "," << top_words[word].second << ")\t";
             out << "\n\n";
         }
