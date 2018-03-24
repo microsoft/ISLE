@@ -317,7 +317,10 @@ namespace ISLE
         // Lloyds on B_k with k-means++ seeds
         //
         if (ENABLE_KMEANS_ON_LOWD) {
-            B_sigmaVT_d_fl.run_lloyds(num_centers_lowd, centers_lowd,
+            //B_sigmaVT_d_fl.run_lloyds(num_centers_lowd, centers_lowd,
+             //   NULL, MAX_KMEANS_LOWD_REPS);
+
+            B_fl->run_lloyds_on_projected_space(num_centers_lowd, centers_lowd,
                 NULL, MAX_KMEANS_LOWD_REPS);
 
             B_fl->left_multiply_by_U_Spectra(centers, centers_lowd, num_topics, num_topics);

@@ -971,6 +971,7 @@ namespace ISLE
         :
         SparseMatrix<FPTYPE>(d, s),
         U_colmajor(NULL),
+        U_rowmajor(NULL),
         U_rows(0),
         U_cols(0),
         SigmaVT(NULL)
@@ -1657,6 +1658,7 @@ namespace ISLE
         assert(sizeof(word_id_t) == sizeof(MKL_INT));
         assert(sizeof(offset_t) == sizeof(MKL_INT));
 
+        // Output: projected_docs: num_docs X num_topics (Row-Major)
         FPcsrmm(&transa, &m, &n, &k, &alpha, matdescra,
             vals_CSC + offsets_CSC[doc_begin], (const MKL_INT*)rows_CSC + offsets_CSC[doc_begin],
             (const MKL_INT*)shifted_offsets_CSC, (const MKL_INT*)(shifted_offsets_CSC + 1),
@@ -1685,6 +1687,7 @@ namespace ISLE
         FPTYPE *ones_vec = new FPTYPE[std::max(doc_end - doc_begin, num_centers)];
         std::fill_n(ones_vec, std::max(doc_end - doc_begin, num_centers), (FPTYPE)1.0);
         
+        // centers_tr = num_centers x num_topics [row-major]
         FPTYPE *centers_tr = new FPTYPE[(size_t)num_centers * num_centers];
         // Improve this
         for (word_id_t r = 0; r < num_centers; ++r)
@@ -1694,6 +1697,7 @@ namespace ISLE
 
         // project docs in range(doc_begin, doc_end)
         FPTYPE *projected_docs = new FPTYPE[num_centers * (doc_end - doc_begin) * sizeof(FPTYPE)];
+        // projected_docs : num_docs x num_topics [row-major]
         project_docs(doc_begin, doc_end, projected_docs);
 
         const char transa = 'N';
@@ -1708,10 +1712,12 @@ namespace ISLE
             m, n, k, alpha, 
             projected_docs, num_centers, centers_tr, num_centers, beta, 
             projected_dist_matrix, num_centers);
+
         FPgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
             doc_end - doc_begin, num_centers, 1,
             (FPTYPE)1.0, ones_vec, doc_end - doc_begin, projected_centers_l2sq, num_centers,
             (FPTYPE)1.0, projected_dist_matrix, num_centers);
+
         FPgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
             doc_end - doc_begin, num_centers, 1,
             (FPTYPE)1.0, projected_docs_l2sq, doc_end - doc_begin, ones_vec, num_centers,
@@ -1810,6 +1816,7 @@ namespace ISLE
         doc_id_t *const closest_center = new doc_id_t[num_docs()];
 
         compute_projected_centers_l2sq(projected_centers, projected_centers_l2sq, num_centers);
+        
         for (doc_id_t block = 0; block < num_doc_blocks; ++block) {
             projected_closest_centers(num_centers, projected_centers, projected_centers_l2sq,
                 block * doc_block_size, std::min((block + 1) * doc_block_size, num_docs()),
@@ -1851,10 +1858,12 @@ namespace ISLE
         delete[] projected_docs;
 
         // divide by number of points to obtain centroid
-        pfor(auto center_id = 0; center_id < num_centers; ++center_id) {
+        for(auto center_id = 0; center_id < num_centers; ++center_id) {
             auto div = (FPTYPE)cluster_sizes[center_id];
-            if (div > 0.0f)
+            if (div > 0.0f) {
+                std::cout << "Cluster #" << center_id + 1 << ":" << cluster_sizes[center_id] << std::endl;
                 FPscal(num_centers, 1.0f / div, projected_centers + center_id * num_centers, 1);
+            }
         }
         timer.next_time_secs("lloyd: find centers", 30);
 
