@@ -153,12 +153,12 @@ namespace ISLE
 
         void compute_Spectra(const doc_id_t num_topics);
 
-        void copy_spectraSigmaVT_from(
+        void copy_sigmaVT_from(
             FloatingPointDenseMatrix<FPTYPE>& from,
             const doc_id_t k,
             bool hardCopy = false); // true for memcpy, false for alias
 
-        void copy_spectraSigmaVT_from(
+        void copy_sigmaVT_from(
             FloatingPointSparseMatrix<FPTYPE>& from,
             const doc_id_t k,
             bool hardCopy = false);

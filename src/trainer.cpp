@@ -296,8 +296,8 @@ namespace ISLE
         //
         // k-means++ on the column space (Simga*VT) of k-rank approx of B
         //
-        FloatingPointDenseMatrix<FPTYPE> B_spectraSigmaVT_d_fl((word_id_t)num_topics, B_fl_CSC->num_docs());
-        B_spectraSigmaVT_d_fl.copy_spectraSigmaVT_from(*B_fl, num_topics);
+        FloatingPointDenseMatrix<FPTYPE> B_sigmaVT_d_fl((word_id_t)num_topics, B_fl_CSC->num_docs());
+        B_sigmaVT_d_fl.copy_sigmaVT_from(*B_fl, num_topics);
         std::vector<doc_id_t> best_kmeans_seeds;
         if (!ENABLE_KMEANS_ON_LOWD)
             assert(KMEANS_INIT_METHOD == KMEANSPP || KMEANS_INIT_METHOD == KMEANSMCMC);
@@ -307,19 +307,17 @@ namespace ISLE
         if (KMEANS_INIT_METHOD == KMEANSPP) out_log->print_string("k-means init method: KMEANSPP\n");
         if (KMEANS_INIT_METHOD == KMEANSMCMC) out_log->print_string("k-means init method: KMEANSMCMC\n");
         if (KMEANS_INIT_METHOD == KMEANSBB) out_log->print_string("k-means init method: KMEANSBB\n");
-        auto best_residual = B_spectraSigmaVT_d_fl.kmeans_init(num_centers_lowd,
+        auto best_residual = B_sigmaVT_d_fl.kmeans_init(num_centers_lowd,
             KMEANS_INIT_REPS, KMEANS_INIT_METHOD, best_kmeans_seeds, centers_lowd);
         out_log->print_string("Best k-means init residual: " + std::to_string(best_residual) + "\n");
         timer->next_time_secs("K-means seeds initialization");
 
 
         //
-        // TODO : Couple k-means++ with B_k LLoyds, and do best of 3.
-        //
         // Lloyds on B_k with k-means++ seeds
         //
         if (ENABLE_KMEANS_ON_LOWD) {
-            B_spectraSigmaVT_d_fl.run_lloyds(num_centers_lowd, centers_lowd,
+            B_sigmaVT_d_fl.run_lloyds(num_centers_lowd, centers_lowd,
                 NULL, MAX_KMEANS_LOWD_REPS);
 
             B_fl->left_multiply_by_U_Spectra(centers, centers_lowd, num_topics, num_topics);

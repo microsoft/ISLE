@@ -343,7 +343,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::copy_spectraSigmaVT_from(
+    void FloatingPointDenseMatrix<FPTYPE>::copy_sigmaVT_from(
         FloatingPointDenseMatrix<FPTYPE>& from,
         const doc_id_t k,
         bool hardCopy) // true for memcpy, false for alias
@@ -366,7 +366,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::copy_spectraSigmaVT_from(
+    void FloatingPointDenseMatrix<FPTYPE>::copy_sigmaVT_from(
         FloatingPointSparseMatrix<FPTYPE>& from,
         const doc_id_t k,
         bool hardCopy)
