@@ -171,6 +171,7 @@ namespace ISLE
         Eigen::MatrixX BBT;				// For Spectra EigenSolve
         //Eigen::MatrixX U_Spectra;		// first few eig vectors of this*this^T
         FPTYPE *U_colmajor;             // First num_topics eigenvectors of this*this^T
+        FPTYPE *U_rowmajor;             // U_colmajor in row-major form
         MKL_INT U_rows;
         MKL_INT U_cols;
         FPTYPE *SigmaVT;			    // Sigma * VT obtained from eigensolvers 
@@ -230,7 +231,7 @@ namespace ISLE
             const doc_id_t num_topics,
             std::vector<FPTYPE>& evalues);
 
-       
+        void compute_U_rowmajor();
         void compute_sigmaVT(const doc_id_t num_topics);
 
         // Input: @from: Copy from here
@@ -309,6 +310,8 @@ namespace ISLE
             FPTYPE * centers_l2sq,
             const doc_id_t num_centers);
 
+        void compute_docs_l2sq(FPTYPE *const docs_l2sq);
+
         FPTYPE lloyds_iter(
             const doc_id_t num_centers,
             FPTYPE *centers,
@@ -316,13 +319,59 @@ namespace ISLE
             std::vector<doc_id_t> *closest_docs = NULL,
             bool compute_residual = false);
 
-        void compute_docs_l2sq(FPTYPE *const docs_l2sq);
-
         FPTYPE run_lloyds(
             const doc_id_t			num_centers,
             FPTYPE					*centers,
             std::vector<doc_id_t>	*closest_docs, // Pass NULL if you dont want closest_docs
             const int				max_reps);
+
+        void project_docs(
+            const doc_id_t doc_begin,
+            const doc_id_t doc_end,
+            FPTYPE* const projected_docs);
+
+        void distsq_projected_docs_to_projected_centers(
+            const word_id_t dim,
+            doc_id_t num_centers,
+            const FPTYPE *const projected_centers,
+            const FPTYPE *const projected_centers_l2sq,
+            const doc_id_t doc_begin,
+            const doc_id_t doc_end,
+            const FPTYPE *const projected_docs_l2sq,
+            FPTYPE *projected_dist_matrix);
+
+        // same input semantics as `closest_centers`
+        void projected_closest_centers(
+            const doc_id_t num_centers,
+            const FPTYPE *const projected_centers,
+            const FPTYPE *const projected_centers_l2sq,
+            const doc_id_t doc_begin,
+            const doc_id_t doc_end,
+            const FPTYPE *const projected_docs_l2sq, 
+            doc_id_t *center_index,                  
+            FPTYPE *const projected_dist_matrix); 
+
+        void compute_projected_centers_l2sq(
+            FPTYPE * projected_centers,
+            FPTYPE * projected_centers_l2sq,
+            const doc_id_t num_centers);
+
+        void compute_projected_docs_l2sq(
+            FPTYPE *const projected_docs_l2sq);
+
+        FPTYPE lloyds_iter_on_projected_space(
+            const doc_id_t num_centers,
+            FPTYPE *projected_centers,
+            const FPTYPE *const projected_docs_l2sq,
+            std::vector<doc_id_t> *closest_docs = NULL,
+            bool compute_residual = false);
+
+        FPTYPE run_lloyds_on_projected_space(
+            const doc_id_t			num_centers,
+            FPTYPE					*projected_centers, // centers are already projected to U^T
+            std::vector<doc_id_t>	*closest_docs, // Pass NULL if you dont want closest_docs
+            const int				max_reps);
+
 
         // Input: @num_centers, @centers: coords of centers to start the iteration, @print_residual
         // Output: @closest_docs: if NULL, nothing is returned; is !NULL, return partition of docs between centers

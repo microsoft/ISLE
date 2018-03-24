@@ -981,6 +981,7 @@ namespace ISLE
     {
         if (SigmaVT) delete[] SigmaVT;
         if (U_colmajor) delete[] U_colmajor;
+        if (U_rowmajor) delete[] U_rowmajor;
     }
 
     template<class FPTYPE>
@@ -1124,28 +1125,32 @@ namespace ISLE
         memcpy(U_colmajor, sevecs.memptr(), U_rows * U_cols * sizeof(FPTYPE));
         compute_sigmaVT(num_topics);
     }
-
-
+    
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::compute_sigmaVT(const doc_id_t num_topics)
-    {
-        FPTYPE *U_rowm = new FPTYPE[(size_t)num_topics*(size_t)vocab_size()];
+    void FloatingPointSparseMatrix<FPTYPE>::compute_U_rowmajor() {
+        assert(U_colmajor != NULL);
+        assert(U_rowmajor == NULL);
+        U_rowmajor = new FPTYPE[(size_t)U_rows*(size_t)U_cols];
 
-        // MKl_?FPomatcopy does not seem to work
-        //FPomatcopy(CblasColMajor, 'T', vocab_size(), num_topics,
-        //	1.0, U_Spectra.data(), vocab_size(), U_rowm, num_topics);
-        // TODO: Improve this
-        for (word_id_t r = 0; r < vocab_size(); ++r)
-            for (auto c = 0; c < num_topics; ++c)
-                U_rowm[(size_t)c + (size_t)r * (size_t)num_topics]
-                = U_colmajor[(size_t)r + (size_t)c * (size_t)vocab_size()];
+        for (word_id_t r = 0; r < U_rows; ++r)
+            for (auto c = 0; c < U_cols; ++c)
+                U_rowmajor[(size_t)c + (size_t)r * (size_t)U_cols]
+                = U_colmajor[(size_t)r + (size_t)c * (size_t)U_rows];
 
-        auto tr_diff = std::abs(FPdot((size_t)vocab_size() * (size_t)num_topics,
+        auto tr_diff = std::abs(FPdot((size_t)U_rows * (size_t)U_cols,
             U_colmajor, 1, U_colmajor, 1))
-            - FPdot((size_t)vocab_size()*(size_t)num_topics, U_rowm, 1, U_rowm, 1);
+            - FPdot((size_t)U_rows*(size_t)U_cols, U_rowmajor, 1, U_rowmajor, 1);
+
         if (tr_diff > 0.01)
             std::cout << "\n === WARNING : Diff between marix and transpose is "
             << tr_diff << "\n" << std::endl;
+    }
+    
+    template<class FPTYPE>
+    void FloatingPointSparseMatrix<FPTYPE>::compute_sigmaVT(const doc_id_t num_topics)
+    {
+        if (!U_rowmajor)
+            compute_U_rowmajor();
 
         const char transa = 'N';
         const MKL_INT m = num_docs();
@@ -1160,9 +1165,8 @@ namespace ISLE
 
         FPcsrmm(&transa, &m, &n, &k, &alpha, matdescra,
             vals_CSC, (const MKL_INT*)rows_CSC, (const MKL_INT*)offsets_CSC, (const MKL_INT*)(offsets_CSC + 1),
-            U_rowm, &n,
+            U_rowmajor, &n,
             &beta, SigmaVT, &n);
-        delete[] U_rowm;
     }
 
     template<class FPTYPE>
@@ -1481,9 +1485,8 @@ namespace ISLE
         Timer timer;
         bool return_doc_partition = (closest_docs != NULL);
 
-        doc_id_t doc_block_size = 1 << 20;
-        doc_id_t num_doc_blocks = (num_docs() % doc_block_size == 0)
-            ? num_docs() / doc_block_size : num_docs() / doc_block_size + 1;
+        doc_id_t doc_block_size = DOC_BLOCK_SIZE;
+        doc_id_t num_doc_blocks = divide_round_up(num_docs(), doc_block_size);
 
         FPTYPE *const centers_l2sq = new FPTYPE[num_centers];
         FPTYPE *dist_matrix = new FPTYPE[(size_t)num_centers * (size_t)doc_block_size];
@@ -1627,6 +1630,306 @@ namespace ISLE
         return residual;
     }
 
+    template<class FPTYPE>
+    void FloatingPointSparseMatrix<FPTYPE>::project_docs(
+        const doc_id_t doc_begin,
+        const doc_id_t doc_end,
+        FPTYPE* const projected_docs) 
+    {
+        assert(U_rowmajor != NULL);
+        assert(doc_begin < doc_end);
+        assert(doc_end <= num_docs());
+        
+        // create shifted copy of offsets array
+        MKL_INT * shifted_offsets_CSC = new MKL_INT[doc_end - doc_begin + 1];
+        for (doc_id_t d = doc_begin; d <= doc_end; ++d) {
+            shifted_offsets_CSC[d - doc_begin] = offsets_CSC[d] - offsets_CSC[doc_begin];
+        }
+
+        const char transa = 'N';
+        const MKL_INT m = doc_end - doc_begin;
+        const MKL_INT n = U_cols;
+        const MKL_INT k = U_rows;
+        const char matdescra[6] = { 'G',0,0,'C',0,0 };
+        FPTYPE alpha = 1.0; FPTYPE beta = 0.0;
+
+        assert(sizeof(MKL_INT) == sizeof(offset_t));
+        assert(sizeof(word_id_t) == sizeof(MKL_INT));
+        assert(sizeof(offset_t) == sizeof(MKL_INT));
+
+        FPcsrmm(&transa, &m, &n, &k, &alpha, matdescra,
+            vals_CSC + offsets_CSC[doc_begin], (const MKL_INT*)rows_CSC + offsets_CSC[doc_begin],
+            (const MKL_INT*)shifted_offsets_CSC, (const MKL_INT*)(shifted_offsets_CSC + 1),
+            U_rowmajor, &n, &beta, projected_docs, &n);
+
+        delete[] shifted_offsets_CSC;
+    }
+
+    template<class FPTYPE>
+    void FloatingPointSparseMatrix<FPTYPE>::distsq_projected_docs_to_projected_centers(
+        const word_id_t dim,
+        doc_id_t num_centers,
+        const FPTYPE *const projected_centers,
+        const FPTYPE *const projected_centers_l2sq,
+        const doc_id_t doc_begin,
+        const doc_id_t doc_end,
+        const FPTYPE *const projected_docs_l2sq,
+        FPTYPE *projected_dist_matrix) 
+    {
+        assert(doc_begin < doc_end);
+        assert(doc_end <= num_docs());
+        assert(num_centers == U_cols);
+        assert(sizeof(MKL_INT) == sizeof(offset_t));
+        //assert(num_docs() >= num_centers);
+
+        FPTYPE *ones_vec = new FPTYPE[std::max(doc_end - doc_begin, num_centers)];
+        std::fill_n(ones_vec, std::max(doc_end - doc_begin, num_centers), (FPTYPE)1.0);
+        
+        FPTYPE *centers_tr = new FPTYPE[(size_t)num_centers * num_centers];
+        // Improve this
+        for (word_id_t r = 0; r < num_centers; ++r)
+            for (auto c = 0; c < num_centers; ++c)
+                centers_tr[(size_t)c + (size_t)r * (size_t)num_centers]
+                = projected_centers[(size_t)r + (size_t)c * (size_t)num_centers];
+
+        // project docs in range(doc_begin, doc_end)
+        FPTYPE *projected_docs = new FPTYPE[num_centers * (doc_end - doc_begin) * sizeof(FPTYPE)];
+        project_docs(doc_begin, doc_end, projected_docs);
+
+        const char transa = 'N';
+        const MKL_INT m = (doc_end - doc_begin);
+        const MKL_INT n = num_centers;
+        const MKL_INT k = num_centers;
+        const char matdescra[6] = { 'G',0,0,'C',0,0 };
+        FPTYPE alpha = -2.0; FPTYPE beta = 0.0;
+
+        // data_block^T, U (data block is in col_major, 
+        FPgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+            m, n, k, alpha, 
+            projected_docs, num_centers, centers_tr, num_centers, beta, 
+            projected_dist_matrix, num_centers);
+        FPgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
+            doc_end - doc_begin, num_centers, 1,
+            (FPTYPE)1.0, ones_vec, doc_end - doc_begin, projected_centers_l2sq, num_centers,
+            (FPTYPE)1.0, projected_dist_matrix, num_centers);
+        FPgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
+            doc_end - doc_begin, num_centers, 1,
+            (FPTYPE)1.0, projected_docs_l2sq, doc_end - doc_begin, ones_vec, num_centers,
+            (FPTYPE)1.0, projected_dist_matrix, num_centers);
+
+        delete[] ones_vec;
+        delete[] centers_tr;
+        delete[] projected_docs;
+    }
+
+    template<class FPTYPE>
+    void FloatingPointSparseMatrix<FPTYPE>::projected_closest_centers(
+        const doc_id_t num_centers,
+        const FPTYPE *const projected_centers,
+        const FPTYPE *const projected_centers_l2sq,
+        const doc_id_t doc_begin,
+        const doc_id_t doc_end,
+        const FPTYPE *const projected_docs_l2sq,
+        doc_id_t *center_index,
+        FPTYPE *const projected_dist_matrix)
+    {
+        assert(doc_begin < doc_end);
+        assert(doc_end <= num_docs());
+        distsq_projected_docs_to_projected_centers(vocab_size(),
+            num_centers, projected_centers, projected_centers_l2sq,
+            doc_begin, doc_end, projected_docs_l2sq, projected_dist_matrix);
+
+        pfor_static_131072(int64_t d = 0; d < doc_end - doc_begin; ++d)
+            center_index[d] = (doc_id_t)FPimin(num_centers,
+                projected_dist_matrix + (size_t)d * (size_t)num_centers, 1);
+    }
+
+    template<class FPTYPE>
+    void FloatingPointSparseMatrix<FPTYPE>::compute_projected_centers_l2sq(
+        FPTYPE * projected_centers,
+        FPTYPE * projected_centers_l2sq,
+        const doc_id_t num_centers)
+    {
+        assert(U_cols == num_centers);
+        pfor_static_256(int64_t c = 0; c < num_centers; ++c)
+            projected_centers_l2sq[c] = FPdot(num_centers,
+                projected_centers + (size_t)c * (size_t)num_centers, 1,
+                projected_centers + (size_t)c * (size_t)num_centers, 1);
+    }
+
+
+    template<class FPTYPE>
+    void FloatingPointSparseMatrix<FPTYPE>::compute_projected_docs_l2sq(
+        FPTYPE *const projected_docs_l2sq)
+    {
+        assert(projected_docs_l2sq != NULL);
+
+        const doc_id_t doc_block_size = DOC_BLOCK_SIZE;
+        const doc_id_t num_doc_blocks = divide_round_up(num_docs(), doc_block_size);
+
+        auto projected_doc_block = new FPTYPE[doc_block_size * U_cols * sizeof(FPTYPE)];
+
+        for (doc_id_t block = 0; block < num_doc_blocks; ++block) {
+            const doc_id_t doc_begin = block * doc_block_size;
+            const doc_id_t doc_end = std::min(num_docs(), (block + 1)* doc_block_size);
+
+            // project  docs
+            project_docs(doc_begin, doc_end, projected_doc_block);
+            
+            // compute l2sq norm of docs
+            pfor_static_131072(int d = 0; d < (doc_end - doc_begin); ++d)
+                projected_docs_l2sq[d + doc_begin] 
+                = FPdot(U_cols, 
+                    projected_doc_block + d * U_cols, 1,
+                    projected_doc_block + d * U_cols, 1);
+
+            // reset buffer
+            memset(projected_doc_block, 0, doc_block_size * U_cols * sizeof(FPTYPE));
+        }
+
+        // free mem
+        delete[] projected_doc_block;
+    }
+    
+    template<class FPTYPE>
+    FPTYPE FloatingPointSparseMatrix<FPTYPE>::lloyds_iter_on_projected_space(
+        const doc_id_t num_centers,
+        FPTYPE *projected_centers,
+        const FPTYPE *const projected_docs_l2sq,
+        std::vector<doc_id_t> *closest_docs = NULL,
+        bool compute_residual = false) 
+    {
+        Timer timer;
+        bool return_doc_partition = (closest_docs != NULL);
+
+        doc_id_t doc_block_size = DOC_BLOCK_SIZE;
+        doc_id_t num_doc_blocks = divide_round_up(num_docs(), doc_block_size);
+
+        FPTYPE *const projected_centers_l2sq = new FPTYPE[num_centers];
+        FPTYPE *projected_dist_matrix = new FPTYPE[(size_t)num_centers * (size_t)doc_block_size];
+        doc_id_t *const closest_center = new doc_id_t[num_docs()];
+
+        compute_projected_centers_l2sq(projected_centers, projected_centers_l2sq, num_centers);
+        for (doc_id_t block = 0; block < num_doc_blocks; ++block) {
+            projected_closest_centers(num_centers, projected_centers, projected_centers_l2sq,
+                block * doc_block_size, std::min((block + 1) * doc_block_size, num_docs()),
+                projected_docs_l2sq + block * doc_block_size,
+                closest_center + block * doc_block_size, projected_dist_matrix);
+        }
+        timer.next_time_secs("lloyd: closest center", 30);
+
+        memset(projected_centers, 0, sizeof(FPTYPE) * (size_t)num_centers * (size_t)num_centers);
+        std::vector<size_t> cluster_sizes(num_centers, 0);
+
+        FPTYPE *projected_docs = new FPTYPE[doc_block_size * num_centers];
+        for (doc_id_t block = 0; block < num_doc_blocks; ++block) {
+
+            if (closest_docs == NULL)
+                closest_docs = new std::vector<doc_id_t>[num_centers];
+            else
+                for (doc_id_t c = 0; c < num_centers; ++c)
+                    closest_docs[c].clear();
+
+            doc_id_t num_docs_in_block = std::min(doc_block_size, num_docs() - block*doc_block_size);
+
+            for (doc_id_t d = block * doc_block_size; d < block*doc_block_size + num_docs_in_block; ++d)
+                closest_docs[closest_center[d]].push_back(d);
+
+            for (size_t c = 0; c < num_centers; ++c)
+                cluster_sizes[c] += closest_docs[c].size();
+
+            project_docs(block * doc_block_size,
+                block*doc_block_size + num_docs_in_block,
+                projected_docs);
+
+            pfor_dynamic_1(int c = 0; c < num_centers; ++c) {
+                auto center = projected_centers + (size_t)c * (size_t)num_centers;
+                for (auto diter = closest_docs[c].begin(); diter != closest_docs[c].end(); ++diter)
+                    FPaxpy(num_centers, 1.0, center, 1, projected_docs + (*diter)*num_centers, 1);
+            }
+        }
+        delete[] projected_docs;
+
+        // divide by number of points to obtain centroid
+        pfor(auto center_id = 0; center_id < num_centers; ++center_id) {
+            auto div = (FPTYPE)cluster_sizes[center_id];
+            if (div > 0.0f)
+                FPscal(num_centers, 1.0f / div, projected_centers + center_id * num_centers, 1);
+        }
+        timer.next_time_secs("lloyd: find centers", 30);
+
+        FPTYPE residual = 0.0;
+        if (compute_residual) {
+            assert(false); // Need to fill in
+        }
+
+        if (!return_doc_partition)
+            delete[] closest_docs;
+        delete[] closest_center;
+        delete[] projected_dist_matrix;
+        delete[] projected_centers_l2sq;
+        return residual;
+    }
+
+    template<class FPTYPE>
+    FPTYPE FloatingPointSparseMatrix<FPTYPE>::run_lloyds_on_projected_space(
+        const doc_id_t			num_centers,
+        FPTYPE					*projected_centers,
+        std::vector<doc_id_t>	*closest_docs,
+        const int				max_reps)
+    {
+        FPTYPE residual;
+        bool return_clusters = (closest_docs != NULL);
+
+        if (return_clusters)
+            for (int center = 0; center < num_centers; ++center)
+                assert(closest_docs[center].size() == 0);
+        else
+            closest_docs = new std::vector<doc_id_t>[num_centers];
+
+        FPTYPE *projected_docs_l2sq = new FPTYPE[num_docs()];
+        compute_projected_docs_l2sq(projected_docs_l2sq);
+
+        std::vector<size_t> prev_cl_sizes(num_centers, 0);
+        auto prev_closest_docs = new std::vector<doc_id_t>[num_centers];
+
+        Timer timer;
+        for (int i = 0; i < max_reps; ++i) {
+            residual = lloyds_iter_on_projected_space(num_centers, 
+                projected_centers, projected_docs_l2sq, closest_docs);
+            std::cout << "Lloyd's iter " << i << "  dist_sq residual: " << std::sqrt(residual) << "\n";
+            timer.next_time_secs("run_lloyds: lloyds iter", 30);
+
+            Timer timer;
+            bool clusters_changed = false;
+            for (int center = 0; center < num_centers; ++center) {
+                if (prev_cl_sizes[center] != closest_docs[center].size())
+                    clusters_changed = true;
+                prev_cl_sizes[center] = closest_docs[center].size();
+            }
+
+            if (!clusters_changed)
+                for (int center = 0; center < num_centers; ++center) {
+                    std::sort(closest_docs[center].begin(), closest_docs[center].end());
+                    std::sort(prev_closest_docs[center].begin(), prev_closest_docs[center].end());
+
+                    if (prev_closest_docs[center] != closest_docs[center])
+                        clusters_changed = true;
+                    prev_closest_docs[center] = closest_docs[center];
+                }
+
+            if (!clusters_changed) {
+                std::cout << "Lloyds converged\n";
+                break;
+            }
+            timer.next_time_secs("run_lloyds: check conv.", 30);
+        }
+        delete[] projected_docs_l2sq;
+        delete[] prev_closest_docs;
+        if (!return_clusters)
+            delete[] closest_docs;
+        return residual;
+    }
 
     // Input: @num_centers, @centers: coords of centers to start the iteration, @print_residual
     // Output: @closest_docs: if NULL, nothing is returned; is !NULL, return partition of docs between centers

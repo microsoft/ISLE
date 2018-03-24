@@ -39,6 +39,8 @@ namespace ISLE
 #define BLOCK_KS_BLOCK_SIZE  10
 #define BLOCK_KS_TOLERANCE   1e-5
 
+#define DOC_BLOCK_SIZE (1 << 20)
+
     enum KMEANS_INIT_OPTIONS {
         KMEANSPP,
         KMEANSBB,
