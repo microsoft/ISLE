@@ -1498,22 +1498,39 @@ namespace ISLE
         }
         timer.next_time_secs("lloyd: closest center", 30);
 
-        if (closest_docs == NULL)
-            closest_docs = new std::vector<doc_id_t>[num_centers];
-        else
-            for (doc_id_t c = 0; c < num_centers; ++c)
-                closest_docs[c].clear();
-        for (doc_id_t d = 0; d < num_docs(); ++d)
-            closest_docs[closest_center[d]].push_back(d);
         memset(centers, 0, sizeof(FPTYPE) * (size_t)num_centers * (size_t)vocab_size());
-        timer.next_time_secs("lloyd: init centers", 30);
+        std::vector<size_t> cluster_sizes(num_centers, 0);
+        for (doc_id_t block = 0; block < num_doc_blocks; ++block) {
 
-        pfor_dynamic_1(int c = 0; c < num_centers; ++c) {
-            auto center = centers + (size_t)c * (size_t)vocab_size();
-            auto div = (FPTYPE)closest_docs[c].size();
-            for (auto diter = closest_docs[c].begin(); diter != closest_docs[c].end(); ++diter)
-                for (auto witer = offsets_CSC[*diter]; witer < offsets_CSC[1 + *diter]; ++witer)
-                    *(center + rows_CSC[witer]) += vals_CSC[witer] / div;
+            if (closest_docs == NULL)
+                closest_docs = new std::vector<doc_id_t>[num_centers];
+            else
+                for (doc_id_t c = 0; c < num_centers; ++c)
+                    closest_docs[c].clear();
+
+            doc_id_t num_docs_in_block = std::min(doc_block_size, num_docs() - block*doc_block_size);
+
+            for (doc_id_t d = block * doc_block_size; d < block*doc_block_size + num_docs_in_block; ++d) 
+                closest_docs[closest_center[d]].push_back(d);
+
+            for (size_t c = 0; c < num_centers; ++c)
+                cluster_sizes[c] += closest_docs[c].size();
+
+            pfor_dynamic_1(int c = 0; c < num_centers; ++c) {
+                auto center = centers + (size_t)c * (size_t)vocab_size();
+                auto div = (FPTYPE)closest_docs[c].size();
+                for (auto diter = closest_docs[c].begin(); diter != closest_docs[c].end(); ++diter)
+                    for (auto witer = offsets_CSC[*diter]; witer < offsets_CSC[1 + *diter]; ++witer)
+                        *(center + rows_CSC[witer]) += vals_CSC[witer];
+            }
+        }
+
+        // divide by number of points to obtain centroid
+        pfor(auto center_id = 0; center_id < num_centers; ++center_id) {
+            auto div = (FPTYPE)cluster_sizes[center_id];
+            if (div > 0.0f)
+                for (auto dim = 0; dim < vocab_size(); ++dim)
+                    centers[(center_id * vocab_size()) + dim] /= div;
         }
         timer.next_time_secs("lloyd: find centers", 30);
 
