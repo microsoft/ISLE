@@ -1381,53 +1381,57 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::distsq_alldocs_to_centers(
+    void FloatingPointSparseMatrix<FPTYPE>::distsq_docs_to_centers(
         const word_id_t dim,
         doc_id_t num_centers,
         const FPTYPE *const centers,
         const FPTYPE *const centers_l2sq,
+        const doc_id_t doc_begin,
+        const doc_id_t doc_end,
         const FPTYPE *const docs_l2sq,
         FPTYPE *dist_matrix)
     {
+        assert(doc_begin < doc_end);
+        assert(doc_end <= num_docs());
         assert(sizeof(MKL_INT) == sizeof(offset_t));
-        assert(num_docs() >= num_centers);
+        //assert(num_docs() >= num_centers);
 
-        FPTYPE *ones_vec = new FPTYPE[num_docs()];
-        std::fill_n(ones_vec, num_docs(), (FPTYPE)1.0);
+        FPTYPE *ones_vec = new FPTYPE[std::max(doc_end-doc_begin, num_centers)];
+        std::fill_n(ones_vec, std::max(doc_end - doc_begin, num_centers), (FPTYPE)1.0);
 
         FPTYPE *centers_tr = new FPTYPE[(size_t)num_centers*(size_t)vocab_size()];
-        // TODO: mkl_?FPomatcopy doesn't seem to work. 
-        /*FPomatcopy(CblasColMajor, 'T',
-            vocab_size(), num_centers,
-            1.0, centers, vocab_size(), centers_tr, num_centers);*/
-
-
-            // Improve this
+        // Improve this
         for (word_id_t r = 0; r < vocab_size(); ++r)
             for (auto c = 0; c < num_centers; ++c)
                 centers_tr[(size_t)c + (size_t)r * (size_t)num_centers]
                 = centers[(size_t)r + (size_t)c * (size_t)vocab_size()];
 
         const char transa = 'N';
-        const MKL_INT m = num_docs();
+        const MKL_INT m = doc_end - doc_begin;
         const MKL_INT n = num_centers;
         const MKL_INT k = vocab_size();
         const char matdescra[6] = { 'G',0,0,'C',0,0 };
         FPTYPE alpha = -2.0; FPTYPE beta = 0.0;
 
+        auto shifted_offsets_CSC = new MKL_INT[doc_end - doc_begin + 1];
+        for (auto doc = doc_begin; doc <= doc_end; ++doc)
+            shifted_offsets_CSC[doc - doc_begin] = offsets_CSC[doc] - offsets_CSC[doc_begin];
+
         FPcsrmm(&transa, &m, &n, &k, &alpha, matdescra,
-            vals_CSC, (const MKL_INT*)rows_CSC, (const MKL_INT*)offsets_CSC, (const MKL_INT*)(offsets_CSC + 1),
-            centers_tr, &n,
-            &beta, dist_matrix, &n);
+            vals_CSC + offsets_CSC[doc_begin], (const MKL_INT*)(rows_CSC + offsets_CSC[doc_begin]),
+            (const MKL_INT*)(shifted_offsets_CSC), (const MKL_INT*)(shifted_offsets_CSC + 1),
+            centers_tr, &n, &beta, dist_matrix, &n);
 
         FPgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
-            num_docs(), num_centers, 1,
-            (FPTYPE)1.0, ones_vec, num_docs(), centers_l2sq, num_centers,
+            doc_end - doc_begin, num_centers, 1,
+            (FPTYPE)1.0, ones_vec, doc_end - doc_begin, centers_l2sq, num_centers,
             (FPTYPE)1.0, dist_matrix, num_centers);
         FPgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
-            num_docs(), num_centers, 1,
-            (FPTYPE)1.0, docs_l2sq, num_docs(), ones_vec, num_centers,
+            doc_end - doc_begin, num_centers, 1,
+            (FPTYPE)1.0, docs_l2sq, doc_end - doc_begin, ones_vec, num_centers,
             (FPTYPE)1.0, dist_matrix, num_centers);
+
+        delete[] shifted_offsets_CSC;
         delete[] ones_vec;
         delete[] centers_tr;
     }
@@ -1436,16 +1440,22 @@ namespace ISLE
     void FloatingPointSparseMatrix<FPTYPE>::closest_centers(
         const doc_id_t num_centers,
         const FPTYPE *const centers,
-        const FPTYPE *const docs_l2sq,
         const FPTYPE *const centers_l2sq,
+        const doc_id_t const doc_begin,
+        const doc_id_t const doc_end,
+        const FPTYPE *const docs_l2sq,
         doc_id_t *center_index,
-        FPTYPE *const dist_matrix) // Scratch space initialized to num_centers*num_docs() size 
+        FPTYPE *const dist_matrix) 
     {
-        distsq_alldocs_to_centers(vocab_size(), num_centers, centers, centers_l2sq,
-            docs_l2sq, dist_matrix);
+        assert(doc_begin < doc_end);
+        assert(doc_end <= num_docs());
+        distsq_docs_to_centers(vocab_size(), 
+            num_centers, centers, centers_l2sq,
+            doc_begin, doc_end, docs_l2sq, dist_matrix);
 
-        pfor_static_131072 (int64_t d = 0; d < num_docs(); ++d)
-            center_index[d] = (doc_id_t)FPimin(num_centers, dist_matrix + (size_t)d * (size_t)num_centers, 1);
+        pfor_static_131072(int64_t d = 0; d < doc_end - doc_begin; ++d)
+            center_index[d] = (doc_id_t)FPimin(num_centers,
+                dist_matrix + (size_t)d * (size_t)num_centers, 1);
     }
 
     template<class FPTYPE>
@@ -1471,12 +1481,21 @@ namespace ISLE
         Timer timer;
         bool return_doc_partition = (closest_docs != NULL);
 
-        FPTYPE *const centers_l2sq = new FPTYPE[num_centers];
-       FPTYPE *dist_matrix = new FPTYPE[(size_t)num_centers * (size_t)num_docs()];
-        doc_id_t *const closest_center = new doc_id_t[num_docs()];
+        doc_id_t doc_block_size = 1 << 20;
+        doc_id_t num_doc_blocks = (num_docs() % doc_block_size == 0)
+            ? num_docs() / doc_block_size : num_docs() / doc_block_size + 1;
 
+        FPTYPE *const centers_l2sq = new FPTYPE[num_centers];
+        FPTYPE *dist_matrix = new FPTYPE[(size_t)num_centers * (size_t)doc_block_size];
+        doc_id_t *const closest_center = new doc_id_t[num_docs()];
+        
         compute_centers_l2sq(centers, centers_l2sq, num_centers);
-        closest_centers(num_centers, centers, docs_l2sq, centers_l2sq, closest_center, dist_matrix);
+        for (doc_id_t block = 0; block < num_doc_blocks; ++block) {
+            closest_centers(num_centers, centers, centers_l2sq,
+                block * doc_block_size, std::min((block + 1) * doc_block_size, num_docs()),
+                docs_l2sq + block * doc_block_size,
+                closest_center + block * doc_block_size, dist_matrix);
+        }
         timer.next_time_secs("lloyd: closest center", 30);
 
         if (closest_docs == NULL)
@@ -1630,7 +1649,8 @@ namespace ISLE
 
         compute_centers_l2sq(centers, centers_l2sq, num_centers);
         compute_docs_l2sq(docs_l2sq);
-        closest_centers(num_centers, centers, docs_l2sq, centers_l2sq, closest_center, lb_distsq_matrix);
+        closest_centers(num_centers, centers, centers_l2sq, 
+            0, num_docs(), docs_l2sq, closest_center, lb_distsq_matrix);
         //pfor_static_131072 (auto doc = 0; doc < num_docs(); ++doc)
         //	ub_distsq[doc] = distsq_doc_to_pt(doc, centers + vocab_size() * closest_center[doc]);
         auto nearest_docs = new std::vector<doc_id_t>[num_centers];

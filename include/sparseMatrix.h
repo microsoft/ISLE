@@ -284,20 +284,25 @@ namespace ISLE
         // Input: @centers: column major matrix with coords of centers.
         // Input: @centers_l2sq: l_2^2 of centers
         // Input: @docs_l2sq: l_2^2 of points,
-        void distsq_alldocs_to_centers(
+        void distsq_docs_to_centers(
             const word_id_t dim,
             doc_id_t num_centers,
             const FPTYPE *const centers,
             const FPTYPE *const centers_l2sq,
+            const doc_id_t doc_begin,
+            const doc_id_t doc_end,
             const FPTYPE *const docs_l2sq,
             FPTYPE *dist_matrix);
 
-        void closest_centers(const doc_id_t num_centers,
+        void closest_centers(
+            const doc_id_t num_centers,
             const FPTYPE *const centers,
-            const FPTYPE *const docs_l2sq,
             const FPTYPE *const centers_l2sq,
-            doc_id_t *center_index,
-            FPTYPE *const dist_matrix); // Initialized to num_centers*num_docs() size 
+            const doc_id_t const doc_begin,
+            const doc_id_t const doc_end,
+            const FPTYPE *const docs_l2sq, // 0-th element corresponds to doc_begin
+            doc_id_t *center_index,        // 0-th element corresponds to doc_begin
+            FPTYPE *const dist_matrix);    // Initialized to num_centers*(doc_end-doc_begin) size 
 
         void compute_centers_l2sq(
             FPTYPE * centers,
