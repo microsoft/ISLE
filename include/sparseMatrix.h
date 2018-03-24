@@ -295,8 +295,14 @@ namespace ISLE
         void closest_centers(const doc_id_t num_centers,
             const FPTYPE *const centers,
             const FPTYPE *const docs_l2sq,
+            const FPTYPE *const centers_l2sq,
             doc_id_t *center_index,
             FPTYPE *const dist_matrix); // Initialized to num_centers*num_docs() size 
+
+        void compute_centers_l2sq(
+            FPTYPE * centers,
+            FPTYPE * centers_l2sq,
+            const doc_id_t num_centers);
 
         FPTYPE lloyds_iter(
             const doc_id_t num_centers,

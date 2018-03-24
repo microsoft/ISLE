@@ -225,7 +225,7 @@ namespace ISLE
             freqs_comp[chunk] = new std::vector<T>[vocab_size()];
         timer.next_time_secs("list_freqs: alloc", 30);
 
-        pfor (long long chunk = 0; chunk < num_chunks; chunk++) {
+        pfor(long long chunk = 0; chunk < num_chunks; chunk++) {
             auto chunk_b = chunk*CHUNK_SIZE;
             auto chunk_e = (chunk + 1) * CHUNK_SIZE > num_docs() ? num_docs() : (chunk + 1) * CHUNK_SIZE;
             list_word_freqs_r(freqs_comp[chunk], chunk_b, chunk_e, 0, vocab_size());
@@ -1023,7 +1023,7 @@ namespace ISLE
 
     template<class FPTYPE>
     FloatingPointSparseMatrix<FPTYPE>::WordDocPair::WordDocPair(const word_id_t& word_, const doc_id_t& doc_)
-    : word(word_), doc(doc_)
+        : word(word_), doc(doc_)
     {}
 
     template<class FPTYPE>
@@ -1113,7 +1113,7 @@ namespace ISLE
             num_topics, 2 * num_topics + BLOCK_KS_BLOCK_SIZE,
             BLOCK_KS_MAX_ITERS, BLOCK_KS_BLOCK_SIZE, BLOCK_KS_TOLERANCE);
         eigensolver.init();
-        eigensolver.compute();      
+        eigensolver.compute();
         assert(eigensolver.num_converged() == num_topics);
 
         ARMA_FPMAT sevecs = eigensolver.eigenvectors();
@@ -1176,7 +1176,7 @@ namespace ISLE
         delete[] SigmaVT;
         SigmaVT = NULL;
     }
-    
+
 
     // Input: @from: Copy from here
     // Input: @zetas: zetas[word] indicates the threshold for each word
@@ -1433,24 +1433,31 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::closest_centers(const doc_id_t num_centers,
+    void FloatingPointSparseMatrix<FPTYPE>::closest_centers(
+        const doc_id_t num_centers,
         const FPTYPE *const centers,
         const FPTYPE *const docs_l2sq,
+        const FPTYPE *const centers_l2sq,
         doc_id_t *center_index,
-        FPTYPE *const dist_matrix) // Initialized to num_centers*num_docs() size 
+        FPTYPE *const dist_matrix) // Scratch space initialized to num_centers*num_docs() size 
     {
-        // Need to parallelize
-        FPTYPE *const centers_l2sq = new FPTYPE[num_centers];
-        for (doc_id_t c = 0; c < num_centers; ++c)
+        distsq_alldocs_to_centers(vocab_size(), num_centers, centers, centers_l2sq,
+            docs_l2sq, dist_matrix);
+
+        pfor_static_131072 (int64_t d = 0; d < num_docs(); ++d)
+            center_index[d] = (doc_id_t)FPimin(num_centers, dist_matrix + (size_t)d * (size_t)num_centers, 1);
+    }
+
+    template<class FPTYPE>
+    void FloatingPointSparseMatrix<FPTYPE>::compute_centers_l2sq(
+        FPTYPE * centers,
+        FPTYPE * centers_l2sq,
+        const doc_id_t num_centers)
+    {
+        pfor_static_256(int64_t c = 0; c < num_centers; ++c)
             centers_l2sq[c] = FPdot(vocab_size(),
                 centers + (size_t)c * (size_t)vocab_size(), 1,
                 centers + (size_t)c * (size_t)vocab_size(), 1);
-
-        distsq_alldocs_to_centers(vocab_size(), num_centers, centers, centers_l2sq,
-            docs_l2sq, dist_matrix);
-        pfor_static_131072(int64_t d = 0; d < num_docs(); ++d)
-            center_index[d] = (doc_id_t)FPimin(num_centers, dist_matrix + (size_t)d * (size_t)num_centers, 1);
-        delete[] centers_l2sq;
     }
 
     template<class FPTYPE>
@@ -1464,9 +1471,12 @@ namespace ISLE
         Timer timer;
         bool return_doc_partition = (closest_docs != NULL);
 
-        FPTYPE *dist_matrix = new FPTYPE[(size_t)num_centers * (size_t)num_docs()];
+        FPTYPE *const centers_l2sq = new FPTYPE[num_centers];
+       FPTYPE *dist_matrix = new FPTYPE[(size_t)num_centers * (size_t)num_docs()];
         doc_id_t *const closest_center = new doc_id_t[num_docs()];
-        closest_centers(num_centers, centers, docs_l2sq, closest_center, dist_matrix);
+
+        compute_centers_l2sq(centers, centers_l2sq, num_centers);
+        closest_centers(num_centers, centers, docs_l2sq, centers_l2sq, closest_center, dist_matrix);
         timer.next_time_secs("lloyd: closest center", 30);
 
         if (closest_docs == NULL)
@@ -1476,7 +1486,7 @@ namespace ISLE
                 closest_docs[c].clear();
         for (doc_id_t d = 0; d < num_docs(); ++d)
             closest_docs[closest_center[d]].push_back(d);
-        FPscal((size_t)num_centers * (size_t)vocab_size(), 0.0, centers, 1);
+        memset(centers, 0, sizeof(FPTYPE) * (size_t)num_centers * (size_t)vocab_size());
         timer.next_time_secs("lloyd: init centers", 30);
 
         pfor_dynamic_1(int c = 0; c < num_centers; ++c) {
@@ -1508,6 +1518,7 @@ namespace ISLE
             delete[] closest_docs;
         delete[] closest_center;
         delete[] dist_matrix;
+        delete[] centers_l2sq;
         return residual;
     }
 
@@ -1617,8 +1628,9 @@ namespace ISLE
 
         timer.next_time_secs("Elkan: Alloc", 30);
 
+        compute_centers_l2sq(centers, centers_l2sq, num_centers);
         compute_docs_l2sq(docs_l2sq);
-        closest_centers(num_centers, centers, docs_l2sq, closest_center, lb_distsq_matrix);
+        closest_centers(num_centers, centers, docs_l2sq, centers_l2sq, closest_center, lb_distsq_matrix);
         //pfor_static_131072 (auto doc = 0; doc < num_docs(); ++doc)
         //	ub_distsq[doc] = distsq_doc_to_pt(doc, centers + vocab_size() * closest_center[doc]);
         auto nearest_docs = new std::vector<doc_id_t>[num_centers];
