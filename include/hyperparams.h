@@ -41,6 +41,8 @@ namespace ISLE
 
 #define DOC_BLOCK_SIZE (1 << 20)
 
+#define USE_EXPLICIT_PROJECTED_MATRIX false
+
     enum KMEANS_INIT_OPTIONS {
         KMEANSPP,
         KMEANSBB,

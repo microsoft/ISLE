@@ -1849,21 +1849,19 @@ namespace ISLE
                 block*doc_block_size + num_docs_in_block,
                 projected_docs);
 
-            pfor_dynamic_1(int c = 0; c < num_centers; ++c) {
-                auto center = projected_centers + (size_t)c * (size_t)num_centers;
+         pfor_dynamic_1(int c = 0; c < num_centers; ++c) {
+                FPTYPE* center = projected_centers + (size_t)c * (size_t)num_centers;
                 for (auto diter = closest_docs[c].begin(); diter != closest_docs[c].end(); ++diter)
-                    FPaxpy(num_centers, 1.0, center, 1, projected_docs + (*diter)*num_centers, 1);
+                    FPaxpy(num_centers, 1.0, projected_docs + ((*diter) - block*doc_block_size)*num_centers, 1, center, 1);
             }
         }
         delete[] projected_docs;
 
         // divide by number of points to obtain centroid
-        for(auto center_id = 0; center_id < num_centers; ++center_id) {
+        for (auto center_id = 0; center_id < num_centers; ++center_id) {
             auto div = (FPTYPE)cluster_sizes[center_id];
-            if (div > 0.0f) {
-                std::cout << "Cluster #" << center_id + 1 << ":" << cluster_sizes[center_id] << std::endl;
+            if (div > 0.0f)
                 FPscal(num_centers, 1.0f / div, projected_centers + center_id * num_centers, 1);
-            }
         }
         timer.next_time_secs("lloyd: find centers", 30);
 
@@ -1898,7 +1896,7 @@ namespace ISLE
 
         FPTYPE *projected_docs_l2sq = new FPTYPE[num_docs()];
         compute_projected_docs_l2sq(projected_docs_l2sq);
-
+        
         std::vector<size_t> prev_cl_sizes(num_centers, 0);
         auto prev_closest_docs = new std::vector<doc_id_t>[num_centers];
 
