@@ -162,11 +162,11 @@ namespace ISLE
 
         void compute_log_combinatorial(std::vector<FPTYPE>& docs_log_fact);
 
-        friend class FloatingPointSparseMatrix<FPTYPE>;
+        friend class FPSparseMatrix<FPTYPE>;
     };
 
     template<class FPTYPE>
-    class FloatingPointSparseMatrix : public SparseMatrix<FPTYPE>
+    class FPSparseMatrix : public SparseMatrix<FPTYPE>
     {
         Eigen::MatrixX BBT;				// For Spectra EigenSolve
         //Eigen::MatrixX U_Spectra;		// first few eig vectors of this*this^T
@@ -178,7 +178,7 @@ namespace ISLE
         MKL_INT num_singular_vals;		// Number of Singular values
 
     public:
-        friend class FloatingPointDenseMatrix<FPTYPE>;
+        friend class FPDenseMatrix<FPTYPE>;
 
         using SparseMatrix<FPTYPE>::allocate;
         using SparseMatrix<FPTYPE>::num_docs;
@@ -195,11 +195,11 @@ namespace ISLE
         using SparseMatrix<FPTYPE>::_nnzs;
         using SparseMatrix<FPTYPE>::_num_docs;
 
-        FloatingPointSparseMatrix(const word_id_t d, const doc_id_t s);
+        FPSparseMatrix(const word_id_t d, const doc_id_t s);
 
-        ~FloatingPointSparseMatrix();
+        ~FPSparseMatrix();
 
-        FloatingPointSparseMatrix(
+        FPSparseMatrix(
             const SparseMatrix<FPTYPE>& from,
             const bool copy_normalized = false);
 

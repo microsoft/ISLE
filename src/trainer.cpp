@@ -175,7 +175,7 @@ namespace ISLE
         }
 
         A_sp = new SparseMatrix<A_TYPE>(vocab_size, num_docs);
-        B_fl_CSC = new FloatingPointSparseMatrix<FPTYPE>(vocab_size, num_docs);
+        B_fl_CSC = new FPSparseMatrix<FPTYPE>(vocab_size, num_docs);
         catchwords = new std::vector<word_id_t>[num_topics];
         topwords = new std::vector<std::pair<word_id_t, FPTYPE> >[num_topics];
         closest_docs = new std::vector<doc_id_t>[num_topics];
@@ -234,7 +234,7 @@ namespace ISLE
     //
     void ISLETrainer::compute_input_svd()
     {
-        FloatingPointSparseMatrix<FPTYPE> A_fl_CSC(*A_sp, true);
+        FPSparseMatrix<FPTYPE> A_fl_CSC(*A_sp, true);
         A_fl_CSC.initialize_for_eigensolver(num_topics);
         timer->next_time_secs("Spectra A_sp init");
         std::vector<FPTYPE> A_sq_svalues;
@@ -296,7 +296,7 @@ namespace ISLE
         //
         // k-means++ on the column space (Simga*VT) of k-rank approx of B
         //
-        FloatingPointDenseMatrix<FPTYPE> B_sigmaVT_d_fl((word_id_t)num_topics, B_fl_CSC->num_docs());
+        FPDenseMatrix<FPTYPE> B_sigmaVT_d_fl((word_id_t)num_topics, B_fl_CSC->num_docs());
         B_sigmaVT_d_fl.copy_sigmaVT_from(*B_fl, num_topics);
         std::vector<doc_id_t> best_kmeans_seeds;
         if (!ENABLE_KMEANS_ON_LOWD)
@@ -514,7 +514,7 @@ namespace ISLE
         const FPTYPE& avg_coherence,
         const std::vector<FPTYPE>& nl_coherences,
         const FPTYPE& avg_nl_coherence,
-        const FloatingPointSparseMatrix<FPTYPE> *const A_sp)
+        const FPSparseMatrix<FPTYPE> *const A_sp)
     {
         assert(is_training_complete);
 

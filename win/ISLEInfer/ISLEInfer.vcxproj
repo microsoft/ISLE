@@ -112,7 +112,7 @@
   </PropertyGroup>
   <PropertyGroup Condition="'$(Configuration)|$(Platform)'=='Release|x64'">
     <LinkIncremental>false</LinkIncremental>
-    <LibraryPath>C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2017.1.143\windows\compiler\lib\intel64_win;$(LibraryPath)</LibraryPath>
+    <LibraryPath>$(SolutionDir)x64\Release;C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2017.1.143\windows\compiler\lib\intel64_win;$(LibraryPath)</LibraryPath>
     <IncludePath>$(SolutionDir)..\armadillo-8.400.0\include;$(SolutionDir)..\block-ks;$(SolutionDir)..;$(SolutionDir)..\include;$(IncludePath)</IncludePath>
   </PropertyGroup>
   <ItemDefinitionGroup Condition="'$(Configuration)|$(Platform)'=='Debug|Win32'">

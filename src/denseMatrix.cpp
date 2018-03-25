@@ -205,7 +205,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    FloatingPointDenseMatrix<FPTYPE>::FloatingPointDenseMatrix(word_id_t d, doc_id_t s) :
+    FPDenseMatrix<FPTYPE>::FPDenseMatrix(word_id_t d, doc_id_t s) :
         DenseMatrix<FPTYPE>(d, s),
         svd_temp(NULL),
         U(NULL),
@@ -217,11 +217,11 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    FloatingPointDenseMatrix<FPTYPE>::~FloatingPointDenseMatrix()
+    FPDenseMatrix<FPTYPE>::~FPDenseMatrix()
     {}
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::populate_from_sparse(const FloatingPointSparseMatrix<FPTYPE>& from)
+    void FPDenseMatrix<FPTYPE>::populate_from_sparse(const FPSparseMatrix<FPTYPE>& from)
     {
         assert(vocab_size() == from.vocab_size());
         assert(num_docs() == from.num_docs());
@@ -249,13 +249,13 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    FPTYPE FloatingPointDenseMatrix<FPTYPE>::frobenius() const
+    FPTYPE FPDenseMatrix<FPTYPE>::frobenius() const
     {
         return FPdot((size_t)num_docs() * (size_t)vocab_size(), data(), 1, data(), 1);
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::initialize_for_full_svd()
+    void FPDenseMatrix<FPTYPE>::initialize_for_full_svd()
     {
         // TODO: memory alignment
         svd_temp = new FPTYPE[(size_t)vocab_size()*(size_t)num_docs()];
@@ -267,7 +267,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    FPTYPE FloatingPointDenseMatrix<FPTYPE>::singular_val(int k) const
+    FPTYPE FPDenseMatrix<FPTYPE>::singular_val(int k) const
     {
         assert(Sigma != NULL);
         assert(k < num_singular_vals);
@@ -275,7 +275,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::cleanup_full_svd()
+    void FPDenseMatrix<FPTYPE>::cleanup_full_svd()
     {
         assert(svd_temp != NULL);
         assert(U != NULL);
@@ -289,7 +289,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::initialize_for_eigensolver(const doc_id_t num_topics)
+    void FPDenseMatrix<FPTYPE>::initialize_for_eigensolver(const doc_id_t num_topics)
     {
         SigmaVT = new FPTYPE[(size_t)num_topics*(size_t)num_docs()];
 
@@ -302,7 +302,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::compute_Spectra(const doc_id_t num_topics)
+    void FPDenseMatrix<FPTYPE>::compute_Spectra(const doc_id_t num_topics)
     {
         // Call truncated Symm Eigensolve on BBT to get squared singular vals and U_trunc
         /*Spectra::DenseSymMatProd<FPTYPE> op(BBT);
@@ -343,8 +343,8 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::copy_sigmaVT_from(
-        FloatingPointDenseMatrix<FPTYPE>& from,
+    void FPDenseMatrix<FPTYPE>::copy_sigmaVT_from(
+        FPDenseMatrix<FPTYPE>& from,
         const doc_id_t k,
         bool hardCopy) // true for memcpy, false for alias
     {
@@ -366,8 +366,8 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::copy_sigmaVT_from(
-        FloatingPointSparseMatrix<FPTYPE>& from,
+    void FPDenseMatrix<FPTYPE>::copy_sigmaVT_from(
+        FPSparseMatrix<FPTYPE>& from,
         const doc_id_t k,
         bool hardCopy)
     {
@@ -389,7 +389,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::left_multiply_by_U_Spectra(
+    void FPDenseMatrix<FPTYPE>::left_multiply_by_U_Spectra(
         FPTYPE *const out,
         const FPTYPE *in,
         const doc_id_t ld_in,
@@ -405,13 +405,13 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    FPTYPE* FloatingPointDenseMatrix<FPTYPE>::get_ptr_to_spectraSigmaVT()
+    FPTYPE* FPDenseMatrix<FPTYPE>::get_ptr_to_spectraSigmaVT()
     {
         return SigmaVT;
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::compare_LAPACK_Spectra(
+    void FPDenseMatrix<FPTYPE>::compare_LAPACK_Spectra(
         const doc_id_t num_topics,
         const double U_TOLERANCE,
         const double VT_TOLERANCE)
@@ -461,7 +461,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::cleanup_after_eigensolver()
+    void FPDenseMatrix<FPTYPE>::cleanup_after_eigensolver()
     {
         assert(SigmaVT != NULL);
         delete[] SigmaVT;
@@ -469,9 +469,9 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::populate_with_topk_singulars(
+    void FPDenseMatrix<FPTYPE>::populate_with_topk_singulars(
         const doc_id_t k,
-        FloatingPointDenseMatrix<FPTYPE> &from)
+        FPDenseMatrix<FPTYPE> &from)
     {
         assert(from.U != NULL && from.VT != NULL && from.Sigma != NULL);
         assert(this->num_docs() == from.num_docs() && this->vocab_size() == from.vocab_size());
@@ -490,7 +490,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    FPTYPE FloatingPointDenseMatrix<FPTYPE>::distsq_point_to_center(
+    FPTYPE FPDenseMatrix<FPTYPE>::distsq_point_to_center(
         const doc_id_t d,
         const FPTYPE *const center)
     {
@@ -501,7 +501,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::distsq_alldocs_to_centers(
+    void FPDenseMatrix<FPTYPE>::distsq_alldocs_to_centers(
         const word_id_t dim,
         doc_id_t num_centers, const FPTYPE *const centers, const FPTYPE *const centers_l2sq,
         doc_id_t num_docs, const FPTYPE *const docs, const FPTYPE *const docs_l2sq,
@@ -530,7 +530,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::distsq_to_closest_center(
+    void FPDenseMatrix<FPTYPE>::distsq_to_closest_center(
         const word_id_t dim,
         doc_id_t num_centers,
         const FPTYPE *const centers,
@@ -558,7 +558,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::update_min_distsq_to_centers(
+    void FPDenseMatrix<FPTYPE>::update_min_distsq_to_centers(
         const word_id_t dim,
         const doc_id_t num_centers,
         const FPTYPE *const centers,
@@ -609,7 +609,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    FPTYPE FloatingPointDenseMatrix<FPTYPE>::kmeanspp(
+    FPTYPE FPDenseMatrix<FPTYPE>::kmeanspp(
         const doc_id_t k,
         std::vector<doc_id_t>&centers,
         const bool weighted,
@@ -681,7 +681,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    FPTYPE FloatingPointDenseMatrix<FPTYPE>::kmeansbb(
+    FPTYPE FPDenseMatrix<FPTYPE>::kmeansbb(
         const doc_id_t k,
         FPTYPE* final_centers_coords)
     {
@@ -742,7 +742,7 @@ namespace ISLE
         std::sort(centers.begin(), centers.end());
         centers.erase(std::unique(centers.begin(), centers.end()), centers.end());
         std::cout << "K-means||, #initial centers: " << centers.size() << std::endl;
-        FloatingPointDenseMatrix<FPTYPE> CentersMtx(vocab_size(), centers.size());
+        FPDenseMatrix<FPTYPE> CentersMtx(vocab_size(), centers.size());
         for (size_t c = 0; c < centers.size(); ++c)
             memcpy(CentersMtx.data() + (size_t)c * (size_t)vocab_size(),
                 data() + (size_t)c * (size_t)vocab_size(), sizeof(FPTYPE) * vocab_size());
@@ -785,7 +785,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    FPTYPE FloatingPointDenseMatrix<FPTYPE>::kmeansmcmc(
+    FPTYPE FPDenseMatrix<FPTYPE>::kmeansmcmc(
         const doc_id_t k,
         std::vector<doc_id_t>&centers)
     {
@@ -885,7 +885,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    FPTYPE FloatingPointDenseMatrix<FPTYPE>::kmeans_init(
+    FPTYPE FPDenseMatrix<FPTYPE>::kmeans_init(
         const int num_centers,
         const int max_reps,
         const int method,
@@ -940,7 +940,7 @@ namespace ISLE
     // Output: Sum of distances of all points to chosen seeds
     // All calulations are done on the column space of Sigma*VT of the truncated SVD
     template<class FPTYPE>
-    FPTYPE FloatingPointDenseMatrix<FPTYPE>::kmeanspp_on_col_space(
+    FPTYPE FPDenseMatrix<FPTYPE>::kmeanspp_on_col_space(
         doc_id_t k,
         std::vector<doc_id_t>& centers,
         int spectrum_source)
@@ -1009,7 +1009,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::closest_centers(
+    void FPDenseMatrix<FPTYPE>::closest_centers(
         const doc_id_t num_centers,
         const FPTYPE *const centers,
         const FPTYPE *const docs_l2sq,
@@ -1029,7 +1029,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    FPTYPE FloatingPointDenseMatrix<FPTYPE>::distsq(
+    FPTYPE FPDenseMatrix<FPTYPE>::distsq(
         FPTYPE* p1_coords,
         FPTYPE* p2_coords,
         word_id_t dim)
@@ -1040,7 +1040,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointDenseMatrix<FPTYPE>::compute_docs_l2sq(FPTYPE *const docs_l2sq)
+    void FPDenseMatrix<FPTYPE>::compute_docs_l2sq(FPTYPE *const docs_l2sq)
     {
         assert(docs_l2sq != NULL);
         pfor_static_131072(int d = 0; d < num_docs(); ++d)
@@ -1049,7 +1049,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    FPTYPE FloatingPointDenseMatrix<FPTYPE>::lloyds_iter(
+    FPTYPE FPDenseMatrix<FPTYPE>::lloyds_iter(
         const doc_id_t num_centers,
         FPTYPE *centers,
         const FPTYPE *const docs_l2sq,
@@ -1119,7 +1119,7 @@ namespace ISLE
     // Return last residual
     //
     template<class FPTYPE>
-    FPTYPE FloatingPointDenseMatrix<FPTYPE>::run_lloyds(
+    FPTYPE FPDenseMatrix<FPTYPE>::run_lloyds(
         const doc_id_t num_centers,
         FPTYPE *centers,
         std::vector<doc_id_t> *closest_docs, // Pass NULL if you dont want closest_docs returned
@@ -1181,4 +1181,4 @@ namespace ISLE
 }
 
 template class ISLE::DenseMatrix<float>;
-template class ISLE::FloatingPointDenseMatrix<float>;
+template class ISLE::FPDenseMatrix<float>;

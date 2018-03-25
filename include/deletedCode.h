@@ -27,7 +27,7 @@ inline word_id_t vocab_size()const { return _vocab_size; }
 /*{  //Does not work.
 FPTYPE eigen1, eigen100;
 eigen1 = B_d_fl.get_singular_vals(0); eigen100 = B_d_fl.get_singular_vals(99);
-FloatingPointSparseMatrix<float> B_sp_fl(s, s);
+FPSparseMatrix<float> B_sp_fl(s, s);
 auto inner_nnzs = B_sp_fl.populate_with_inner_product(B_CSC, B_CSC, s*s/1);
 std::cout << "#NNZs in the sparse representation of innerp product of thresholed matrix: "
 << inner_nnzs << std::endl;
@@ -36,7 +36,7 @@ B_sp_fl.compute_feast_eigen_vals();
 }*/
 
 /* // Can do k-means on (Sigma*VT) of B_d_fl instead
-FloatingPointDenseMatrix<FPTYPE> B_topk_d_fl(vocab_size, num_docs);
+FPDenseMatrix<FPTYPE> B_topk_d_fl(vocab_size, num_docs);
 B_topk_d_fl.populate_with_topk_singulars(B_d_fl, num_topics);
 timer.next_time_secs("Computing best rank-k approx from SVD"); 
 
@@ -290,7 +290,7 @@ timer.next_time_secs("Writing document-topic catchword sums");
 //	delete[] zetas;
 //}
 
-// Deleted methods from FloatingPointSparseMatrix
+// Deleted methods from FPSparseMatrix
 // {
 //
 //	/*eigenvals(NULL), residual(NULL), eigenvecs(NULL),
@@ -460,7 +460,7 @@ timer.next_time_secs("Writing document-topic catchword sums");
 //		assert(nz_count == nnzs);
 //	}
 //
-//	friend class FloatingPointSparseMatrix<FPTYPE>;
+//	friend class FPSparseMatrix<FPTYPE>;
 //};
 
 

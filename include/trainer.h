@@ -63,7 +63,7 @@ namespace ISLE
         std::vector<DocWordEntry<count_t> > entries;
 
         SparseMatrix<A_TYPE>* A_sp;
-        FloatingPointSparseMatrix<FPTYPE> *B_fl_CSC;
+        FPSparseMatrix<FPTYPE> *B_fl_CSC;
 
         std::vector<std::string> vocab_words;
 
@@ -163,7 +163,7 @@ namespace ISLE
             const FPTYPE& avg_coherence,
             const std::vector<FPTYPE>& nl_coherences,
             const FPTYPE& avg_nl_coherence,
-            const FloatingPointSparseMatrix<FPTYPE> *const A_sp);
+            const FPSparseMatrix<FPTYPE> *const A_sp);
 
         //
         // Output Model to file

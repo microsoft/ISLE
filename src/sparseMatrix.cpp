@@ -964,10 +964,10 @@ namespace ISLE
         delete[] log_fact;
     }
 
-    // FloatingPointSparseMatrix
+    // FPSparseMatrix
 
     template<class FPTYPE>
-    FloatingPointSparseMatrix<FPTYPE>::FloatingPointSparseMatrix(const word_id_t d, const doc_id_t s)
+    FPSparseMatrix<FPTYPE>::FPSparseMatrix(const word_id_t d, const doc_id_t s)
         :
         SparseMatrix<FPTYPE>(d, s),
         U_colmajor(NULL),
@@ -978,7 +978,7 @@ namespace ISLE
     {}
 
     template<class FPTYPE>
-    FloatingPointSparseMatrix<FPTYPE>::~FloatingPointSparseMatrix()
+    FPSparseMatrix<FPTYPE>::~FPSparseMatrix()
     {
         if (SigmaVT) delete[] SigmaVT;
         if (U_colmajor) delete[] U_colmajor;
@@ -986,7 +986,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    FloatingPointSparseMatrix<FPTYPE>::FloatingPointSparseMatrix(
+    FPSparseMatrix<FPTYPE>::FPSparseMatrix(
         const SparseMatrix<FPTYPE>& from,
         const bool copy_normalized)
         : SparseMatrix<FPTYPE>(from.vocab_size(), from.num_docs()),
@@ -1009,14 +1009,14 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    FPTYPE FloatingPointSparseMatrix<FPTYPE>::frobenius() const
+    FPTYPE FPSparseMatrix<FPTYPE>::frobenius() const
     {
         assert(offsets_CSC[0] == 0);
         return FPdot(get_nnzs(), vals_CSC, 1, vals_CSC, 1);
     }
 
     template<class FPTYPE>
-    FPTYPE FloatingPointSparseMatrix<FPTYPE>::normalized_frobenius() const
+    FPTYPE FPSparseMatrix<FPTYPE>::normalized_frobenius() const
     {
         assert(normalized_vals_CSC != NULL);
         return FPdot(get_nnzs(), normalized_vals_CSC, 1,
@@ -1024,19 +1024,19 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    FloatingPointSparseMatrix<FPTYPE>::WordDocPair::WordDocPair(const word_id_t& word_, const doc_id_t& doc_)
+    FPSparseMatrix<FPTYPE>::WordDocPair::WordDocPair(const word_id_t& word_, const doc_id_t& doc_)
         : word(word_), doc(doc_)
     {}
 
     template<class FPTYPE>
-    FloatingPointSparseMatrix<FPTYPE>::WordDocPair::WordDocPair(const WordDocPair& from)
+    FPSparseMatrix<FPTYPE>::WordDocPair::WordDocPair(const WordDocPair& from)
     {
         word = from.word;
         doc = from.doc;
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::get_word_major_list(
+    void FPSparseMatrix<FPTYPE>::get_word_major_list(
         std::vector<WordDocPair>& entries,
         std::vector<offset_t>& word_offsets)
     {
@@ -1063,7 +1063,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::initialize_for_eigensolver(const doc_id_t num_topics)
+    void FPSparseMatrix<FPTYPE>::initialize_for_eigensolver(const doc_id_t num_topics)
     {
         U_rows = vocab_size();
         U_cols = num_topics;
@@ -1072,7 +1072,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::compute_Spectra(
+    void FPSparseMatrix<FPTYPE>::compute_Spectra(
         const doc_id_t num_topics,
         std::vector<FPTYPE>& evalues)
     {
@@ -1104,7 +1104,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::compute_block_ks(
+    void FPSparseMatrix<FPTYPE>::compute_block_ks(
         const doc_id_t num_topics,
         std::vector<FPTYPE>& evalues)
     {
@@ -1128,7 +1128,7 @@ namespace ISLE
     }
     
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::compute_U_rowmajor() {
+    void FPSparseMatrix<FPTYPE>::compute_U_rowmajor() {
         assert(U_colmajor != NULL);
         assert(U_rowmajor == NULL);
         U_rowmajor = new FPTYPE[(size_t)U_rows*(size_t)U_cols];
@@ -1148,7 +1148,7 @@ namespace ISLE
     }
     
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::compute_sigmaVT(const doc_id_t num_topics)
+    void FPSparseMatrix<FPTYPE>::compute_sigmaVT(const doc_id_t num_topics)
     {
         if (!U_rowmajor)
             compute_U_rowmajor();
@@ -1171,7 +1171,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::cleanup_after_eigensolver()
+    void FPSparseMatrix<FPTYPE>::cleanup_after_eigensolver()
     {
         assert(U_colmajor != NULL);
         delete[] U_colmajor;
@@ -1190,7 +1190,7 @@ namespace ISLE
     // Output: @original_cols: For remaining cols, id to original cols, if drop_empty==true
     template<class FPTYPE>
     template <class fromT>
-    void FloatingPointSparseMatrix<FPTYPE>::threshold_and_copy(
+    void FPSparseMatrix<FPTYPE>::threshold_and_copy(
         const SparseMatrix<fromT>& from,
         const std::vector<fromT>& zetas,
         const offset_t nnzs,
@@ -1246,7 +1246,7 @@ namespace ISLE
 
     template<class FPTYPE>
     template <class fromT>
-    void FloatingPointSparseMatrix<FPTYPE>::sampled_threshold_and_copy(
+    void FPSparseMatrix<FPTYPE>::sampled_threshold_and_copy(
         const SparseMatrix<fromT>& from,
         const std::vector<fromT>& zetas,
         const offset_t nnzs,
@@ -1330,7 +1330,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::left_multiply_by_U_Spectra(
+    void FPSparseMatrix<FPTYPE>::left_multiply_by_U_Spectra(
         FPTYPE *const out,
         const FPTYPE *in,
         const doc_id_t ld_in,
@@ -1345,7 +1345,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::copy_col_to(
+    void FPSparseMatrix<FPTYPE>::copy_col_to(
         FPTYPE *const dst,
         const doc_id_t doc) const
     {
@@ -1356,7 +1356,7 @@ namespace ISLE
 
     // pt must have at least vocab_size() entries
     template<class FPTYPE>
-    inline FPTYPE FloatingPointSparseMatrix<FPTYPE>::distsq_doc_to_pt(
+    inline FPTYPE FPSparseMatrix<FPTYPE>::distsq_doc_to_pt(
         const doc_id_t doc,
         const FPTYPE *const pt,
         const FPTYPE pt_l2sq) const
@@ -1371,7 +1371,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    inline FPTYPE FloatingPointSparseMatrix<FPTYPE>::distsq_normalized_doc_to_pt(
+    inline FPTYPE FPSparseMatrix<FPTYPE>::distsq_normalized_doc_to_pt(
         const doc_id_t doc,
         const FPTYPE *const pt,
         const FPTYPE pt_l2sq) const
@@ -1386,7 +1386,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::distsq_docs_to_centers(
+    void FPSparseMatrix<FPTYPE>::distsq_docs_to_centers(
         const word_id_t dim,
         doc_id_t num_centers,
         const FPTYPE *const centers,
@@ -1442,7 +1442,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::closest_centers(
+    void FPSparseMatrix<FPTYPE>::closest_centers(
         const doc_id_t num_centers,
         const FPTYPE *const centers,
         const FPTYPE *const centers_l2sq,
@@ -1464,7 +1464,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::compute_centers_l2sq(
+    void FPSparseMatrix<FPTYPE>::compute_centers_l2sq(
         FPTYPE * centers,
         FPTYPE * centers_l2sq,
         const doc_id_t num_centers)
@@ -1476,7 +1476,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    FPTYPE FloatingPointSparseMatrix<FPTYPE>::lloyds_iter(
+    FPTYPE FPSparseMatrix<FPTYPE>::lloyds_iter(
         const doc_id_t num_centers,
         FPTYPE *centers,
         const FPTYPE *const docs_l2sq,
@@ -1563,7 +1563,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::compute_docs_l2sq(FPTYPE *const docs_l2sq)
+    void FPSparseMatrix<FPTYPE>::compute_docs_l2sq(FPTYPE *const docs_l2sq)
     {
         assert(docs_l2sq != NULL);
         FPscal(num_docs(), 0.0, docs_l2sq, 1);
@@ -1573,7 +1573,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    FPTYPE FloatingPointSparseMatrix<FPTYPE>::run_lloyds(
+    FPTYPE FPSparseMatrix<FPTYPE>::run_lloyds(
         const doc_id_t			num_centers,
         FPTYPE					*centers,
         std::vector<doc_id_t>	*closest_docs, // Pass NULL if you dont want closest_docs
@@ -1632,7 +1632,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::project_docs(
+    void FPSparseMatrix<FPTYPE>::project_docs(
         const doc_id_t doc_begin,
         const doc_id_t doc_end,
         FPTYPE* const projected_docs) 
@@ -1668,7 +1668,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::distsq_projected_docs_to_projected_centers(
+    void FPSparseMatrix<FPTYPE>::distsq_projected_docs_to_projected_centers(
         const word_id_t dim,
         doc_id_t num_centers,
         const FPTYPE *const projected_centers,
@@ -1729,7 +1729,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::projected_closest_centers(
+    void FPSparseMatrix<FPTYPE>::projected_closest_centers(
         const doc_id_t num_centers,
         const FPTYPE *const projected_centers,
         const FPTYPE *const projected_centers_l2sq,
@@ -1751,7 +1751,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::compute_projected_centers_l2sq(
+    void FPSparseMatrix<FPTYPE>::compute_projected_centers_l2sq(
         FPTYPE * projected_centers,
         FPTYPE * projected_centers_l2sq,
         const doc_id_t num_centers)
@@ -1765,7 +1765,7 @@ namespace ISLE
 
 
     template<class FPTYPE>
-    void FloatingPointSparseMatrix<FPTYPE>::compute_projected_docs_l2sq(
+    void FPSparseMatrix<FPTYPE>::compute_projected_docs_l2sq(
         FPTYPE *const projected_docs_l2sq)
     {
         assert(projected_docs_l2sq != NULL);
@@ -1798,7 +1798,7 @@ namespace ISLE
     }
     
     template<class FPTYPE>
-    FPTYPE FloatingPointSparseMatrix<FPTYPE>::lloyds_iter_on_projected_space(
+    FPTYPE FPSparseMatrix<FPTYPE>::lloyds_iter_on_projected_space(
         const doc_id_t num_centers,
         FPTYPE *projected_centers,
         const FPTYPE *const projected_docs_l2sq,
@@ -1879,7 +1879,7 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    FPTYPE FloatingPointSparseMatrix<FPTYPE>::run_lloyds_on_projected_space(
+    FPTYPE FPSparseMatrix<FPTYPE>::run_lloyds_on_projected_space(
         const doc_id_t			num_centers,
         FPTYPE					*projected_centers,
         std::vector<doc_id_t>	*closest_docs,
@@ -1941,7 +1941,7 @@ namespace ISLE
     // Input: @num_centers, @centers: coords of centers to start the iteration, @print_residual
     // Output: @closest_docs: if NULL, nothing is returned; is !NULL, return partition of docs between centers
     template<class FPTYPE>
-    FPTYPE FloatingPointSparseMatrix<FPTYPE>::run_elkans(
+    FPTYPE FPSparseMatrix<FPTYPE>::run_elkans(
         const doc_id_t			num_centers,
         FPTYPE					*centers,
         std::vector<doc_id_t>	*closest_docs, // Pass NULL if you dont want closest_docs
@@ -2194,16 +2194,16 @@ namespace ISLE
 }
 
 template class ISLE::SparseMatrix<float>;
-template class ISLE::FloatingPointSparseMatrix<float>;
+template class ISLE::FPSparseMatrix<float>;
 
-template void ISLE::FloatingPointSparseMatrix<float>::threshold_and_copy(
+template void ISLE::FPSparseMatrix<float>::threshold_and_copy(
     const SparseMatrix<float>& from,
     const std::vector<float>& zetas,
     const offset_t nnzs,
     std::vector<doc_id_t>& original_cols
 );
 
-template void ISLE::FloatingPointSparseMatrix<float>::sampled_threshold_and_copy(
+template void ISLE::FPSparseMatrix<float>::sampled_threshold_and_copy(
     const SparseMatrix<float>& from,
     const std::vector<float>& zetas,
     const offset_t nnzs,
