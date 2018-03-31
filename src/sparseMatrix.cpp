@@ -1441,8 +1441,8 @@ namespace ISLE
         const doc_id_t num_centers,
         const FPTYPE *const centers,
         const FPTYPE *const centers_l2sq,
-        const doc_id_t const doc_begin,
-        const doc_id_t const doc_end,
+        const doc_id_t doc_begin,
+        const doc_id_t doc_end,
         const FPTYPE *const docs_l2sq,
         doc_id_t *center_index,
         FPTYPE *const dist_matrix) 
