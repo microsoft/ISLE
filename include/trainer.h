@@ -77,6 +77,10 @@ namespace ISLE
         A_TYPE* catchword_thresholds;
         FPTYPE* centers;
 
+        std::vector<std::tuple<int, int, doc_id_t> > top_topic_pairs;
+        std::vector<std::pair<word_id_t, int> > catchword_topics;
+        std::vector<std::tuple<doc_id_t, doc_id_t, FPTYPE> > doc_topic_sum;
+
     public:
         enum data_ingest { FILE_DATA_LOAD, ITERATIVE_DATA_LOAD };
 
@@ -143,6 +147,11 @@ namespace ISLE
         //
         void train();
 
+        // 
+        // Write the trained model, catchwords and other information to file 
+        //
+        void ISLETrainer::write_output_to_files();
+
         //
         // Calculate coherence based on cluster averages, without using catchwords
         //	
@@ -158,12 +167,7 @@ namespace ISLE
         //
         // Output Catchwords and Dominant Words for each topic
         //
-        void output_cluster_summary(
-            const std::vector<FPTYPE>& coherences,
-            const FPTYPE& avg_coherence,
-            const std::vector<FPTYPE>& nl_coherences,
-            const FPTYPE& avg_nl_coherence,
-            const FPSparseMatrix<FPTYPE> *const A_sp);
+        void output_cluster_summary();
 
         //
         // Output Model to file

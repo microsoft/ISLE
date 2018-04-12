@@ -125,6 +125,9 @@ namespace ISLE
         timer->next_time_secs("Reading file Entries");
 
         finalize_data();
+
+        if (flag_compute_log_combinatorial) print_log_combinatorial();
+        if (flag_compute_distinct_top_five_sets) print_distinct_top_five_sets();
     }
 
     void ISLETrainer::feed_data(
@@ -250,9 +253,6 @@ namespace ISLE
 
     void ISLETrainer::train()
     {
-        if (flag_compute_log_combinatorial) print_log_combinatorial();
-        if (flag_compute_distinct_top_five_sets) print_distinct_top_five_sets();
-
         //
         // Threshold
         //
@@ -351,11 +351,6 @@ namespace ISLE
             for (auto d = closest_docs[topic].begin(); d < closest_docs[topic].end(); ++d)
                 *d = original_cols[*d];
 
-        FPTYPE avg_nl_coherence;
-        std::vector<FPTYPE> nl_coherences(num_topics, 0.0);
-        if (flag_compute_avg_coherence)
-            output_avg_topic_coherence(avg_nl_coherence, nl_coherences);
-
         //
         // Identify Catchwords
         //
@@ -377,10 +372,7 @@ namespace ISLE
 
         //
         // Construct the topic model
-        //
-        std::vector<std::tuple<int, int, doc_id_t> > top_topic_pairs;
-        std::vector<std::pair<word_id_t, int> > catchword_topics;
-        std::vector<std::tuple<doc_id_t, doc_id_t, FPTYPE> > doc_topic_sum;
+        //   
         A_sp->construct_topic_model(
             *Model, num_topics, closest_docs, catchwords,
             AVG_CLUSTER_FOR_CATCHLESS_TOPIC,
@@ -391,32 +383,23 @@ namespace ISLE
 
 
         //
-        // Print top 2 topics for each document to file
-        //
-        if (flag_print_top_two_topics)
-            print_top_two_topics(top_topic_pairs);
-        timer->next_time_secs("Printing top 2 topics/doc");
-
-
-        //
         // Construct edge topics
         //
         if (flag_construct_edge_topics)
             construct_edge_topics_v2(top_topic_pairs);
         timer->next_time_secs("Constructing edge topic model");
 
-        //
-        // Calculate Topic Coherence 
-        //
-        std::vector<FPTYPE> coherences; coherences.resize(num_topics, 0);
-        A_sp->topic_coherence(num_topics, DEFAULT_COHERENCE_NUM_WORDS, *Model, topwords, coherences);
-        auto avg_coherence = std::accumulate(coherences.begin(), coherences.end(), (FPTYPE)0.0) / coherences.size();
-        timer->next_time_secs("Calculating coherence");
-
         is_training_complete = true;
+    }
 
-        output_cluster_summary(coherences, avg_coherence, nl_coherences, avg_nl_coherence, B_fl);
-        timer->next_time_secs("Output summary");
+    void ISLETrainer::write_output_to_files()
+    {
+        //
+        // Print top 2 topics for each document to file
+        //
+        if (flag_print_top_two_topics)
+            print_top_two_topics(top_topic_pairs);
+        timer->next_time_secs("Printing top 2 topics/doc");
 
         output_model(true);
         timer->next_time_secs("Output model");
@@ -509,14 +492,22 @@ namespace ISLE
     //
     // Output Catchwords and Dominant Words for each topic
     //
-    void ISLETrainer::output_cluster_summary(
-        const std::vector<FPTYPE>& coherences,
-        const FPTYPE& avg_coherence,
-        const std::vector<FPTYPE>& nl_coherences,
-        const FPTYPE& avg_nl_coherence,
-        const FPSparseMatrix<FPTYPE> *const A_sp)
+    void ISLETrainer::output_cluster_summary()
     {
         assert(is_training_complete);
+
+        Timer timer;
+        FPTYPE avg_nl_coherence;
+        std::vector<FPTYPE> nl_coherences(num_topics, 0.0);
+        if (flag_compute_avg_coherence)
+            output_avg_topic_coherence(avg_nl_coherence, nl_coherences);
+        timer.next_time_secs("Calculating average coherence");
+
+
+        std::vector<FPTYPE> coherences; coherences.resize(num_topics, 0);
+        A_sp->topic_coherence(num_topics, DEFAULT_COHERENCE_NUM_WORDS, *Model, topwords, coherences);
+        auto avg_coherence = std::accumulate(coherences.begin(), coherences.end(), (FPTYPE)0.0) / coherences.size();
+        timer.next_time_secs("Calculating coherence");
 
         for (doc_id_t t = 0; t < num_topics; ++t) {
             out_log->print_string("\n---------- Topic: " + std::to_string(t)
@@ -543,7 +534,7 @@ namespace ISLE
             //       distsq[i] += A_sp->distsq_normalized_doc_to_pt(*diter, centers + (size_t)i * (size_t)vocab_size);
         //}
         out_log->print_cluster_details(num_topics, distsq, catchwords, closest_docs, coherences, nl_coherences);
-        timer->next_time_secs("Output summary");
+        timer.next_time_secs("Output summary");
     }
 
     //
@@ -592,7 +583,8 @@ namespace ISLE
     // Output document catchword frequencies in 1-based index
     // Output doc-topic catchword sums in 1-based index
     //
-    void ISLETrainer::output_doc_topic(std::vector<std::pair<word_id_t, int> >& catchword_topics,
+    void ISLETrainer::output_doc_topic(
+        std::vector<std::pair<word_id_t, int> >& catchword_topics,
         std::vector<std::tuple<doc_id_t, doc_id_t, FPTYPE> >& doc_topic_sum)
     {
         assert(is_training_complete);
