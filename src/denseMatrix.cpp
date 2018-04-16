@@ -584,17 +584,17 @@ namespace ISLE
             center_l2sq[c] = FPdot(dim,
                 centers + (size_t)c * (size_t)dim, 1,
                 centers + (size_t)c * (size_t)dim, 1);
+
         distsq_alldocs_to_centers(dim,
             num_centers, centers, center_l2sq,
             num_docs, docs, docs_l2sq,
             dist, ones_vec);
 
         pfor_static_131072(int d = 0; d < num_docs; ++d) {
-            dist[d] = dist[d] > (FPTYPE)0.0 ? dist[d] : (FPTYPE)0.0;
-
             if (num_centers == 1) {
+                // Round about for small negative distances
+                dist[d] = dist[d] >(FPTYPE)0.0 ? dist[d] : (FPTYPE)0.0;
                 min_dist[d] = min_dist[d] > dist[d] ? dist[d] : min_dist[d];
-                // TODO: Fix Ugly round about for small distance errors;
             }
             else {
                 FPTYPE min = FP_MAX;
@@ -629,7 +629,6 @@ namespace ISLE
         centers_l2sq[0] = FPdot(vocab_size(),
             data() + (size_t)centers[0] * (size_t)vocab_size(), 1,
             data() + (size_t)centers[0] * (size_t)vocab_size(), 1);
-        //FPblascopy (vocab_size(), data() + (size_t)centers[0] * (size_t)vocab_size(), 1, centers_coords, 1);
         memcpy(centers_coords, data() + (size_t)centers[0] * (size_t)vocab_size(), sizeof(FPTYPE)*vocab_size());
 
         pfor_static_131072(int d = 0; d < num_docs(); ++d)
@@ -658,14 +657,13 @@ namespace ISLE
 
             auto dice_throw = dist_cumul[num_docs()] * rand_fraction();
             assert(dice_throw < dist_cumul[num_docs()]);
-            doc_id_t new_center = (doc_id_t)(std::upper_bound(dist_cumul.begin(), dist_cumul.end(), dice_throw)
+            doc_id_t new_center 
+                = (doc_id_t)(std::upper_bound(dist_cumul.begin(), dist_cumul.end(), dice_throw)
                 - 1 - dist_cumul.begin());
             assert(new_center < num_docs());
             centers_l2sq[centers.size()] = FPdot(vocab_size(),
                 data() + (size_t)new_center * (size_t)vocab_size(), 1,
                 data() + (size_t)new_center * (size_t)vocab_size(), 1);
-            //FPblascopy(vocab_size(), data() + (size_t)new_center * (size_t)vocab_size(), 1,
-            //			centers_coords + centers.size() * (size_t)vocab_size(), 1);
             memcpy(centers_coords + centers.size() * (size_t)vocab_size(),
                 data() + (size_t)new_center * (size_t)vocab_size(), sizeof(FPTYPE) * vocab_size());
             centers.push_back(new_center);

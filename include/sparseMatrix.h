@@ -372,6 +372,25 @@ namespace ISLE
             std::vector<doc_id_t>	*closest_docs, // Pass NULL if you dont want closest_docs
             const int				max_reps);
 
+        void update_min_distsq_to_projected_centers(
+            const word_id_t dim,
+            const doc_id_t num_centers,
+            const FPTYPE *const projected_centers,
+            const doc_id_t doc_begin,
+            const doc_id_t doc_end,
+            const FPTYPE *const projected_docs_l2sq,
+            FPTYPE *min_dist,
+            FPTYPE *projected_dist);
+
+        FPTYPE kmeanspp_on_projected_space(
+            const doc_id_t k,
+            std::vector<doc_id_t>&centers);
+
+        FPTYPE kmeans_init_on_projected_space(
+            const int num_centers,
+            const int max_reps,
+            std::vector<doc_id_t>&	best_seed,   // Wont be initialized if method==KMEANSBB
+            FPTYPE *const			best_centers_coords); // Wont be initialized if null
 
         // Input: @num_centers, @centers: coords of centers to start the iteration, @print_residual
         // Output: @closest_docs: if NULL, nothing is returned; is !NULL, return partition of docs between centers

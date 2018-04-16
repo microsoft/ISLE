@@ -535,18 +535,20 @@ namespace ISLE
         }
         timer.next_time_secs("c TM: catchless", 30);
 
+        
         bool free_catchword_topics = false;
-
         if (catchword_topics == NULL) {
             catchword_topics = new std::vector<std::pair<word_id_t, int> >;
             free_catchword_topics = true;
         }
+        
         for (auto topic = 0; topic < num_topics; ++topic)
             if (catchwords[topic].size() > 0)
                 for (auto iter = catchwords[topic].begin(); iter < catchwords[topic].end(); ++iter)
                     catchword_topics->push_back(std::make_pair(*iter, topic));
         std::sort(catchword_topics->begin(), catchword_topics->end(),
             [](const auto& l, const auto& r) {return l.first < r.first; });
+        
         word_id_t *all_catchwords = new word_id_t[catchword_topics->size()];
         int *catchword_topic = new int[catchword_topics->size()];
         int num_catchwords = catchword_topics->size();
@@ -555,6 +557,7 @@ namespace ISLE
             catchword_topic[i] = (*catchword_topics)[i].second;
         }
         timer.next_time_secs("c TM: list", 30);
+
 
         // Can we use a sparse matrix here?
         size_t doc_block_size = 1 << 19;
@@ -579,6 +582,7 @@ namespace ISLE
             size_t doc_begin = block * doc_block_size;
             size_t doc_end = (block + 1) * doc_block_size;
             if ((size_t)num_docs() < doc_end) doc_end = (size_t)num_docs();
+
             pfor(long long doc = doc_begin; doc < doc_end; ++doc) {
                 offset_t c_pos = 0;
                 for (offset_t pos = offsets_CSC[doc]; pos < offsets_CSC[doc + 1]; ++pos) {
@@ -605,21 +609,12 @@ namespace ISLE
         delete[] DocTopicSumArray;
         timer.next_time_secs("c TM: topic wts in doc", 30);
 
+
         for (doc_id_t doc = 0; doc < num_docs(); ++doc) {
             if (top_topic_pairs != NULL) {
                 FPTYPE max = 0.0, max2 = 0.0; // second max 
                 int max_topic = -1, max2_topic = -1;
-                /*for (int topic = 0; topic < num_topics; ++topic) {
-                    if (DocTopicSums.elem(topic, doc) > max) {
-                        max2 = max; max2_topic = max_topic;
-                        max = DocTopicSums.elem(topic, doc);
-                        max_topic = topic;
-                    }
-                    else if (DocTopicSums.elem(topic, doc) > max2) {
-                        max2 = DocTopicSums.elem(topic, doc);
-                        max2_topic = topic;
-                    }
-                    }*/
+
                 for (auto iter = doc_topic_sum->begin() + doc_start_index[doc];
                     iter < doc_topic_sum->begin() + doc_start_index[doc + 1]; ++iter) {
 
@@ -680,8 +675,9 @@ namespace ISLE
             if (topic_end > num_topics) topic_end = num_topics;
 
             auto iter = std::lower_bound(doc_topic_sum->begin(), doc_topic_sum->end(), topic_begin,
-                [](const auto& l, const auto& r)
-            {return std::get<1>(l) < r; });
+                [](const auto& l, const auto& r) {return std::get<1>(l) < r; });
+            assert(iter != doc_topic_sum->end());
+
             for (auto topic = topic_begin; topic < topic_end; ++topic) {
                 if (catchwords[topic].size() > 0) {
                     /*std::sort(sorted_doc_topic_sums + (size_t)topic * (size_t)num_docs(),
@@ -695,6 +691,7 @@ namespace ISLE
                     auto end = std::upper_bound(iter, doc_topic_sum->end(), topic,
                         [](const auto& l, const auto& r)
                     {return l < std::get<1>(r); });
+
                     FPTYPE model_threshold = 0.0;
                     if (end - iter < rank_threshold) {
                         std::cout << "\n==== Warning: Topic " << topic << " threshold is 0.\n";
@@ -707,11 +704,11 @@ namespace ISLE
 
                     int num_cols_used = 0;
                     while (iter < end && std::get<2>(*iter) > model_threshold) {
-                        ++iter;
                         ++num_cols_used;
                         doc_id_t doc = std::get<0>(*iter);
                         for (offset_t pos = offsets_CSC[doc]; pos < offsets_CSC[doc + 1]; ++pos)
                             Model.elem_ref(rows_CSC[pos], topic) += (FPTYPE)normalized_vals_CSC[pos];
+                        ++iter;
                     }
 
                     for (word_id_t word = 0; word < vocab_size(); ++word)
@@ -1671,7 +1668,7 @@ namespace ISLE
     void FPSparseMatrix<FPTYPE>::distsq_projected_docs_to_projected_centers(
         const word_id_t dim,
         doc_id_t num_centers,
-        const FPTYPE *const projected_centers,
+        const FPTYPE *const projected_centers,  // This is atleast of size num_centers * U_cols
         const FPTYPE *const projected_centers_l2sq,
         const doc_id_t doc_begin,
         const doc_id_t doc_end,
@@ -1680,7 +1677,7 @@ namespace ISLE
     {
         assert(doc_begin < doc_end);
         assert(doc_end <= num_docs());
-        assert(num_centers == U_cols);
+        //assert(num_centers == U_cols);
         assert(sizeof(MKL_INT) == sizeof(offset_t));
         //assert(num_docs() >= num_centers);
 
@@ -1688,40 +1685,39 @@ namespace ISLE
         std::fill_n(ones_vec, std::max(doc_end - doc_begin, num_centers), (FPTYPE)1.0);
         
         // centers_tr = num_centers x num_topics [row-major]
-        FPTYPE *centers_tr = new FPTYPE[(size_t)num_centers * num_centers];
+        FPTYPE *centers_tr = new FPTYPE[(size_t)num_centers * (size_t) U_cols];
         // Improve this
-        for (word_id_t r = 0; r < num_centers; ++r)
+        for (word_id_t r = 0; r < U_cols; ++r)
             for (auto c = 0; c < num_centers; ++c)
                 centers_tr[(size_t)c + (size_t)r * (size_t)num_centers]
                 = projected_centers[(size_t)r + (size_t)c * (size_t)num_centers];
 
         // project docs in range(doc_begin, doc_end)
-        FPTYPE *projected_docs = new FPTYPE[num_centers * (doc_end - doc_begin) * sizeof(FPTYPE)];
-        // projected_docs : num_docs x num_topics [row-major]
+        FPTYPE *projected_docs = new FPTYPE[U_cols * (doc_end - doc_begin) * sizeof(FPTYPE)];
+        // projected_docs : num_docs x num_topics (U_cols) [row-major]
         project_docs(doc_begin, doc_end, projected_docs);
 
         const char transa = 'N';
         const MKL_INT m = (doc_end - doc_begin);
         const MKL_INT n = num_centers;
-        const MKL_INT k = num_centers;
+        const MKL_INT k = U_cols;
         const char matdescra[6] = { 'G',0,0,'C',0,0 };
-        FPTYPE alpha = -2.0; FPTYPE beta = 0.0;
 
         // data_block^T, U (data block is in col_major, 
         FPgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-            m, n, k, alpha, 
-            projected_docs, num_centers, centers_tr, num_centers, beta, 
-            projected_dist_matrix, num_centers);
+            m, n, k, (FPTYPE)-2.0, 
+            projected_docs, k, centers_tr, n, 
+            (FPTYPE)0.0, projected_dist_matrix, n);
 
         FPgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
-            doc_end - doc_begin, num_centers, 1,
-            (FPTYPE)1.0, ones_vec, doc_end - doc_begin, projected_centers_l2sq, num_centers,
-            (FPTYPE)1.0, projected_dist_matrix, num_centers);
+            m, n, 1, (FPTYPE)1.0,
+            ones_vec, m, projected_centers_l2sq, n,
+            (FPTYPE)1.0, projected_dist_matrix, n);
 
         FPgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
-            doc_end - doc_begin, num_centers, 1,
-            (FPTYPE)1.0, projected_docs_l2sq, doc_end - doc_begin, ones_vec, num_centers,
-            (FPTYPE)1.0, projected_dist_matrix, num_centers);
+            m, n, 1, (FPTYPE)1.0,
+            projected_docs_l2sq, m, ones_vec, n,
+            (FPTYPE)1.0, projected_dist_matrix, n);
 
         delete[] ones_vec;
         delete[] centers_tr;
@@ -1936,6 +1932,154 @@ namespace ISLE
         if (!return_clusters)
             delete[] closest_docs;
         return residual;
+    }
+
+    template<class FPTYPE>
+    void FPSparseMatrix<FPTYPE>::update_min_distsq_to_projected_centers(
+        const word_id_t dim,
+        const doc_id_t num_centers,
+        const FPTYPE *const projected_centers,
+        const doc_id_t doc_begin,
+        const doc_id_t doc_end,
+        const FPTYPE *const projected_docs_l2sq,
+        FPTYPE *min_dist,
+        FPTYPE *projected_dist) // preallocated scratch of space num_docs
+    {
+        assert(doc_end >= doc_begin);
+        assert(doc_end <= num_docs());
+        assert(min_dist != NULL);
+
+        bool dist_alloc = false;
+        if (projected_dist == NULL) {
+            projected_dist = new FPTYPE[(size_t)(doc_end - doc_begin) * (size_t)num_centers];
+            dist_alloc = true;
+        }
+        FPTYPE* projected_center_l2sq = new FPTYPE[num_centers];
+        for (auto c = 0; c < num_centers; ++c)
+            projected_center_l2sq[c] = FPdot(dim,
+                projected_centers + (size_t)c * (size_t)dim, 1,
+                projected_centers + (size_t)c * (size_t)dim, 1);
+
+
+        distsq_projected_docs_to_projected_centers(dim,
+            num_centers, projected_centers, projected_center_l2sq,
+            doc_begin, doc_end, projected_docs_l2sq,
+            projected_dist);
+
+        pfor_static_131072(int d = doc_begin; d < doc_end; ++d) {
+
+            if (num_centers == 1) {
+                // Round about for small negative distances
+                projected_dist[d] = projected_dist[d] >(FPTYPE)0.0 ? projected_dist[d] : (FPTYPE)0.0;
+                min_dist[d] = min_dist[d] > projected_dist[d] ? projected_dist[d] : min_dist[d];
+            }
+            else {
+                FPTYPE min = FP_MAX;
+                for (doc_id_t c = 0; c < num_centers; ++c)
+                    if (projected_dist[(size_t)c + (size_t)d * (size_t)num_centers] < min)
+                        min = projected_dist[(size_t)c + (size_t)d * (size_t)num_centers];
+                min_dist[d] = min > (FPTYPE)0.0 ? min : (FPTYPE)0.0;
+            }
+        }
+        delete[] projected_center_l2sq;
+        if (dist_alloc) delete[] projected_dist;
+    }
+
+    template<class FPTYPE>
+    FPTYPE FPSparseMatrix<FPTYPE>::kmeanspp_on_projected_space(
+        const doc_id_t k,
+        std::vector<doc_id_t>&centers)
+    {
+        assert(num_docs() >= k);
+
+        FPTYPE *const centers_l2sq = new FPTYPE[k];
+        FPTYPE *const projected_docs_l2sq = new FPTYPE[num_docs()];
+        FPTYPE *const min_dist = new FPTYPE[num_docs()];
+        FPTYPE *const centers_coords = new FPTYPE[(size_t)k * (size_t)U_cols];
+        std::vector<FPTYPE> dist_cumul(num_docs() + 1);
+
+        memset(projected_docs_l2sq, 0, sizeof(FPTYPE) * num_docs());
+        compute_projected_docs_l2sq(projected_docs_l2sq);
+
+        memset(centers_coords, 0, sizeof(FPTYPE) * (size_t)k * (size_t)U_cols);
+        std::fill_n(min_dist, num_docs(), FP_MAX);
+        centers.push_back((doc_id_t)((size_t)rand() * (size_t)84619573 % (size_t)num_docs()));
+        project_docs(centers[0], centers[0] + 1, centers_coords);
+        centers_l2sq[0] = FPdot(U_cols, centers_coords, 1, centers_coords, 1);
+
+
+        const doc_id_t doc_block_size = DOC_BLOCK_SIZE;
+        const doc_id_t num_doc_blocks = divide_round_up(num_docs(), doc_block_size);
+
+        FPTYPE *dist_scratch_space = new FPTYPE[num_docs()];
+        FPTYPE *ones_vec = new FPTYPE[num_docs()];
+        std::fill_n(ones_vec, num_docs(), (FPTYPE)1.0);
+        while (centers.size() < k) {
+            std::cout << "centers.size()  " << centers.size() << std::endl;
+            update_min_distsq_to_projected_centers(
+                U_cols, 1, centers_coords + (size_t)(centers.size() - 1) * (size_t)U_cols,
+                0, num_docs(), projected_docs_l2sq, min_dist, dist_scratch_space);
+            dist_cumul[0] = 0;
+            for (doc_id_t doc = 0; doc < num_docs(); ++doc)
+                dist_cumul[doc + 1] = dist_cumul[doc] + min_dist[doc];
+            for (auto iter = centers.begin(); iter != centers.end(); ++iter) {
+                // Disance from center to its closest center == 0
+                assert(abs(dist_cumul[(*iter) + 1] - dist_cumul[*iter]) < 1e-4);
+                // Center is not replicated
+                assert(std::find(centers.begin(), centers.end(), *iter) == iter);
+                assert(std::find(iter + 1, centers.end(), *iter) == centers.end());
+            }
+
+            auto dice_throw = dist_cumul[num_docs()] * rand_fraction();
+            assert(dice_throw < dist_cumul[num_docs()]);
+            doc_id_t new_center
+                = (doc_id_t)(std::upper_bound(dist_cumul.begin(), dist_cumul.end(), dice_throw)
+                    - 1 - dist_cumul.begin());
+            assert(new_center < num_docs());
+            project_docs(new_center, new_center + 1, centers_coords + centers.size() * (size_t)U_cols);
+            centers_l2sq[centers.size()] = FPdot(U_cols,
+                centers_coords + centers.size() * (size_t)U_cols, 1,
+                centers_coords + centers.size() * (size_t)U_cols, 1);
+            centers.push_back(new_center);
+
+        }
+        delete[] ones_vec;
+        delete[] dist_scratch_space;
+        delete[] centers_l2sq;
+        delete[] projected_docs_l2sq;
+        delete[] min_dist;
+        delete[] centers_coords;
+        return dist_cumul[num_docs() - 1];
+    }
+
+    template<class FPTYPE>
+    FPTYPE FPSparseMatrix<FPTYPE>::kmeans_init_on_projected_space(
+        const int num_centers,
+        const int max_reps,
+        std::vector<doc_id_t>&	best_seed,   // Wont be initialized if method==KMEANSBB
+        FPTYPE *const			best_centers_coords) // Wont be initialized if null
+    {
+        FPTYPE min_total_dist_to_centers = FP_MAX;
+        int best_rep;
+
+        auto kmeans_seeds = new std::vector<doc_id_t>[max_reps];
+        for (int rep = 0; rep < max_reps; ++rep) {
+            FPTYPE dist;
+            dist = kmeanspp_on_projected_space(num_centers, kmeans_seeds[rep]);
+            std::cout << "k-means init residual: " << dist << std::endl;
+            if (dist < min_total_dist_to_centers) {
+                min_total_dist_to_centers = dist;
+                best_rep = rep;
+            }
+        }
+        best_seed = kmeans_seeds[best_rep];
+        for (doc_id_t d = 0; d < num_centers; ++d)
+            project_docs(best_seed[d], best_seed[d] + 1,
+                best_centers_coords + (size_t)d * (size_t)num_centers);
+            //copy_col_to(best_centers_coords + (size_t)d * (size_t)num_centers, best_seed[d]);
+        delete[] kmeans_seeds;
+        
+        return min_total_dist_to_centers;
     }
 
     // Input: @num_centers, @centers: coords of centers to start the iteration, @print_residual
