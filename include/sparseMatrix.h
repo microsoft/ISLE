@@ -325,15 +325,32 @@ namespace ISLE
             std::vector<doc_id_t>	*closest_docs, // Pass NULL if you dont want closest_docs
             const int				max_reps);
 
-        void project_docs(
+        //
+        // U^T x docs in range [doc_begin, doc_end) 
+        // Output is projected docs in column-major order
+        //
+        void UT_times_docs(
             const doc_id_t doc_begin,
             const doc_id_t doc_end,
             FPTYPE* const projected_docs);
 
+        //
+        // Let A denote the block of data [doc_begin, doc_end)
+        // This function computes out = A^T * in
+        // out is row-majot with size (doc_end - doc_end) * cols
+        // in is row-major with size vocab_size() * cols
+        //
+        void multiply_with(
+            const doc_id_t doc_begin,
+            const doc_id_t doc_end,
+            const FPTYPE *const in,
+            FPTYPE *const out,
+            const MKL_INT cols);
+
         void distsq_projected_docs_to_projected_centers(
             const word_id_t dim,
             doc_id_t num_centers,
-            const FPTYPE *const projected_centers,
+            const FPTYPE *const projected_centers_tr,
             const FPTYPE *const projected_centers_l2sq,
             const doc_id_t doc_begin,
             const doc_id_t doc_end,
@@ -343,7 +360,7 @@ namespace ISLE
         // same input semantics as `closest_centers`
         void projected_closest_centers(
             const doc_id_t num_centers,
-            const FPTYPE *const projected_centers,
+            const FPTYPE *const projected_centers_tr,
             const FPTYPE *const projected_centers_l2sq,
             const doc_id_t doc_begin,
             const doc_id_t doc_end,

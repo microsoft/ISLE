@@ -680,17 +680,9 @@ namespace ISLE
 
             for (auto topic = topic_begin; topic < topic_end; ++topic) {
                 if (catchwords[topic].size() > 0) {
-                    /*std::sort(sorted_doc_topic_sums + (size_t)topic * (size_t)num_docs(),
-                        sorted_doc_topic_sums + (size_t)(topic + 1) * (size_t)num_docs(),
-                        std::greater<>());
-                        model_thresholds[topic]
-                        = sorted_doc_topic_sums[(size_t)topic * (size_t)num_docs() + (size_t)rank_threshold - 1];
-                        if (model_thresholds[topic] == 0.0)
-                        std::cout << "\n==== Warning: Topic " << topic << " threshold is 0.\n";
-                    */
+                    
                     auto end = std::upper_bound(iter, doc_topic_sum->end(), topic,
-                        [](const auto& l, const auto& r)
-                    {return l < std::get<1>(r); });
+                        [](const auto& l, const auto& r)  {return l < std::get<1>(r); });
 
                     FPTYPE model_threshold = 0.0;
                     if (end - iter < rank_threshold) {
@@ -1629,7 +1621,43 @@ namespace ISLE
     }
 
     template<class FPTYPE>
-    void FPSparseMatrix<FPTYPE>::project_docs(
+    void FPSparseMatrix<FPTYPE>::multiply_with(
+        const doc_id_t doc_begin,
+        const doc_id_t doc_end,
+        const FPTYPE *const in,
+        FPTYPE *const out,
+        const MKL_INT cols)
+    {
+        assert(doc_begin < doc_end);
+        assert(doc_end <= num_docs());
+
+        // create shifted copy of offsets array
+        MKL_INT * shifted_offsets_CSC = new MKL_INT[doc_end - doc_begin + 1];
+        for (doc_id_t d = doc_begin; d <= doc_end; ++d) {
+            shifted_offsets_CSC[d - doc_begin] = offsets_CSC[d] - offsets_CSC[doc_begin];
+        }
+
+        const char transa = 'N';
+        const MKL_INT m = doc_end - doc_begin;
+        const MKL_INT n = cols;
+        const MKL_INT k = vocab_size();
+        const char matdescra[6] = { 'G',0,0,'C',0,0 };
+        FPTYPE alpha = 1.0; FPTYPE beta = 0.0;
+
+        assert(sizeof(MKL_INT) == sizeof(offset_t));
+        assert(sizeof(word_id_t) == sizeof(MKL_INT));
+        assert(sizeof(offset_t) == sizeof(MKL_INT));
+
+        FPcsrmm(&transa, &m, &n, &k, &alpha, matdescra,
+            vals_CSC + offsets_CSC[doc_begin], (const MKL_INT*)rows_CSC + offsets_CSC[doc_begin],
+            (const MKL_INT*)shifted_offsets_CSC, (const MKL_INT*)(shifted_offsets_CSC + 1),
+            in, &n, &beta, out, &n);
+
+        delete[] shifted_offsets_CSC;
+    }
+
+    template<class FPTYPE>
+    void FPSparseMatrix<FPTYPE>::UT_times_docs(
         const doc_id_t doc_begin,
         const doc_id_t doc_end,
         FPTYPE* const projected_docs) 
@@ -1668,7 +1696,7 @@ namespace ISLE
     void FPSparseMatrix<FPTYPE>::distsq_projected_docs_to_projected_centers(
         const word_id_t dim,
         doc_id_t num_centers,
-        const FPTYPE *const projected_centers,  // This is atleast of size num_centers * U_cols
+        const FPTYPE *const projected_centers_tr,  // This is row-major, of size (U_cols * num_centers)
         const FPTYPE *const projected_centers_l2sq,
         const doc_id_t doc_begin,
         const doc_id_t doc_end,
@@ -1684,18 +1712,10 @@ namespace ISLE
         FPTYPE *ones_vec = new FPTYPE[std::max(doc_end - doc_begin, num_centers)];
         std::fill_n(ones_vec, std::max(doc_end - doc_begin, num_centers), (FPTYPE)1.0);
         
-        // centers_tr = num_centers x num_topics [row-major]
-        FPTYPE *centers_tr = new FPTYPE[(size_t)num_centers * (size_t) U_cols];
-        // Improve this
-        for (word_id_t r = 0; r < U_cols; ++r)
-            for (auto c = 0; c < num_centers; ++c)
-                centers_tr[(size_t)c + (size_t)r * (size_t)num_centers]
-                = projected_centers[(size_t)r + (size_t)c * (size_t)num_centers];
-
         // project docs in range(doc_begin, doc_end)
         FPTYPE *projected_docs = new FPTYPE[U_cols * (doc_end - doc_begin) * sizeof(FPTYPE)];
         // projected_docs : num_docs x num_topics (U_cols) [row-major]
-        project_docs(doc_begin, doc_end, projected_docs);
+        UT_times_docs(doc_begin, doc_end, projected_docs);
 
         const char transa = 'N';
         const MKL_INT m = (doc_end - doc_begin);
@@ -1706,7 +1726,7 @@ namespace ISLE
         // data_block^T, U (data block is in col_major, 
         FPgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
             m, n, k, (FPTYPE)-2.0, 
-            projected_docs, k, centers_tr, n, 
+            projected_docs, k, projected_centers_tr, n, 
             (FPTYPE)0.0, projected_dist_matrix, n);
 
         FPgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
@@ -1720,14 +1740,13 @@ namespace ISLE
             (FPTYPE)1.0, projected_dist_matrix, n);
 
         delete[] ones_vec;
-        delete[] centers_tr;
         delete[] projected_docs;
     }
 
     template<class FPTYPE>
     void FPSparseMatrix<FPTYPE>::projected_closest_centers(
         const doc_id_t num_centers,
-        const FPTYPE *const projected_centers,
+        const FPTYPE *const projected_centers_tr,
         const FPTYPE *const projected_centers_l2sq,
         const doc_id_t doc_begin,
         const doc_id_t doc_end,
@@ -1738,7 +1757,7 @@ namespace ISLE
         assert(doc_begin < doc_end);
         assert(doc_end <= num_docs());
         distsq_projected_docs_to_projected_centers(vocab_size(),
-            num_centers, projected_centers, projected_centers_l2sq,
+            num_centers, projected_centers_tr, projected_centers_l2sq,
             doc_begin, doc_end, projected_docs_l2sq, projected_dist_matrix);
 
         pfor_static_131072(int64_t d = 0; d < doc_end - doc_begin; ++d)
@@ -1776,7 +1795,7 @@ namespace ISLE
             const doc_id_t doc_end = std::min(num_docs(), (block + 1)* doc_block_size);
 
             // project  docs
-            project_docs(doc_begin, doc_end, projected_doc_block);
+            UT_times_docs(doc_begin, doc_end, projected_doc_block);
             
             // compute l2sq norm of docs
             pfor_static_131072(int d = 0; d < (doc_end - doc_begin); ++d)
@@ -1813,8 +1832,16 @@ namespace ISLE
 
         compute_projected_centers_l2sq(projected_centers, projected_centers_l2sq, num_centers);
         
+        // centers_tr = num_centers x num_topics [row-major]
+        FPTYPE *projected_centers_tr = new FPTYPE[(size_t)num_centers * (size_t)U_cols];
+        // Improve this
+        for (word_id_t r = 0; r < U_cols; ++r)
+            for (auto c = 0; c < num_centers; ++c)
+                projected_centers_tr[(size_t)c + (size_t)r * (size_t)num_centers]
+                = projected_centers[(size_t)r + (size_t)c * (size_t)num_centers];
+
         for (doc_id_t block = 0; block < num_doc_blocks; ++block) {
-            projected_closest_centers(num_centers, projected_centers, projected_centers_l2sq,
+            projected_closest_centers(num_centers, projected_centers_tr, projected_centers_l2sq,
                 block * doc_block_size, std::min((block + 1) * doc_block_size, num_docs()),
                 projected_docs_l2sq + block * doc_block_size,
                 closest_center + block * doc_block_size, projected_dist_matrix);
@@ -1841,7 +1868,7 @@ namespace ISLE
             for (size_t c = 0; c < num_centers; ++c)
                 cluster_sizes[c] += closest_docs[c].size();
 
-            project_docs(block * doc_block_size,
+            UT_times_docs(block * doc_block_size,
                 block*doc_block_size + num_docs_in_block,
                 projected_docs);
 
@@ -1869,6 +1896,7 @@ namespace ISLE
         if (!return_doc_partition)
             delete[] closest_docs;
         delete[] closest_center;
+        delete[] projected_centers_tr;
         delete[] projected_dist_matrix;
         delete[] projected_centers_l2sq;
         return residual;
@@ -2004,7 +2032,7 @@ namespace ISLE
         memset(centers_coords, 0, sizeof(FPTYPE) * (size_t)k * (size_t)U_cols);
         std::fill_n(min_dist, num_docs(), FP_MAX);
         centers.push_back((doc_id_t)((size_t)rand() * (size_t)84619573 % (size_t)num_docs()));
-        project_docs(centers[0], centers[0] + 1, centers_coords);
+        UT_times_docs(centers[0], centers[0] + 1, centers_coords);
         centers_l2sq[0] = FPdot(U_cols, centers_coords, 1, centers_coords, 1);
 
 
@@ -2036,7 +2064,7 @@ namespace ISLE
                 = (doc_id_t)(std::upper_bound(dist_cumul.begin(), dist_cumul.end(), dice_throw)
                     - 1 - dist_cumul.begin());
             assert(new_center < num_docs());
-            project_docs(new_center, new_center + 1, centers_coords + centers.size() * (size_t)U_cols);
+            UT_times_docs(new_center, new_center + 1, centers_coords + centers.size() * (size_t)U_cols);
             centers_l2sq[centers.size()] = FPdot(U_cols,
                 centers_coords + centers.size() * (size_t)U_cols, 1,
                 centers_coords + centers.size() * (size_t)U_cols, 1);
@@ -2074,7 +2102,7 @@ namespace ISLE
         }
         best_seed = kmeans_seeds[best_rep];
         for (doc_id_t d = 0; d < num_centers; ++d)
-            project_docs(best_seed[d], best_seed[d] + 1,
+            UT_times_docs(best_seed[d], best_seed[d] + 1,
                 best_centers_coords + (size_t)d * (size_t)num_centers);
             //copy_col_to(best_centers_coords + (size_t)d * (size_t)num_centers, best_seed[d]);
         delete[] kmeans_seeds;
