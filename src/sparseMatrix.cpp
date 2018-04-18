@@ -1798,7 +1798,7 @@ namespace ISLE
         const doc_id_t num_centers,
         FPTYPE *projected_centers,
         const FPTYPE *const projected_docs_l2sq,
-        std::vector<doc_id_t> *closest_docs = NULL,
+        std::vector<doc_id_t> *closest_docs,
         bool compute_residual) 
     {
         Timer timer;

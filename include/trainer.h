@@ -150,7 +150,7 @@ namespace ISLE
         // 
         // Write the trained model, catchwords and other information to file 
         //
-        void ISLETrainer::write_output_to_files();
+        void write_output_to_files();
 
         //
         // Calculate coherence based on cluster averages, without using catchwords
