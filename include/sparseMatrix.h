@@ -336,8 +336,8 @@ namespace ISLE
 
         //
         // Let A denote the block of data [doc_begin, doc_end)
-        // This function computes out = A^T * in
-        // out is row-majot with size (doc_end - doc_end) * cols
+        // This function computes out := A^T * in
+        // out is row-major with size (doc_end - doc_end) * cols
         // in is row-major with size vocab_size() * cols
         //
         void multiply_with(

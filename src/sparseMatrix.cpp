@@ -1662,34 +1662,7 @@ namespace ISLE
         const doc_id_t doc_end,
         FPTYPE* const projected_docs) 
     {
-        assert(U_rowmajor != NULL);
-        assert(doc_begin < doc_end);
-        assert(doc_end <= num_docs());
-        
-        // create shifted copy of offsets array
-        MKL_INT * shifted_offsets_CSC = new MKL_INT[doc_end - doc_begin + 1];
-        for (doc_id_t d = doc_begin; d <= doc_end; ++d) {
-            shifted_offsets_CSC[d - doc_begin] = offsets_CSC[d] - offsets_CSC[doc_begin];
-        }
-
-        const char transa = 'N';
-        const MKL_INT m = doc_end - doc_begin;
-        const MKL_INT n = U_cols;
-        const MKL_INT k = U_rows;
-        const char matdescra[6] = { 'G',0,0,'C',0,0 };
-        FPTYPE alpha = 1.0; FPTYPE beta = 0.0;
-
-        assert(sizeof(MKL_INT) == sizeof(offset_t));
-        assert(sizeof(word_id_t) == sizeof(MKL_INT));
-        assert(sizeof(offset_t) == sizeof(MKL_INT));
-
-        // Output: projected_docs: num_docs X num_topics (Row-Major)
-        FPcsrmm(&transa, &m, &n, &k, &alpha, matdescra,
-            vals_CSC + offsets_CSC[doc_begin], (const MKL_INT*)rows_CSC + offsets_CSC[doc_begin],
-            (const MKL_INT*)shifted_offsets_CSC, (const MKL_INT*)(shifted_offsets_CSC + 1),
-            U_rowmajor, &n, &beta, projected_docs, &n);
-
-        delete[] shifted_offsets_CSC;
+        multiply_with(doc_begin, doc_end, U_rowmajor, projected_docs, U_cols);
     }
 
     template<class FPTYPE>
@@ -1701,7 +1674,7 @@ namespace ISLE
         const doc_id_t doc_begin,
         const doc_id_t doc_end,
         const FPTYPE *const projected_docs_l2sq,
-        FPTYPE *projected_dist_matrix) 
+        FPTYPE *projected_dist_matrix)
     {
         assert(doc_begin < doc_end);
         assert(doc_end <= num_docs());
@@ -1711,11 +1684,9 @@ namespace ISLE
 
         FPTYPE *ones_vec = new FPTYPE[std::max(doc_end - doc_begin, num_centers)];
         std::fill_n(ones_vec, std::max(doc_end - doc_begin, num_centers), (FPTYPE)1.0);
-        
-        // project docs in range(doc_begin, doc_end)
-        FPTYPE *projected_docs = new FPTYPE[U_cols * (doc_end - doc_begin) * sizeof(FPTYPE)];
-        // projected_docs : num_docs x num_topics (U_cols) [row-major]
-        UT_times_docs(doc_begin, doc_end, projected_docs);
+
+        //FPTYPE *projected_docs = new FPTYPE[U_cols * (doc_end - doc_begin) * sizeof(FPTYPE)];
+        //UT_times_docs(doc_begin, doc_end, projected_docs);   // projected_docs : (doc_end-doc_begin) x num_topics (U_cols) [row-major]
 
         const char transa = 'N';
         const MKL_INT m = (doc_end - doc_begin);
@@ -1723,11 +1694,22 @@ namespace ISLE
         const MKL_INT k = U_cols;
         const char matdescra[6] = { 'G',0,0,'C',0,0 };
 
-        // data_block^T, U (data block is in col_major, 
+        FPTYPE *UUTrC = new FPTYPE[U_rows * num_centers];
         FPgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-            m, n, k, (FPTYPE)-2.0, 
-            projected_docs, k, projected_centers_tr, n, 
+            U_rows, num_centers, U_cols, (FPTYPE)-2.0,
+            U_rowmajor, U_cols, projected_centers_tr, num_centers,
+            (FPTYPE)0.0, UUTrC, num_centers);
+        multiply_with(doc_begin, doc_end, UUTrC,
+            projected_dist_matrix, num_centers);
+        delete[] UUTrC;
+
+        // data_block^T, U (data block is in col_major, 
+        /*FPgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+            m, n, k, (FPTYPE)-2.0,
+            projected_docs, k, projected_centers_tr, n,
             (FPTYPE)0.0, projected_dist_matrix, n);
+           delete[] projected_docs;
+         */
 
         FPgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
             m, n, 1, (FPTYPE)1.0,
@@ -1740,7 +1722,6 @@ namespace ISLE
             (FPTYPE)1.0, projected_dist_matrix, n);
 
         delete[] ones_vec;
-        delete[] projected_docs;
     }
 
     template<class FPTYPE>
@@ -1832,9 +1813,8 @@ namespace ISLE
 
         compute_projected_centers_l2sq(projected_centers, projected_centers_l2sq, num_centers);
         
-        // centers_tr = num_centers x num_topics [row-major]
+        // projected_centers_tr = num_centers x num_topics [row-major, each column a center]
         FPTYPE *projected_centers_tr = new FPTYPE[(size_t)num_centers * (size_t)U_cols];
-        // Improve this
         for (word_id_t r = 0; r < U_cols; ++r)
             for (auto c = 0; c < num_centers; ++c)
                 projected_centers_tr[(size_t)c + (size_t)r * (size_t)num_centers]
@@ -1928,7 +1908,6 @@ namespace ISLE
         for (int i = 0; i < max_reps; ++i) {
             residual = lloyds_iter_on_projected_space(num_centers, 
                 projected_centers, projected_docs_l2sq, closest_docs);
-            std::cout << "Lloyd's iter " << i << "  dist_sq residual: " << std::sqrt(residual) << "\n";
             timer.next_time_secs("run_lloyds: lloyds iter", 30);
 
             Timer timer;
@@ -1988,6 +1967,12 @@ namespace ISLE
                 projected_centers + (size_t)c * (size_t)dim, 1,
                 projected_centers + (size_t)c * (size_t)dim, 1);
 
+        FPTYPE *projected_centers_tr = new FPTYPE[(size_t)num_centers * (size_t)U_cols];
+        // Improve this
+        for (word_id_t r = 0; r < U_cols; ++r)
+            for (auto c = 0; c < num_centers; ++c)
+                projected_centers_tr[(size_t)c + (size_t)r * (size_t)num_centers]
+                = projected_centers[(size_t)r + (size_t)c * (size_t)num_centers];
 
         distsq_projected_docs_to_projected_centers(dim,
             num_centers, projected_centers, projected_center_l2sq,
@@ -2010,6 +1995,7 @@ namespace ISLE
             }
         }
         delete[] projected_center_l2sq;
+        delete[] projected_centers_tr;
         if (dist_alloc) delete[] projected_dist;
     }
 
@@ -2031,10 +2017,10 @@ namespace ISLE
 
         memset(centers_coords, 0, sizeof(FPTYPE) * (size_t)k * (size_t)U_cols);
         std::fill_n(min_dist, num_docs(), FP_MAX);
-        centers.push_back((doc_id_t)((size_t)rand() * (size_t)84619573 % (size_t)num_docs()));
+        centers.push_back((doc_id_t)((size_t)rand() * (size_t)84619573 % (size_t)num_docs())); // Pick a random center
         UT_times_docs(centers[0], centers[0] + 1, centers_coords);
         centers_l2sq[0] = FPdot(U_cols, centers_coords, 1, centers_coords, 1);
-
+        assert(std::abs(centers_l2sq[0] - projected_docs_l2sq[centers[0]]) < 1e-6);
 
         const doc_id_t doc_block_size = DOC_BLOCK_SIZE;
         const doc_id_t num_doc_blocks = divide_round_up(num_docs(), doc_block_size);
@@ -2051,7 +2037,7 @@ namespace ISLE
             for (doc_id_t doc = 0; doc < num_docs(); ++doc)
                 dist_cumul[doc + 1] = dist_cumul[doc] + min_dist[doc];
             for (auto iter = centers.begin(); iter != centers.end(); ++iter) {
-                // Disance from center to its closest center == 0
+                // Distance from center to its closest center == 0
                 assert(abs(dist_cumul[(*iter) + 1] - dist_cumul[*iter]) < 1e-4);
                 // Center is not replicated
                 assert(std::find(centers.begin(), centers.end(), *iter) == iter);
