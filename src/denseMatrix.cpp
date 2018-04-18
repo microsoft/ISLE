@@ -804,7 +804,7 @@ namespace ISLE
 
         std::fill_n(ones_vec, num_docs(), (FPTYPE)1.0);
         std::fill_n(init_prob, num_docs(), FP_MAX);
-        FPscal((size_t)k * (size_t)vocab_size(), 0.0, centers_coords, 1);
+        memset(centers_coords, 0, sizeof(FPTYPE) * (size_t)k * (size_t)vocab_size());
 
         centers.push_back((doc_id_t)((size_t)rand() * (size_t)84619573 % (size_t)num_docs()));
         centers_l2sq[0] = FPdot(vocab_size(),

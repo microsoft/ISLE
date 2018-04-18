@@ -1435,8 +1435,8 @@ namespace ISLE
         const doc_id_t num_centers,
         const FPTYPE *const centers,
         const FPTYPE *const centers_l2sq,
-        const doc_id_t const doc_begin,
-        const doc_id_t const doc_end,
+        const doc_id_t doc_begin,
+        const doc_id_t doc_end,
         const FPTYPE *const docs_l2sq,
         doc_id_t *center_index,
         FPTYPE *const dist_matrix) 
@@ -1799,7 +1799,7 @@ namespace ISLE
         FPTYPE *projected_centers,
         const FPTYPE *const projected_docs_l2sq,
         std::vector<doc_id_t> *closest_docs = NULL,
-        bool compute_residual = false) 
+        bool compute_residual) 
     {
         Timer timer;
         bool return_doc_partition = (closest_docs != NULL);
