@@ -1,3 +1,5 @@
+#include <algorithm>
+
 #include "sparseMatrix.h"
 #include "restarted_block_ks.h"
 
@@ -1545,6 +1547,12 @@ namespace ISLE
 
         if (!return_doc_partition)
             delete[] closest_docs;
+        else {
+            for (doc_id_t c = 0; c < num_centers; ++c)
+                closest_docs[c].clear();
+            for (doc_id_t d = 0; d < num_docs(); ++d)
+                closest_docs[closest_center[d]].push_back(d);
+        }
         delete[] closest_center;
         delete[] dist_matrix;
         delete[] centers_l2sq;
@@ -1685,14 +1693,11 @@ namespace ISLE
         FPTYPE *ones_vec = new FPTYPE[std::max(doc_end - doc_begin, num_centers)];
         std::fill_n(ones_vec, std::max(doc_end - doc_begin, num_centers), (FPTYPE)1.0);
 
-        //FPTYPE *projected_docs = new FPTYPE[U_cols * (doc_end - doc_begin) * sizeof(FPTYPE)];
-        //UT_times_docs(doc_begin, doc_end, projected_docs);   // projected_docs : (doc_end-doc_begin) x num_topics (U_cols) [row-major]
-
         const char transa = 'N';
         const MKL_INT m = (doc_end - doc_begin);
         const MKL_INT n = num_centers;
         const MKL_INT k = U_cols;
-        const char matdescra[6] = { 'G',0,0,'C',0,0 };
+        const char matdescra[6] = {'G',0,0,'C',0,0};
 
         FPTYPE *UUTrC = new FPTYPE[U_rows * num_centers];
         FPgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
@@ -1703,13 +1708,15 @@ namespace ISLE
             projected_dist_matrix, num_centers);
         delete[] UUTrC;
 
+        /*FPTYPE *projected_docs = new FPTYPE[U_cols * (doc_end - doc_begin) * sizeof(FPTYPE)];
+        // projected_docs : (doc_end-doc_begin) x num_topics (U_cols) [row-major]
+        UT_times_docs(doc_begin, doc_end, projected_docs);   
         // data_block^T, U (data block is in col_major, 
-        /*FPgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+        FPgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
             m, n, k, (FPTYPE)-2.0,
             projected_docs, k, projected_centers_tr, n,
             (FPTYPE)0.0, projected_dist_matrix, n);
-           delete[] projected_docs;
-         */
+        delete[] projected_docs;*/
 
         FPgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
             m, n, 1, (FPTYPE)1.0,
@@ -1818,7 +1825,7 @@ namespace ISLE
         for (word_id_t r = 0; r < U_cols; ++r)
             for (auto c = 0; c < num_centers; ++c)
                 projected_centers_tr[(size_t)c + (size_t)r * (size_t)num_centers]
-                = projected_centers[(size_t)r + (size_t)c * (size_t)num_centers];
+                = projected_centers[(size_t)r + (size_t)c * (size_t)U_cols];
 
         for (doc_id_t block = 0; block < num_doc_blocks; ++block) {
             projected_closest_centers(num_centers, projected_centers_tr, projected_centers_l2sq,
@@ -1849,10 +1856,10 @@ namespace ISLE
                 cluster_sizes[c] += closest_docs[c].size();
 
             UT_times_docs(block * doc_block_size,
-                block*doc_block_size + num_docs_in_block,
+                block * doc_block_size + num_docs_in_block,
                 projected_docs);
 
-         pfor_dynamic_1(int c = 0; c < num_centers; ++c) {
+            pfor_dynamic_1(int c = 0; c < num_centers; ++c) {
                 FPTYPE* center = projected_centers + (size_t)c * (size_t)num_centers;
                 for (auto diter = closest_docs[c].begin(); diter != closest_docs[c].end(); ++diter)
                     FPaxpy(num_centers, 1.0, projected_docs + ((*diter) - block*doc_block_size)*num_centers, 1, center, 1);
@@ -1875,6 +1882,12 @@ namespace ISLE
 
         if (!return_doc_partition)
             delete[] closest_docs;
+        else {
+            for (doc_id_t c = 0; c < num_centers; ++c)
+                closest_docs[c].clear();
+            for (doc_id_t d = 0; d < num_docs(); ++d)
+                closest_docs[closest_center[d]].push_back(d);
+        }
         delete[] closest_center;
         delete[] projected_centers_tr;
         delete[] projected_dist_matrix;
@@ -1972,26 +1985,26 @@ namespace ISLE
         for (word_id_t r = 0; r < U_cols; ++r)
             for (auto c = 0; c < num_centers; ++c)
                 projected_centers_tr[(size_t)c + (size_t)r * (size_t)num_centers]
-                = projected_centers[(size_t)r + (size_t)c * (size_t)num_centers];
+                = projected_centers[(size_t)r + (size_t)c * (size_t)U_cols];
 
         distsq_projected_docs_to_projected_centers(dim,
-            num_centers, projected_centers, projected_center_l2sq,
+            num_centers, projected_centers_tr, projected_center_l2sq,
             doc_begin, doc_end, projected_docs_l2sq,
             projected_dist);
 
         pfor_static_131072(int d = doc_begin; d < doc_end; ++d) {
-
             if (num_centers == 1) {
                 // Round about for small negative distances
-                projected_dist[d] = projected_dist[d] >(FPTYPE)0.0 ? projected_dist[d] : (FPTYPE)0.0;
-                min_dist[d] = min_dist[d] > projected_dist[d] ? projected_dist[d] : min_dist[d];
+                size_t pos = (size_t)d - (size_t)doc_begin;
+                projected_dist[pos] = projected_dist[pos] >(FPTYPE)0.0 ? projected_dist[pos] : (FPTYPE)0.0;
+                min_dist[d] = min_dist[d] > projected_dist[pos] ? projected_dist[pos] : min_dist[d];
             }
             else {
-                FPTYPE min = FP_MAX;
-                for (doc_id_t c = 0; c < num_centers; ++c)
-                    if (projected_dist[(size_t)c + (size_t)d * (size_t)num_centers] < min)
-                        min = projected_dist[(size_t)c + (size_t)d * (size_t)num_centers];
-                min_dist[d] = min > (FPTYPE)0.0 ? min : (FPTYPE)0.0;
+                for (doc_id_t c = 0; c < num_centers; ++c) {
+                    size_t pos = (size_t)c + (size_t)d * (size_t)num_centers - (size_t)doc_begin * (size_t)num_centers;
+                    projected_dist[pos] = projected_dist[pos] >(FPTYPE)0.0 ? projected_dist[pos] : (FPTYPE)0.0;
+                    min_dist[d] = projected_dist[pos] < min_dist[d] ? projected_dist[pos] : min_dist[d];
+                }
             }
         }
         delete[] projected_center_l2sq;
@@ -2028,11 +2041,13 @@ namespace ISLE
         FPTYPE *dist_scratch_space = new FPTYPE[num_docs()];
         FPTYPE *ones_vec = new FPTYPE[num_docs()];
         std::fill_n(ones_vec, num_docs(), (FPTYPE)1.0);
+        int new_centers_added = 1;
         while (centers.size() < k) {
-            std::cout << "centers.size()  " << centers.size() << std::endl;
+            std::cout << "centers.size():  " << centers.size() 
+                << "   new_centers_added: " << new_centers_added << std::endl;
             update_min_distsq_to_projected_centers(
-                U_cols, 1, centers_coords + (size_t)(centers.size() - 1) * (size_t)U_cols,
-                0, num_docs(), projected_docs_l2sq, min_dist, dist_scratch_space);
+                U_cols, new_centers_added, centers_coords + (size_t)(centers.size() - new_centers_added) * (size_t)U_cols,
+                0, num_docs(), projected_docs_l2sq, min_dist, NULL);
             dist_cumul[0] = 0;
             for (doc_id_t doc = 0; doc < num_docs(); ++doc)
                 dist_cumul[doc + 1] = dist_cumul[doc] + min_dist[doc];
@@ -2044,17 +2059,25 @@ namespace ISLE
                 assert(std::find(iter + 1, centers.end(), *iter) == centers.end());
             }
 
-            auto dice_throw = dist_cumul[num_docs()] * rand_fraction();
-            assert(dice_throw < dist_cumul[num_docs()]);
-            doc_id_t new_center
-                = (doc_id_t)(std::upper_bound(dist_cumul.begin(), dist_cumul.end(), dice_throw)
-                    - 1 - dist_cumul.begin());
-            assert(new_center < num_docs());
-            UT_times_docs(new_center, new_center + 1, centers_coords + centers.size() * (size_t)U_cols);
-            centers_l2sq[centers.size()] = FPdot(U_cols,
-                centers_coords + centers.size() * (size_t)U_cols, 1,
-                centers_coords + centers.size() * (size_t)U_cols, 1);
-            centers.push_back(new_center);
+            int s = centers.size();
+            new_centers_added = 0;
+            for (int c = 0; (c < 1 + std::sqrt(s - 5 > 0 ? s - 5 : 0)) && (centers.size() < k); ++c) {
+                auto dice_throw = dist_cumul[num_docs()] * rand_fraction();
+                assert(dice_throw < dist_cumul[num_docs()]);
+                doc_id_t new_center
+                    = (doc_id_t)(std::upper_bound(dist_cumul.begin(), dist_cumul.end(), dice_throw)
+                        - 1 - dist_cumul.begin());
+                assert(new_center < num_docs());
+                if (std::find(centers.begin(), centers.end(), new_center) == centers.end()) {
+                    UT_times_docs(new_center, new_center + 1, 
+                        centers_coords + centers.size() * (size_t)U_cols);
+                    centers_l2sq[centers.size()] = FPdot(U_cols,
+                        centers_coords + centers.size() * (size_t)U_cols, 1,
+                        centers_coords + centers.size() * (size_t)U_cols, 1);
+                    centers.push_back(new_center);
+                    new_centers_added++;
+                }
+            }
 
         }
         delete[] ones_vec;
