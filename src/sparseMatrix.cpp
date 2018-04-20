@@ -255,7 +255,7 @@ namespace ISLE
     {
         Timer timer;
         auto entries = new DocWordEntry<A_TYPE>[get_nnzs()];
-        for (doc_id_t doc = 0; doc < num_docs(); ++doc) {
+        pfor_dynamic_131072 (int64_t doc = 0; doc < (int64_t)num_docs(); ++doc) {
             for (offset_t pos = offsets_CSC[doc]; pos < offsets_CSC[doc + 1]; ++pos) {
                 entries[pos].count = normalized_vals_CSC[pos];
                 entries[pos].word = rows_CSC[pos];
@@ -264,29 +264,36 @@ namespace ISLE
         }
         timer.next_time_secs("list_word_freqs: copy to arr", 30);
 
-
-        doc_id_t chunk_size = 262144;
-        doc_id_t num_chunks = num_docs() % chunk_size == 0
-            ? num_docs() / chunk_size : num_docs() / chunk_size + 1;
-
-        pfor_dynamic_1(int64_t chunk = 0; chunk < num_chunks; ++chunk) {
-            auto off_b = offsets_CSC[chunk*chunk_size];
-            auto off_e = offsets_CSC[(chunk + 1)*chunk_size > num_docs()
-                ? num_docs() : (chunk + 1)*chunk_size];
-            std::sort(entries + off_b, entries + off_e,
-                [](const auto& l, const auto&r)
-            {return l.word < r.word || (l.word == r.word && l.count > r.count); });
-        }
+        std::sort(entries, entries + get_nnzs(),
+            [](const auto& l, const auto&r)
+        {return l.word < r.word || (l.word == r.word && l.count > r.count); });
         timer.next_time_secs("list_word_freqs: sort", 30);
 
-        for (offset_t pos = 0; pos < get_nnzs(); ++pos)
-            freqs[entries[pos].word].push_back(entries[pos].count);
-        timer.next_time_secs("list_word_freqs: copy to vecs", 30);
+        size_t *word_offsets = new size_t[vocab_size() + 1];
+        word_offsets[0] = 0; word_offsets[vocab_size()] = get_nnzs();
+        word_id_t cur_word = 0;
+        for (size_t pos = 0; pos < get_nnzs(); ++pos) {
+            if (entries[pos].word > cur_word) {
+                for (word_id_t w = cur_word + 1; w <= entries[pos].word; ++w)
+                    word_offsets[w] = pos;
+                cur_word = entries[pos].word;
+            }
+        }
+        while (cur_word < vocab_size())
+            word_offsets[++cur_word] = get_nnzs();
+        timer.next_time_secs("list_word_freqs: prefix sum", 30);
 
-        pfor_dynamic_512(int64_t word = 0; word < vocab_size(); ++word)
-            std::sort(freqs[word].begin(), freqs[word].end(), std::greater<>());
-        timer.next_time_secs("list_word_freqs: sorting vecs", 30);
+        pfor_dynamic_256(int64_t word = 0; word < vocab_size(); ++word) {
+            if (word_offsets[word + 1] > word_offsets[word]) {
+                assert(entries[word_offsets[word]].word == word);
+                assert(entries[word_offsets[word + 1] - 1].word == word);
+            }
+            for (size_t pos = word_offsets[word]; pos < word_offsets[word + 1]; ++pos)
+                freqs[word].push_back(entries[pos].count);
+        }
+        timer.next_time_secs("list_word_freqs: copying output", 30); 
 
+        delete[] word_offsets;
         delete[] entries;
     }
 
@@ -313,7 +320,6 @@ namespace ISLE
         const doc_id_t count_eq = (doc_id_t)std::ceil(3.0 * eps1_c * w0_c * (FPTYPE)num_docs() / (FPTYPE)num_topics);
 
         for (word_id_t word = 0; word < vocab_size(); ++word) {
-
             assert(std::is_sorted(freqs[word].begin(), freqs[word].end(), std::greater<>()));
 
             if (std::is_same<T, FPTYPE>::value) {
@@ -325,11 +331,9 @@ namespace ISLE
                 if (trunc != freqs[word].end()) assert(*trunc == 0.0);
                 if (trunc != freqs[word].begin()) assert(*(trunc - 1) > 0.0);
                 freqs[word].resize(trunc - freqs[word].begin());
-
             }
 
             if (freqs[word].size() > 0) {
-
                 if (std::is_same<T, FPTYPE>::value) {
                     assert(freqs[word].size() > 0);
                     assert(freqs[word].back() >= 1.0);
@@ -343,11 +347,9 @@ namespace ISLE
                         else if (std::is_same<T, FPTYPE>::value)
                             zetas[word] = FP_MAX;
                         else assert(false);
-                        //zetas[word] = (T) MAX_THRESHOLD;
                     else { // Throw everything in
                         assert(freqs[word].size() < (1 << 30));
                         new_nnzs += (offset_t)freqs[word].size();
-
                         if (std::is_same<T, count_t>::value)
                             zetas[word] = 1;
                         else if (std::is_same<T, FPTYPE>::value)
@@ -367,7 +369,6 @@ namespace ISLE
                         assert(zeta > 0 && zeta == *cur_pos && zeta == *(next_pos - 1));
                         // Found exactly what we are looking for
                         if (next_pos - cur_pos < count_eq) {
-                            //new_nnzs += cur_pos - freqs[word].begin();
                             new_nnzs += next_pos - freqs[word].begin(); // Use freqs==zeta as well??
                             zetas[word] = zeta;
                             break;
@@ -397,7 +398,6 @@ namespace ISLE
                         assert(zeta > 0); assert(zeta == *cur_pos && zeta == *(next_pos - 1));
                         // Found exactly what we are looking for
                         if (next_pos - cur_pos < count_eq) {
-                            //new_nnzs += cur_pos - freqs[word].begin();
                             new_nnzs += next_pos - freqs[word].begin(); // Use freqs==zeta as well??
                             zetas[word] = zeta;
                             break;
@@ -426,9 +426,9 @@ namespace ISLE
                 //assert(false);
             }
         }
+
         if (freq_less_words > 0)
-            std::cout << "\n ==== WARNING: " << freq_less_words
-            << " words do not occur in the corpus.\n\n";
+            std::cout << "\n ==== WARNING: " << freq_less_words << " words do not occur in the corpus.\n\n";
 
         assert(zetas.size() == vocab_size());
         delete[] freqs;

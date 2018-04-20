@@ -15,6 +15,7 @@
 #define pfor_static_131072	for
 #define pfor_dynamic_1		for
 #define pfor_dynamic_16		for
+#define pfor_dynamic_256	for
 #define pfor_dynamic_512	for
 #define pfor_dynamic_1024	for
 #define pfor_dynamic_8192	for
@@ -38,6 +39,7 @@
 #define pfor_static_131072	cilk_for
 #define pfor_dynamic_1		cilk_for
 #define pfor_dynamic_16		cilk_for
+#define pfor_dynamic_256	cilk_for
 #define pfor_dynamic_512	cilk_for
 #define pfor_dynamic_1024	cilk_for
 #define pfor_dynamic_8192	cilk_for
@@ -56,6 +58,7 @@
 #define pfor_static_131072	__pragma(omp parallel for schedule(static, 131072))	for
 #define pfor_dynamic_1		__pragma(omp parallel for schedule(dynamic, 1))		for
 #define pfor_dynamic_16		__pragma(omp parallel for schedule(dynamic, 16))	for
+#define pfor_dynamic_256	__pragma(omp parallel for schedule(dynamic, 256))	for
 #define pfor_dynamic_512	__pragma(omp parallel for schedule(dynamic, 512))	for
 #define pfor_dynamic_1024	__pragma(omp parallel for schedule(dynamic, 1024))	for
 #define pfor_dynamic_8192	__pragma(omp parallel for schedule(dynamic, 8292))	for
