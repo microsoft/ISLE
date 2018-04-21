@@ -84,6 +84,23 @@ namespace ISLE
     }
 
     template<class T>
+    void SparseMatrix<T>::populate_preprocessed_CSC(
+        offset_t nnzs_,
+        FPTYPE avg_doc_sz_,
+        FPTYPE* normalized_vals_CSC_,
+        word_id_t* rows_CSC_,
+        offset_t *offsets_CSC_)
+    {
+        this->_nnzs = nnzs_;
+        this->avg_doc_sz = avg_doc_sz_;
+        this->normalized_vals_CSC = normalized_vals_CSC_;
+        this->rows_CSC = rows_CSC_;
+        this->offsets_CSC = offsets_CSC_;
+
+        FPscal(_nnzs, avg_doc_sz, this->normalized_vals_CSC, 1);
+    }
+
+    template<class T>
     template<class FPTYPE>
     FPTYPE SparseMatrix<T>::doc_norm(
         doc_id_t doc,

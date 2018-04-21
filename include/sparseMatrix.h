@@ -81,6 +81,13 @@ namespace ISLE
 
         void populate_CSC(const std::vector<DocWordEntry<count_t> >& entries);
 
+        void populate_preprocessed_CSC(
+            offset_t nnzs,
+            FPTYPE avg_doc_sz,
+            FPTYPE* normalized_vals_CSC,
+            word_id_t* rows_CSC_,
+            offset_t *offsets_CSC);
+        
         template<class FPTYPE>
         FPTYPE doc_norm(
             doc_id_t doc,

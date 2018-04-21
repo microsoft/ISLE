@@ -26,6 +26,7 @@ namespace ISLE
         :
         vocab_size(vocab_size_),
         num_docs(num_docs_),
+        avg_doc_sz(0),
         max_entries(max_entries_),
         num_topics(num_topics_),
         how_data_loaded(how_data_loaded_),
@@ -70,6 +71,8 @@ namespace ISLE
 
         if (how_data_loaded == data_ingest::FILE_DATA_LOAD)
             load_data_from_file();
+        if (how_data_loaded == data_ingest::PREPROCESSED_DATA_LOAD)
+            load_preprocessed_data_from_file();
     }
 
     ISLETrainer::~ISLETrainer()
@@ -130,6 +133,68 @@ namespace ISLE
         if (flag_compute_distinct_top_five_sets) print_distinct_top_five_sets();
     }
 
+    //
+    // Load preprocessed file data
+    // Load a vocabulary list from file
+    // convert file data to sparse data matrix 
+    //
+    void ISLETrainer::load_preprocessed_data_from_file()
+    {
+        assert(how_data_loaded == data_ingest::PREPROCESSED_DATA_LOAD);
+
+        std::ifstream info_stream(std::string(input_file) + "_tr.info");
+        word_id_t   file_vocab_size;
+        doc_id_t    file_num_docs;
+        offset_t    file_nnzs;
+        FPTYPE      file_avg_doc_sz;
+        info_stream >> file_num_docs;
+        info_stream >> file_vocab_size;
+        info_stream >> file_nnzs;
+        info_stream >> file_avg_doc_sz;
+        info_stream.close();
+
+        if (vocab_size == 0) vocab_size = file_vocab_size;
+        else if (vocab_size != file_vocab_size) {
+            std::cerr << "Vocab size information mismatch" << std::endl;
+            exit(-1);
+        }
+        if (num_docs == 0) num_docs = file_num_docs;
+        else if (num_docs != file_num_docs) {
+            std::cerr << "Num docs information mismatch" << std::endl;
+            exit(-1);
+        }
+        if (max_entries != file_nnzs) {
+            std::cerr << "Num entries information mismatch" << std::endl;
+            exit(-1);
+        }
+        if (file_avg_doc_sz > 1.0) avg_doc_sz = file_avg_doc_sz;
+        else {
+            std::cerr << "Avg doc size error" << std::endl;
+            exit(-1);
+        }
+
+        std::ostringstream data_size_stream;
+        data_size_stream
+            << "\n<<<<<<<<<<<<\t" << input_file << "\t>>>>>>>>>>>>\n\n"
+            << std::setfill('.') << std::setw(10) << std::left
+            << std::setw(15) << std::left << "#Entries" << max_entries << "\n"
+            << std::setw(15) << std::left << "#Words" << vocab_size << "\n"
+            << std::setw(15) << std::left << "#Docs" << num_docs << "\n"
+            << std::setw(15) << std::left << "#Topics" << num_topics << "\n"
+            << std::setw(15) << std::left << "Sampling?" << flag_sample_docs << "\n"
+            << std::setw(15) << std::left << "Sample rate" << sample_rate << "\n"
+            << std::setw(15) << std::left << "Edge topics?" << flag_construct_edge_topics << "\n"
+            << std::setw(15) << std::left << "#Edge topics" << max_edge_topics << std::endl;
+        out_log->print_stringstream(data_size_stream);
+
+        finalize_data();
+        timer->next_time_secs("Reading file Entries");
+
+
+        if (flag_compute_log_combinatorial) print_log_combinatorial();
+        if (flag_compute_distinct_top_five_sets) print_distinct_top_five_sets();
+    }
+
     void ISLETrainer::feed_data(
         const doc_id_t doc,
         const word_id_t *const words,
@@ -152,51 +217,91 @@ namespace ISLE
     {
         assert(is_data_loaded == false);
 
-        parallel_sort(			// Sort by doc first, and word second.
-            entries.begin(), entries.end(),
-            [](const auto& l, const auto& r)
-        {return (l.doc < r.doc) || (l.doc == r.doc && l.word < r.word); });
-        timer->next_time_secs("Sorting entries");
+        if (how_data_loaded == data_ingest::FILE_DATA_LOAD) {
+            parallel_sort(			// Sort by doc first, and word second.
+                entries.begin(), entries.end(),
+                [](const auto& l, const auto& r)
+            {return (l.doc < r.doc) || (l.doc == r.doc && l.word < r.word); });
+            timer->next_time_secs("Sorting entries");
 
-        entries.erase(			// Remove duplicates
-            std::unique(entries.begin(), entries.end(),
-                [](const auto& l, const auto& r) {return l.doc == r.doc && l.word == r.word; }),
-            entries.end());
-        timer->next_time_secs("De-duplicating entries");
+            entries.erase(			// Remove duplicates
+                std::unique(entries.begin(), entries.end(),
+                    [](const auto& l, const auto& r) {return l.doc == r.doc && l.word == r.word; }),
+                entries.end());
+            timer->next_time_secs("De-duplicating entries");
 
-        if (num_docs == 0) {
-            num_docs = entries.back().doc + 1;
-            std::cout << std::setw(20) << std::left << "#Docs(updated)" << num_docs << "\n";
-        }
-        else
-            assert(entries.back().doc < num_docs);
-        if (vocab_size == 0) {
-            for (auto iter = entries.begin(); iter != entries.end(); ++iter)
-                vocab_size = (vocab_size > iter->word) ? vocab_size : iter->word;
-            ++vocab_size;
-            std::cout << std::setw(20) << std::left << "#Words(updated)" << vocab_size << "\n";
+            if (num_docs == 0) {
+                num_docs = entries.back().doc + 1;
+                std::cout << std::setw(20) << std::left << "#Docs(updated)" << num_docs << "\n";
+            }
+            else
+                assert(entries.back().doc < num_docs);
+            if (vocab_size == 0) {
+                for (auto iter = entries.begin(); iter != entries.end(); ++iter)
+                    vocab_size = (vocab_size > iter->word) ? vocab_size : iter->word;
+                ++vocab_size;
+                std::cout << std::setw(20) << std::left << "#Words(updated)" << vocab_size << "\n";
+            }
         }
 
         A_sp = new SparseMatrix<A_TYPE>(vocab_size, num_docs);
         B_fl_CSC = new FPSparseMatrix<FPTYPE>(vocab_size, num_docs);
-        catchwords = new std::vector<word_id_t>[num_topics];
-        topwords = new std::vector<std::pair<word_id_t, FPTYPE> >[num_topics];
-        closest_docs = new std::vector<doc_id_t>[num_topics];
-        catchword_thresholds = new A_TYPE[(size_t)vocab_size * (size_t)num_topics];
-        centers = new FPTYPE[(size_t)num_topics * (size_t)vocab_size];
-        Model = new DenseMatrix<FPTYPE>(vocab_size, num_topics);
 
+        catchwords   = new std::vector<word_id_t>[num_topics];
+        topwords     = new std::vector<std::pair<word_id_t, FPTYPE> >[num_topics];
+        closest_docs = new std::vector<doc_id_t>[num_topics];
+        centers      = new FPTYPE[(size_t)num_topics * (size_t)vocab_size];
+        Model        = new DenseMatrix<FPTYPE>(vocab_size, num_topics);
+        catchword_thresholds = new A_TYPE[(size_t)vocab_size * (size_t)num_topics];
+        
         create_vocab_list(vocab_file, vocab_words, vocab_size);
 
-        A_sp->populate_CSC(entries);
-        timer->next_time_secs("Populating CSC");
-        A_sp->normalize_docs(true); // delete unnormalized values
-        timer->next_time_secs("Populating CSC");
+        if (how_data_loaded == data_ingest::FILE_DATA_LOAD) {
+            A_sp->populate_CSC(entries);
+            timer->next_time_secs("Populating CSC");
+            A_sp->normalize_docs(true); // delete unnormalized values
+            timer->next_time_secs("Populating CSC");
+        }
+        else if (how_data_loaded == data_ingest::PREPROCESSED_DATA_LOAD) {
+            std::ifstream vals_CSC_stream(std::string(input_file) + "_tr.csr", std::ios::binary | std::ios::in);
+            vals_CSC_stream.seekg(0, std::ios::end);
+            offset_t vals_CSC_len = vals_CSC_stream.tellg();
+            assert(vals_CSC_len == sizeof(FPTYPE) * max_entries);
+            vals_CSC_stream.seekg(0, std::ios::beg);
+            FPTYPE *normalized_vals_CSC = new FPTYPE[max_entries];
+            vals_CSC_stream.read((char*)normalized_vals_CSC, vals_CSC_len);
+            vals_CSC_stream.close();
 
+            std::ifstream rows_CSC_stream(std::string(input_file) + "_tr.col", std::ios::binary | std::ios::in);
+            rows_CSC_stream.seekg(0, std::ios::end);
+            offset_t rows_CSC_len = rows_CSC_stream.tellg();
+            assert(rows_CSC_len == sizeof(word_id_t) * max_entries);
+            rows_CSC_stream.seekg(0, std::ios::beg);
+            word_id_t *rows_CSC = new word_id_t[max_entries];
+            rows_CSC_stream.read((char*)rows_CSC, rows_CSC_len);
+            rows_CSC_stream.close();
+
+            std::ifstream offsets_CSC_stream(std::string(input_file) + "_tr.off", std::ios::binary | std::ios::in);
+            offsets_CSC_stream.seekg(0, std::ios::end);
+            offset_t offsets_CSC_len = offsets_CSC_stream.tellg();
+            assert(offsets_CSC_len == sizeof(offset_t) * (num_docs + 1));
+            offsets_CSC_stream.seekg(0, std::ios::beg);
+            offset_t *offsets_CSC = new offset_t[num_docs + 1];
+            offsets_CSC_stream.read((char*)offsets_CSC, offsets_CSC_len);
+            offsets_CSC_stream.close();
+
+            A_sp->populate_preprocessed_CSC(
+                max_entries, avg_doc_sz,
+                normalized_vals_CSC, rows_CSC, offsets_CSC);
+        } 
+        else assert(false);
         is_data_loaded = true;
-        entries.clear();
-        entries.shrink_to_fit(); // Remove allocated memory
-        entries.swap(entries);   // force deallocation of memory
+
+        if (how_data_loaded == data_ingest::FILE_DATA_LOAD) {
+            entries.clear();
+            entries.shrink_to_fit(); // Remove allocated memory
+            entries.swap(entries);   // force deallocation of memory
+        }
     }
 
     void ISLETrainer::print_log_combinatorial()
