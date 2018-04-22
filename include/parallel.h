@@ -25,6 +25,8 @@
 #define cilk_spawn
 #define cilk_sync
 
+#define parallel_sort std::sort
+
 #else
 
 // Parallelism is enabled.

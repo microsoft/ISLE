@@ -379,7 +379,6 @@ namespace ISLE
         timer->next_time_secs("Creating thresholded and scaled matrix");
 
 
-
         //
         // Truncated SVD with Spectra (ARPACK) or Block KS
         //
