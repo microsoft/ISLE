@@ -281,7 +281,7 @@ namespace ISLE
         }
         timer.next_time_secs("list_word_freqs: copy to arr", 30);
 
-        std::sort(entries, entries + get_nnzs(),
+        parallel_sort(entries, entries + get_nnzs(),
             [](const auto& l, const auto&r)
         {return l.word < r.word || (l.word == r.word && l.count > r.count); });
         timer.next_time_secs("list_word_freqs: sort", 30);
