@@ -910,12 +910,22 @@ namespace ISLE
             iter = next_iter;
         }
 
+	count_t docs_selected = 0;
+	for(const auto &sel_pair : selected_pairs){
+		docs_selected += std::get<2>(sel_pair);
+	}
+	std::cout << "#Edge topics: " << selected_pairs.size() << std::endl
+            << "#Docs selected for edge topics: "
+            << docs_selected << std::endl
+            << "Doc Count threshold for edge topics: " << edge_topic_threshold << std::endl;
+
+	/*
         std::cout << "#Edge topics: " << selected_pairs.size() << std::endl
             << "#Docs selected for edge topics: "
             << std::accumulate(selected_pairs.begin(), selected_pairs.end(), 0,
                 [](const auto& lval, const auto& iter) {return lval + std::get<2>(iter); }) << std::endl
             << "Doc Count threshold for edge topics: " << edge_topic_threshold << std::endl;
-
+*/
         EdgeModel = new DenseMatrix<FPTYPE>(vocab_size, selected_pairs.size());
         pfor_dynamic_16(int ctopic = 0; ctopic < selected_pairs.size(); ++ctopic) {
             auto range = std::equal_range(top_topic_pairs.begin(), top_topic_pairs.end(),
