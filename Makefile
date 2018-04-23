@@ -14,7 +14,7 @@ MKL_ROOT=$(INTEL_ROOT)/mkl
 MKL_COMMON_LDFLAGS=-L$(INTEL_ROOT)/lib/intel64 -L$(MKL_ROOT)/lib/intel64 -Wl,--no-as-needed -lmkl_intel_ilp64 
 MKL_SEQ_LDFLAGS = $(MKL_COMMON_LDFLAGS) -lmkl_sequential -lmkl_core -lm -ldl
 MKL_PAR_LDFLAGS = $(MKL_COMMON_LDFLAGS) -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl
-MKL_PAR_STATIC_LDFLAGS = -Wl,--start-group $(MKL_ROOT)/lib/intel64/libmkl_intel_ilp64.a $(MKL_ROOT)/lib/intel64/libmkl_intel_thread.a $(MKL_ROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -liomp5 -lpthread -lm -ldl
+MKL_PAR_STATIC_LDFLAGS = -L$(INTEL_ROOT)/lib/intel64 -Wl,--start-group $(MKL_ROOT)/lib/intel64/libmkl_intel_ilp64.a $(MKL_ROOT)/lib/intel64/libmkl_intel_thread.a $(MKL_ROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -liomp5 -lpthread -lm -ldl
 
 CILK_LDFLAGS = -lcilkrts
 CILK_FLAGS = -fcilkplus -DCILK

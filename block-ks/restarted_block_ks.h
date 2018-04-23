@@ -148,7 +148,11 @@ void BlockKs<ProdOp>::truncate()
 
   // Compute EVD of `H` & rearrange
   subH = H.submat(nconv, nconv, H.n_cols - 1, H.n_cols - 1);
+  // NOTE :: let MKL execute eigensolver in a single thread or it'll throw SIGFPE
+  mkl_set_num_threads_local(1);
   bool success = arma::eig_sym(eH, vH, subH);
+  mkl_set_num_threads_local(std::stol(std::getenv("OMP_NUM_THREADS")));
+  // std::cerr << "POST:omp_num_threads=" << std::stol(std::getenv("OMP_NUM_THREADS")) << std::endl;	
   // PRINT(arma::norm(arma::imag(vvH)));
   // PRINT(arma::norm(arma::imag(eeH)));
   PRINT_NORM((vH.t() * subH * vH) - arma::diagmat(eH));
