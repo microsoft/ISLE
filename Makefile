@@ -27,7 +27,7 @@ BLOCK_KS_DIR = block-ks
 
 CC=g++
 IFLAGS= -I . -I spectra-master -I $(INCLUDE_DIR) -I$(MKL_ROOT)/include -I$(ARMA_DIR)/include -I$(BLOCK_KS_DIR)
-CFLAGS= -g -Ofast -fopenmp -march=native -mtune=native -std=c++14 -DLINUX $(DEBUGGING_FLAGS) $(CONFIG_FLAGS) $(MKL_EIGEN_FLAGS) $(CILK_FLAGS) -D_GLIBCXX_PARALLEL
+CFLAGS= -g -Ofast -fopenmp -march=native -mtune=native -std=c++14 -DLINUX $(DEBUGGING_FLAGS) $(CONFIG_FLAGS) $(MKL_EIGEN_FLAGS) $(CILK_FLAGS)
 
 INCLUDES =  $(INCLUDE_DIR)/timer.h $(INCLUDE_DIR)/logUtils.h \
 	    $(INCLUDE_DIR)/matUtils.h $(INCLUDE_DIR)/hyperparams.h \
