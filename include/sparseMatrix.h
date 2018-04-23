@@ -132,6 +132,15 @@ namespace ISLE
             const std::vector<doc_id_t>& doc_partition,
             T *thresholds);
 
+        void rth_highest_element_using_CSR(
+            const doc_id_t num_topics,
+            const MKL_UINT r,
+            const std::vector<doc_id_t>* closest_docs,
+            const FPTYPE *const normalized_vals_CSR,
+            const doc_id_t *cols_CSR,
+            const offset_t *const offsets_CSR,
+            T *threshold_matrix);
+
         // Input: @num_topics, @thresholds: Threshold for (words,topic)
         // Output: @catchwords: list of catchwords for each topic
         void find_catchwords(

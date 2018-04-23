@@ -96,8 +96,6 @@ namespace ISLE
         this->normalized_vals_CSC = normalized_vals_CSC_;
         this->rows_CSC = rows_CSC_;
         this->offsets_CSC = offsets_CSC_;
-
-        FPscal(_nnzs, avg_doc_sz, this->normalized_vals_CSC, 1);
     }
 
     template<class T>
@@ -274,13 +272,11 @@ namespace ISLE
         FPTYPE avg_doc_size,
         std::vector<A_TYPE>* freqs)
     {
-        FPscal(offsets_CSR[vocab_size()], avg_doc_size, normalized_vals_CSR, 1);
         pfor_dynamic_256 (int64_t word = 0; word < vocab_size(); ++word) {
             freqs[word].insert(freqs[word].begin(),
                 normalized_vals_CSR + offsets_CSR[word], normalized_vals_CSR + offsets_CSR[word + 1]);
             std::sort(freqs[word].begin(), freqs[word].end(), std::greater<>());
         }
-        FPscal(offsets_CSR[vocab_size()], 1.0 / avg_doc_size, normalized_vals_CSR, 1);
     }
 
     template<class T>
@@ -501,6 +497,52 @@ namespace ISLE
         }
 
         delete[] freqs;
+    }
+
+    template<class T>
+    void SparseMatrix<T>::rth_highest_element_using_CSR(
+        const doc_id_t num_topics,
+        const MKL_UINT r,
+        const std::vector<doc_id_t>* closest_docs,
+        const FPTYPE *const normalized_vals_CSR,
+        const doc_id_t *cols_CSR,
+        const offset_t *const offsets_CSR,
+        T *threshold_matrix)
+    {
+        int *cluster_ids = new int[num_docs()];
+        for (int64_t d = 0; d < num_docs(); ++d)
+            cluster_ids[d] = -1;
+        for (int topic = 0; topic < num_topics; ++topic)
+            for (auto iter = closest_docs[topic].begin(); iter < closest_docs[topic].end(); ++iter)
+                cluster_ids[*iter] = topic;
+
+        for (word_id_t word = 0; word < vocab_size(); ++word) {
+            auto freqs = new std::vector<T>[num_topics];
+            for (auto pos = offsets_CSR[word]; pos < offsets_CSR[word + 1]; ++pos)
+                if (cluster_ids[cols_CSR[pos]] != -1)
+                    freqs[cluster_ids[cols_CSR[pos]]].push_back(normalized_vals_CSR[pos]);
+
+            for (int topic = 0; topic < num_topics; ++topic)
+            {
+                auto doc_partition = closest_docs[topic];
+                auto thresholds = threshold_matrix + (size_t)topic * (size_t)vocab_size();
+
+                if (freqs[topic].size() > r) {
+                    std::sort(freqs[topic].begin(), freqs[topic].end(), std::greater<>());
+                    thresholds[word] = freqs[topic][r - 1];
+                }
+                else {
+                    thresholds[word] =
+                        r >= doc_partition.size()
+                        ? freqs[topic].size() == doc_partition.size()
+                            ? *std::min_element(freqs[topic].begin(), freqs[topic].end())
+                            : (T)0.0
+                        : (T)0.0;
+                }
+            }
+            delete[] freqs;
+        }
+        delete[] cluster_ids;
     }
 
     // Input: @num_topics, @thresholds: Threshold for (words,topic)

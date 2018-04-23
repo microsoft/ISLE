@@ -68,6 +68,7 @@ namespace ISLE
 
         // Also store CSR format when loading preprocessed data 
         FPTYPE              *normalized_vals_CSR;
+        doc_id_t            *cols_CSR;
         offset_t            *offsets_CSR;
 
         std::vector<std::string> vocab_words;

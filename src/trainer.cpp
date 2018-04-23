@@ -36,6 +36,7 @@ namespace ISLE
         flag_sample_docs(flag_sample_docs_),
         sample_rate(sample_rate_),
         normalized_vals_CSR(NULL),
+        cols_CSR(NULL),
         offsets_CSR(NULL),
         flag_construct_edge_topics(flag_construct_edge_topics_),
         max_edge_topics(max_edge_topics_),
@@ -92,6 +93,8 @@ namespace ISLE
         //
         if (normalized_vals_CSR != NULL)
             delete[] normalized_vals_CSR;
+        if (cols_CSR != NULL)
+            delete[] cols_CSR;
         if (offsets_CSR != NULL)
             delete[] offsets_CSR;
 
@@ -303,6 +306,8 @@ namespace ISLE
             offsets_CSC_stream.read((char*)offsets_CSC, offsets_CSC_len);
             offsets_CSC_stream.close();
 
+            FPscal(offsets_CSC[num_docs], avg_doc_sz, normalized_vals_CSC, 1);
+
 
             //
             // Load CSR files
@@ -316,6 +321,15 @@ namespace ISLE
             vals_CSR_stream.read((char*)normalized_vals_CSR, vals_CSR_len);
             vals_CSR_stream.close();
 
+            std::ifstream cols_CSR_stream(std::string(input_file) + ".col", std::ios::binary | std::ios::in);
+            cols_CSR_stream.seekg(0, std::ios::end);
+            offset_t cols_CSR_len = cols_CSR_stream.tellg();
+            assert(cols_CSR_len == sizeof(doc_id_t) * max_entries);
+            cols_CSR_stream.seekg(0, std::ios::beg);
+            cols_CSR = new word_id_t[max_entries];
+            cols_CSR_stream.read((char*)cols_CSR, cols_CSR_len);
+            cols_CSR_stream.close();
+
             std::ifstream offsets_CSR_stream(std::string(input_file) + ".off", std::ios::binary | std::ios::in);
             offsets_CSR_stream.seekg(0, std::ios::end);
             offset_t offsets_CSR_len = offsets_CSR_stream.tellg();
@@ -324,6 +338,9 @@ namespace ISLE
             offsets_CSR = new offset_t[num_docs + 1];
             offsets_CSR_stream.read((char*)offsets_CSR, offsets_CSR_len);
             offsets_CSR_stream.close();
+
+            assert(offsets_CSR[vocab_size] == offsets_CSC[num_docs]);
+            FPscal(offsets_CSR[vocab_size], avg_doc_sz, normalized_vals_CSR, 1);
 
             A_sp->populate_preprocessed_CSC(
                 max_entries, avg_doc_sz,
@@ -520,9 +537,17 @@ namespace ISLE
         else
             r = std::floor(eps2_c*w0_c*(FPTYPE)num_docs / (FPTYPE)(2.0*num_topics));
 
-        pfor_dynamic_16 (int topic = 0; topic < num_topics; ++topic)
-            A_sp->rth_highest_element(r, closest_docs[topic],
-                catchword_thresholds + (size_t)topic * (size_t)vocab_size);
+        if (how_data_loaded == data_ingest::FILE_DATA_LOAD 
+            || how_data_loaded == data_ingest::ITERATIVE_DATA_LOAD) {
+            pfor_dynamic_16(int topic = 0; topic < num_topics; ++topic)
+                A_sp->rth_highest_element(r, closest_docs[topic],
+                    catchword_thresholds + (size_t)topic * (size_t)vocab_size);
+        }
+        else if (how_data_loaded == data_ingest::PREPROCESSED_DATA_LOAD) {
+            A_sp->rth_highest_element_using_CSR(num_topics, r, closest_docs,
+                normalized_vals_CSR, cols_CSR, offsets_CSR,
+                catchword_thresholds);
+        }
         timer->next_time_secs("Collecting word freqs in clusters");
 
         A_sp->find_catchwords(num_topics, catchword_thresholds, catchwords);
