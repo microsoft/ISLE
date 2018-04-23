@@ -35,6 +35,8 @@ namespace ISLE
         output_path_base(output_path_base_),
         flag_sample_docs(flag_sample_docs_),
         sample_rate(sample_rate_),
+        normalized_vals_CSR(NULL),
+        offsets_CSR(NULL),
         flag_construct_edge_topics(flag_construct_edge_topics_),
         max_edge_topics(max_edge_topics_),
         flag_compute_log_combinatorial(flag_compute_log_combinatorial_),
@@ -84,6 +86,14 @@ namespace ISLE
         delete B_fl_CSC;
         delete Model;
         delete EdgeModel;
+
+        //
+        // Clean up CSR data
+        //
+        if (normalized_vals_CSR != NULL)
+            delete[] normalized_vals_CSR;
+        if (offsets_CSR != NULL)
+            delete[] offsets_CSR;
 
         //
         // Cleanup and exit
@@ -263,6 +273,9 @@ namespace ISLE
             timer->next_time_secs("Populating CSC");
         }
         else if (how_data_loaded == data_ingest::PREPROCESSED_DATA_LOAD) {
+            //
+            // Load CSC files
+            //
             std::ifstream vals_CSC_stream(std::string(input_file) + "_tr.csr", std::ios::binary | std::ios::in);
             vals_CSC_stream.seekg(0, std::ios::end);
             offset_t vals_CSC_len = vals_CSC_stream.tellg();
@@ -289,6 +302,28 @@ namespace ISLE
             offset_t *offsets_CSC = new offset_t[num_docs + 1];
             offsets_CSC_stream.read((char*)offsets_CSC, offsets_CSC_len);
             offsets_CSC_stream.close();
+
+
+            //
+            // Load CSR files
+            //
+            std::ifstream vals_CSR_stream(std::string(input_file) + ".csr", std::ios::binary | std::ios::in);
+            vals_CSR_stream.seekg(0, std::ios::end);
+            offset_t vals_CSR_len = vals_CSR_stream.tellg();
+            assert(vals_CSR_len == sizeof(FPTYPE) * max_entries);
+            vals_CSR_stream.seekg(0, std::ios::beg);
+            normalized_vals_CSR = new FPTYPE[max_entries];
+            vals_CSR_stream.read((char*)normalized_vals_CSR, vals_CSR_len);
+            vals_CSR_stream.close();
+
+            std::ifstream offsets_CSR_stream(std::string(input_file) + ".off", std::ios::binary | std::ios::in);
+            offsets_CSR_stream.seekg(0, std::ios::end);
+            offset_t offsets_CSR_len = offsets_CSR_stream.tellg();
+            assert(offsets_CSR_len == sizeof(offset_t) * (vocab_size + 1));
+            offsets_CSR_stream.seekg(0, std::ios::beg);
+            offsets_CSR = new offset_t[num_docs + 1];
+            offsets_CSR_stream.read((char*)offsets_CSR, offsets_CSR_len);
+            offsets_CSR_stream.close();
 
             A_sp->populate_preprocessed_CSC(
                 max_entries, avg_doc_sz,
@@ -362,7 +397,15 @@ namespace ISLE
         // Threshold
         //
         std::vector<A_TYPE> thresholds;
-        offset_t new_nnzs = A_sp->compute_thresholds(thresholds, num_topics);
+        auto freqs = new std::vector<A_TYPE>[vocab_size];
+        if (how_data_loaded == data_ingest::FILE_DATA_LOAD) {
+            A_sp->list_word_freqs_by_sorting(freqs);
+        }
+        else if (how_data_loaded == data_ingest::PREPROCESSED_DATA_LOAD) {
+            A_sp->list_word_freqs_from_CSR(normalized_vals_CSR, offsets_CSR, avg_doc_sz, freqs);
+        }
+        offset_t new_nnzs = A_sp->compute_thresholds(freqs, thresholds, num_topics);
+        delete[] freqs;
         assert(thresholds.size() == vocab_size);
         timer->next_time_secs("Computing thresholds");
         out_log->print_string("Number of entries above threshold: " + std::to_string(new_nnzs) + "\n");

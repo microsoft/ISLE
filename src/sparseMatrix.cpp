@@ -268,6 +268,22 @@ namespace ISLE
     }
 
     template<class T>
+    void SparseMatrix<T>::list_word_freqs_from_CSR(
+        FPTYPE *normalized_vals_CSR,
+        offset_t *offsets_CSR,
+        FPTYPE avg_doc_size,
+        std::vector<A_TYPE>* freqs)
+    {
+        FPscal(offsets_CSR[vocab_size()], avg_doc_size, normalized_vals_CSR, 1);
+        pfor_dynamic_256 (int64_t word = 0; word < vocab_size(); ++word) {
+            freqs[word].insert(freqs[word].begin(),
+                normalized_vals_CSR + offsets_CSR[word], normalized_vals_CSR + offsets_CSR[word + 1]);
+            std::sort(freqs[word].begin(), freqs[word].end(), std::greater<>());
+        }
+        FPscal(offsets_CSR[vocab_size()], 1.0 / avg_doc_size, normalized_vals_CSR, 1);
+    }
+
+    template<class T>
     void SparseMatrix<T>::list_word_freqs_by_sorting(std::vector<A_TYPE>* freqs)
     {
         Timer timer;
@@ -319,13 +335,10 @@ namespace ISLE
     // Return: Total number of entries that are above threshold
     template<class T>
     offset_t SparseMatrix<T>::compute_thresholds(
+        std::vector<A_TYPE> *const freqs,
         std::vector<T>& zetas,
         const doc_id_t num_topics)
     {
-        auto freqs = new std::vector<A_TYPE>[vocab_size()];
-        //list_word_freqs(freqs);
-        list_word_freqs_by_sorting(freqs);
-
         assert(zetas.size() == 0);
         zetas.resize(vocab_size(), (T)0);
 
@@ -448,7 +461,6 @@ namespace ISLE
             std::cout << "\n ==== WARNING: " << freq_less_words << " words do not occur in the corpus.\n\n";
 
         assert(zetas.size() == vocab_size());
-        delete[] freqs;
         return new_nnzs;
     }
 

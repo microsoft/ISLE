@@ -66,6 +66,10 @@ namespace ISLE
         SparseMatrix<A_TYPE>    *A_sp;
         FPSparseMatrix<FPTYPE>  *B_fl_CSC;
 
+        // Also store CSR format when loading preprocessed data 
+        FPTYPE              *normalized_vals_CSR;
+        offset_t            *offsets_CSR;
+
         std::vector<std::string> vocab_words;
 
         std::vector<word_id_t>  *catchwords;
