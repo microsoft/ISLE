@@ -378,7 +378,6 @@ namespace ISLE
                 *A_sp, thresholds, new_nnzs, original_cols);
         timer->next_time_secs("Creating thresholded and scaled matrix");
 
-
         //
         // Truncated SVD with Spectra (ARPACK) or Block KS
         //
@@ -623,7 +622,7 @@ namespace ISLE
 
         std::vector<FPTYPE> coherences; coherences.resize(num_topics, 0);
         A_sp->topic_coherence(num_topics, DEFAULT_COHERENCE_NUM_WORDS, *Model, topwords, coherences);
-        auto avg_coherence = std::accumulate(coherences.begin(), coherences.end(), (FPTYPE)0.0) / coherences.size();
+	FPTYPE avg_coherence =std::accumulate(coherences.begin(), coherences.end(), 0.0)  / coherences.size();
         timer.next_time_secs("Calculating coherence");
 
         for (doc_id_t t = 0; t < num_topics; ++t) {

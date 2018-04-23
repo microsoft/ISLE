@@ -1,9 +1,9 @@
 cmake_minimum_required(VERSION 3.0.0)
 project(ISLE)
 
-add_definitions(-DCILK
-                -DLINUX
-                )
+add_definitions(
+  -DCILK
+  -DLINUX)
 
 # Compiler options
 set(CXX g++)
@@ -20,6 +20,7 @@ add_definitions(-DMKL_ILP64)
 add_compile_options(-m64 -Wl,--no-as-needed)
 include_directories(include ${INTEL_ROOT}/include ${MKL_ROOT}/include)
 link_directories(${INTEL_ROOT}/lib/intel64 ${MKL_ROOT}/lib/intel64)
+#link_libraries(mkl_intel_ilp64 mkl_sequential mkl_core iomp5 pthread m dl cilkrts)
 link_libraries(mkl_intel_ilp64 mkl_intel_thread mkl_core iomp5 pthread m dl cilkrts)
 
 # Other config

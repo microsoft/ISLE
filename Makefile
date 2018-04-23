@@ -5,19 +5,16 @@
 CONFIG_FLAGS = -DSINGLE #-DNDEBUG
 
 MKL_EIGEN_FLAGS = -DMKL_ILP64 #-DEIGEN_USE_MKL_ALL
-#MKL_EIGEN_FLAGS = -DMKL_ILP64 -DEIGEN_USE_MKL_ALL
 
-LDFLAGS= -lm -ldl
+LDFLAGS= #-lm -ldl
 
 INTEL_ROOT=/opt/intel/compilers_and_libraries/linux
 MKL_ROOT=$(INTEL_ROOT)/mkl
-#MKL_ROOT=/opt/intel/compilers_and_libraries/linux/mkl/
 
 MKL_COMMON_LDFLAGS=-L$(INTEL_ROOT)/lib/intel64 -L$(MKL_ROOT)/lib/intel64 -Wl,--no-as-needed -lmkl_intel_ilp64 
-MKL_SEQ_LDFLAGS = $(MKL_COMMON_LDFLAGS) -lmkl_sequential -lmkl_core
-# MKL_PAR_LDFLAGS = $(MKL_COMMON_LDFLAGS) -lmkl_intel_thread -liomp5 -lpthread
-MKL_PAR_LDFLAGS = $(MKL_COMMON_LDFLAGS) -lmkl_intel_thread -lmkl_core -liomp5 -lpthread
-MKL_PAR_STATIC_LDFLAGS = -Wl,--start-group $(MKL_ROOT)/lib/intel64/libmkl_intel_lp64.a $(MKL_ROOT)/lib/intel64/libmkl_intel_thread.a $(MKL_ROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -liomp5 -lpthread -lm -ldl
+MKL_SEQ_LDFLAGS = $(MKL_COMMON_LDFLAGS) -lmkl_sequential -lmkl_core -lm -ldl
+MKL_PAR_LDFLAGS = $(MKL_COMMON_LDFLAGS) -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl
+MKL_PAR_STATIC_LDFLAGS = -Wl,--start-group $(MKL_ROOT)/lib/intel64/libmkl_intel_ilp64.a $(MKL_ROOT)/lib/intel64/libmkl_intel_thread.a $(MKL_ROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -liomp5 -lpthread -lm -ldl
 
 CILK_LDFLAGS = -lcilkrts
 CILK_FLAGS = -fcilkplus -DCILK
@@ -60,10 +57,10 @@ logger.o : $(SRC_DIR)/logger.cpp $(INCLUDES)
 	$(CC) -c -o $@ $< $(IFLAGS) $(CFLAGS) $(MKL_PAR_LDFLAGS) $(CILK_LDFLAGS)
 
 ISLETrain:  $(DRIVER_DIR)/ISLETrain.cpp trainer.o utils.o denseMatrix.o sparseMatrix.o logger.o $(INCLUDES)
-	$(CC) -o $@ $< trainer.o utils.o denseMatrix.o sparseMatrix.o logger.o $(IFLAGS) $(CFLAGS) $(MKL_PAR_LDFLAGS) $(LDFLAGS) $(CILK_LDFLAGS)
+	$(CC) -o $@ $< trainer.o utils.o denseMatrix.o sparseMatrix.o logger.o $(IFLAGS) $(CFLAGS) $(MKL_PAR_LDFLAGS) $(CILK_LDFLAGS)
 
 ISLEInfer: $(DRIVER_DIR)/ISLEInfer.cpp infer.o utils.o denseMatrix.o sparseMatrix.o logger.o $(INCLUDES)
-	$(CC) -o $@ $< infer.o utils.o denseMatrix.o sparseMatrix.o logger.o $(IFLAGS) $(CFLAGS) $(MKL_SEQ_LDFLAGS) $(LDFLAGS) $(CILK_LDFLAGS)
+	$(CC) -o $@ $< infer.o utils.o denseMatrix.o sparseMatrix.o logger.o $(IFLAGS) $(CFLAGS) $(MKL_SEQ_LDFLAGS) $(CILK_LDFLAGS)
 
 .PHONY: clean cleanest
 
