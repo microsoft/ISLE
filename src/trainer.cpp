@@ -478,8 +478,7 @@ namespace ISLE
         else
             r = std::floor(eps2_c*w0_c*(FPTYPE)num_docs / (FPTYPE)(2.0*num_topics));
 
-        // TODO : Need to parallelize
-        for (int topic = 0; topic < num_topics; ++topic)
+        pfor_dynamic_16 (int topic = 0; topic < num_topics; ++topic)
             A_sp->rth_highest_element(r, closest_docs[topic],
                 catchword_thresholds + (size_t)topic * (size_t)vocab_size);
         timer->next_time_secs("Collecting word freqs in clusters");

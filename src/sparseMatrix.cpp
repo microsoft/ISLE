@@ -461,38 +461,34 @@ namespace ISLE
         const std::vector<doc_id_t>& doc_partition,
         T *thresholds)
     {
-        {
-            if (doc_partition.size() == 0) {
-                for (word_id_t word = 0; word < vocab_size(); ++word)
-                    thresholds[word] = (T)0.0;
-                return;
-            }
-
-            auto freqs = new std::vector<T>[vocab_size()];
-
-            // TODO: Parallelize by words
-            for (auto diter = doc_partition.begin(); diter != doc_partition.end(); ++diter)
-                for (auto witer = offsets_CSC[*diter]; witer < offsets_CSC[(*diter) + 1]; ++witer)
-                    freqs[rows_CSC[witer]].push_back(normalized_vals_CSC[witer]);
-
-            // pfor?
-            for (word_id_t word = 0; word < vocab_size(); ++word) {
-                if (freqs[word].size() > r) {
-                    std::sort(freqs[word].begin(), freqs[word].end(), std::greater<>());
-                    thresholds[word] = freqs[word][r - 1];
-                }
-                else {
-                    thresholds[word] =
-                        r >= doc_partition.size()
-                        ? freqs[word].size() == doc_partition.size()
-                        ? *std::min_element(freqs[word].begin(), freqs[word].end())
-                        : (T)0.0
-                        : (T)0.0;
-                }
-            }
-
-            delete[] freqs;
+        if (doc_partition.size() == 0) {
+            for (word_id_t word = 0; word < vocab_size(); ++word)
+                thresholds[word] = (T)0.0;
+            return;
         }
+
+        auto freqs = new std::vector<T>[vocab_size()];
+
+        for (auto diter = doc_partition.begin(); diter != doc_partition.end(); ++diter)
+            for (auto witer = offsets_CSC[*diter]; witer < offsets_CSC[(*diter) + 1]; ++witer)
+                freqs[rows_CSC[witer]].push_back(normalized_vals_CSC[witer]);
+
+        for (word_id_t word = 0; word < vocab_size(); ++word) {
+            if (freqs[word].size() > r) {
+                std::sort(freqs[word].begin(), freqs[word].end(), std::greater<>());
+                thresholds[word] = freqs[word][r - 1];
+            }
+            else {
+                thresholds[word] =
+                    r >= doc_partition.size()
+                    ? freqs[word].size() == doc_partition.size()
+                    ? *std::min_element(freqs[word].begin(), freqs[word].end())
+                    : (T)0.0
+                    : (T)0.0;
+            }
+        }
+
+        delete[] freqs;
     }
 
     // Input: @num_topics, @thresholds: Threshold for (words,topic)
