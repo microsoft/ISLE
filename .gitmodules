@@ -1,0 +1,3 @@
+[submodule "blas-on-flash"]
+	path = blas-on-flash
+	url = ssh://git@github.com/bitesandbytes/blas-on-flash.git
