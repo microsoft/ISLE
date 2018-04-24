@@ -116,13 +116,16 @@ namespace ISLE
         bool normalize_to_one)
     {
         normalized_vals_CSC = new T[get_nnzs()];
-        uint64_t approx_empty_docs = 0; // Approx because there is race condition on counting in pfor
+        uint64_t empty_docs = 0; 
 
-        pfor_static_131072(int64_t doc = 0; doc < num_docs(); ++doc) {
+        #ifndef NOPAR
+        #pragma omp parallel for schedule(dynamic, 131072) reduction(+:empty_docs)
+        #endif
+        for(int64_t doc = 0; doc < num_docs(); ++doc) {
             auto doc_sum = std::accumulate(vals_CSC + offsets_CSC[doc], vals_CSC + offsets_CSC[doc + 1],
                 (T)0.0, std::plus<T>());
             if (doc_sum == (T)0)
-                approx_empty_docs++; // NOT ATOMIC. APPROXIMATE COUNT
+                empty_docs++; 
             for (offset_t pos = offsets_CSC[doc]; pos < offsets_CSC[doc + 1]; ++pos)
                 if (std::is_same<T, count_t>::value) {
                     assert(normalize_to_one == false);
@@ -137,8 +140,8 @@ namespace ISLE
                 else
                     assert(false);
         }
-        if (approx_empty_docs > 0)
-            std::cout << "\n ==== WARNING: approximately " << approx_empty_docs
+        if (empty_docs > 0)
+            std::cout << "\n ==== WARNING:  " << empty_docs
             << " docs are empty\n" << std::endl;
         if (delete_unnormalized) {
             delete[] vals_CSC;
