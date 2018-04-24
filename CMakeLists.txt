@@ -1,9 +1,8 @@
 cmake_minimum_required(VERSION 3.0.0)
 project(ISLE)
 
-add_definitions(
-  -DCILK
-  -DLINUX)
+add_definitions(-DLINUX)
+# Use -DCILK above if you are certain, Mixing Cilk + Intel MKL/OpenMP causes problems
 
 # Compiler options
 set(CXX g++)
@@ -11,7 +10,7 @@ set(CXX g++)
 # CXX Config
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -DDEBUG -O0 -fsanitize=address -fsanitize=leak -fsanitize=undefined")
 set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
-add_compile_options(-std=c++14 -Wall ${CONFIG_FLAGS} -fopenmp -Wfatal-errors -fcilkplus)
+add_compile_options(-std=c++14 -Wall ${CONFIG_FLAGS} -fopenmp -Wfatal-errors)
 
 #MKL Config
 set(INTEL_ROOT /opt/intel/compilers_and_libraries/linux)
