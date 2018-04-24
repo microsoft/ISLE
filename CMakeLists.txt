@@ -9,7 +9,7 @@ set(CXX g++)
 
 # CXX Config
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -DDEBUG -O0 -fsanitize=address -fsanitize=leak -fsanitize=undefined")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Ofast -march=native -mtune=native")
 add_compile_options(-std=c++14 -Wall ${CONFIG_FLAGS} -fopenmp -Wfatal-errors)
 
 #MKL Config
@@ -20,7 +20,7 @@ add_compile_options(-m64 -Wl,--no-as-needed)
 include_directories(include ${INTEL_ROOT}/include ${MKL_ROOT}/include)
 link_directories(${INTEL_ROOT}/lib/intel64 ${MKL_ROOT}/lib/intel64)
 #link_libraries(mkl_intel_ilp64 mkl_sequential mkl_core iomp5 pthread m dl cilkrts)
-link_libraries(mkl_intel_ilp64 mkl_intel_thread mkl_core iomp5 pthread m dl cilkrts)
+link_libraries(mkl_intel_ilp64 mkl_intel_thread mkl_core iomp5 pthread m dl)
 
 # Other config
 add_compile_options(${OPTIM_CXXFLAGS})
