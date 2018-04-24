@@ -136,12 +136,15 @@ namespace ISLE
             T *thresholds);
 
         void rth_highest_element_using_CSR(
+            const word_id_t word_begin,
+            const word_id_t word_end,
             const doc_id_t num_topics,
             const MKL_UINT r,
             const std::vector<doc_id_t>* closest_docs,
             const FPTYPE *const normalized_vals_CSR,
             const doc_id_t *cols_CSR,
             const offset_t *const offsets_CSR,
+            const int *const cluster_ids,
             T *threshold_matrix);
 
         // Input: @num_topics, @thresholds: Threshold for (words,topic)

@@ -421,7 +421,7 @@ namespace ISLE
             new_nnzs = A_sp->compute_thresholds(0, vocab_size, freqs, thresholds, num_topics);
         }
         else if (how_data_loaded == data_ingest::PREPROCESSED_DATA_LOAD) {
-            offset_t chunk_size = 1 << 23;
+            offset_t chunk_size = 1 << 24;
             word_id_t *word_begins = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
             word_id_t *word_ends = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
             word_id_t word_begin = 0; 
@@ -442,7 +442,7 @@ namespace ISLE
                 A_sp->list_word_freqs_from_CSR(word_begins[chunk], word_ends[chunk],
                     normalized_vals_CSR + offsets_CSR[word_begins[chunk]], 
                     offsets_CSR + word_begins[chunk], freqs);
-                new_nnzs_in_chunk[chunk] += A_sp->compute_thresholds(word_begins[chunk], word_ends[chunk],
+                new_nnzs_in_chunk[chunk] = A_sp->compute_thresholds(word_begins[chunk], word_ends[chunk],
                     freqs, thresholds, num_topics);
                 for (word_id_t word = word_begins[chunk]; word < word_ends[chunk]; ++word)
                     freqs[word].clear();
@@ -575,9 +575,46 @@ namespace ISLE
                     catchword_thresholds + (size_t)topic * (size_t)vocab_size);
         }
         else if (how_data_loaded == data_ingest::PREPROCESSED_DATA_LOAD) {
-            A_sp->rth_highest_element_using_CSR(num_topics, r, closest_docs,
-                normalized_vals_CSR, cols_CSR, offsets_CSR,
-                catchword_thresholds);
+            FPTYPE *threshold_matrix_tr = new FPTYPE[(size_t)num_topics * (size_t)vocab_size];
+
+            int *cluster_ids = new int[num_docs];
+            for (int64_t d = 0; d < num_docs; ++d) cluster_ids[d] = -1;
+            for (int topic = 0; topic < num_topics; ++topic)
+                for (auto iter = closest_docs[topic].begin(); iter < closest_docs[topic].end(); ++iter)
+                    cluster_ids[*iter] = topic;
+
+
+            offset_t chunk_size = 1 << 24;
+            word_id_t *word_begins = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
+            word_id_t *word_ends = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
+            word_id_t word_begin = 0;
+            word_id_t word_end = 0;
+            word_id_t num_word_chunks = 0;
+            while (word_begin < vocab_size) {
+                while (offsets_CSR[word_end] - offsets_CSR[word_begin] < (1 << 23) && word_end < vocab_size)
+                    ++word_end;
+                word_begins[num_word_chunks] = word_begin;
+                word_ends[num_word_chunks] = word_end;
+                ++num_word_chunks;
+                word_begin = word_end;
+            }
+            assert(num_word_chunks <= divide_round_up(offsets_CSR[vocab_size], chunk_size));
+
+            pfor(int64_t chunk = 0; chunk < num_word_chunks; ++chunk) {
+                A_sp->rth_highest_element_using_CSR(word_begins[chunk], word_ends[chunk],
+                    num_topics, r, closest_docs,
+                    normalized_vals_CSR, cols_CSR, offsets_CSR, cluster_ids,
+                    threshold_matrix_tr);
+            }
+            pfor_dynamic_8192(int64_t w = 0; w < vocab_size; ++w)
+                for (int t = 0; t < num_topics; ++t)
+                    catchword_thresholds[(size_t)w + (size_t)t * (size_t)vocab_size]
+                    = threshold_matrix_tr[(size_t)w * (size_t)num_topics + (size_t)t];
+            
+            delete[] word_begins;
+            delete[] word_ends;
+            delete[] threshold_matrix_tr;
+            delete[] cluster_ids;
         }
         timer->next_time_secs("Collecting word freqs in clusters");
 
