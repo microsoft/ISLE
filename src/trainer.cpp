@@ -441,7 +441,8 @@ namespace ISLE
             #endif
             for(int64_t chunk = 0; chunk < num_word_chunks; ++chunk) {
                 A_sp->list_word_freqs_from_CSR(word_begins[chunk], word_ends[chunk],
-                    normalized_vals_CSR, offsets_CSR, freqs);
+                    normalized_vals_CSR + offsets_CSR[word_begins[chunk]], 
+                    offsets_CSR + word_begins[chunk], freqs);
                 new_nnzs += A_sp->compute_thresholds(word_begins[chunk], word_ends[chunk],
                     freqs, thresholds, num_topics);
                 for (word_id_t word = word_begins[chunk]; word < word_ends[chunk]; ++word)
@@ -460,10 +461,11 @@ namespace ISLE
             assert(sample_rate > 0.0 && sample_rate < 1.0);
             B_fl_CSC->sampled_threshold_and_copy<A_TYPE>(
                 *A_sp, thresholds, new_nnzs, original_cols, sample_rate);
-        }
-        else
+        } 
+        else {
             B_fl_CSC->threshold_and_copy<A_TYPE>(
                 *A_sp, thresholds, new_nnzs, original_cols);
+        }
         timer->next_time_secs("Creating thresholded and scaled matrix");
 
         //
