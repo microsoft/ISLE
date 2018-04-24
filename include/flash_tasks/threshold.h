@@ -24,13 +24,14 @@ class ThresholdTask : public flash::BaseTask
   // NOTE :: start writing output at 'thresholds[start_row]'
   std::vector<FPTYPE> &thresholds;
   std::vector<A_TYPE> *freqs;
+  offset_t *nnzs_store;
 
 public:
   ThresholdTask(SparseMatrix<A_TYPE> *A_sp, offset_t *csr_offs,
                 flash::flash_ptr<FPTYPE> base_csr_vals,
                 uint64_t start_row, uint64_t blk_size,
                 std::vector<FPTYPE> &thresholds, std::vector<A_TYPE> *freqs,
-                uint64_t num_topics) : 
+                uint64_t num_topics, offset_t *nnzs_store) : 
                 A_sp(A_sp), thresholds(thresholds), freqs(freqs), num_topics(num_topics)
   {
     this->local_csr_offs = csr_offs + start_row;
@@ -52,7 +53,7 @@ public:
     this->A_sp->list_word_freqs_from_CSR(start_row, start_row + blk_size, local_csr_vals_ptr, local_csr_offs, freqs);
 
     // compute thresholds
-    this->A_sp->compute_thresholds(start_row, start_row + blk_size, freqs, thresholds, num_topics);
+    *this->nnzs_store = this->A_sp->compute_thresholds(start_row, start_row + blk_size, freqs, thresholds, num_topics);
 
     // cleanup memory
     delete[] this->local_csr_offs;

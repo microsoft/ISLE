@@ -457,6 +457,7 @@ namespace ISLE
                     freqs[word].clear();
             }
             */
+           
             flash::flash_ptr<FPTYPE> base_csr_vals;
             ThresholdTask** threshold_tasks = new ThresholdTask*[num_word_chunks];
             for (uint64_t chunk = 0; chunk < num_word_chunks; ++chunk){
@@ -464,15 +465,20 @@ namespace ISLE
                 uint64_t chunk_size = word_ends[chunk] - chunk_start;
                 threshold_tasks[chunk] = new ThresholdTask(A_sp, offsets_CSR, base_csr_vals,
                                                        chunk_start, chunk_size, thresholds,
-                                                       freqs, num_topics);
+                                                       freqs, num_topics, new_nnzs_in_chunk + chunk);
                 flash::sched.add_task(threshold_tasks[chunk]);
             }
+            
+            // wait for threshold tasks to complete
             flash::sleep_wait_for_complete(threshold_tasks, num_word_chunks);
+
+            // cleanup threshold tasks
             for (uint64_t chunk = 0; chunk < num_word_chunks; ++chunk){
                 delete threshold_tasks[chunk];
             }
             delete[] threshold_tasks;
 
+            // compute new nnzs
             new_nnzs = std::accumulate(new_nnzs_in_chunk, new_nnzs_in_chunk + num_word_chunks, 0);
             delete[] word_begins;
             delete[] word_ends;
