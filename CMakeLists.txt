@@ -10,7 +10,7 @@ set(CXX g++)
 
 # CXX Config
 set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -DDEBUG -O0 -fsanitize=address -fsanitize=leak -fsanitize=undefined")
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -Ofast -march=native -mtune=native")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3")
 add_compile_options(-std=c++14 -Wall ${CONFIG_FLAGS} -fopenmp -Wfatal-errors -fcilkplus)
 
 #MKL Config
