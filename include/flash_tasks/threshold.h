@@ -54,9 +54,6 @@ public:
 
     // compute thresholds
     *this->nnzs_store = this->A_sp->compute_thresholds(start_row, start_row + blk_size, freqs, thresholds, num_topics);
-
-    // cleanup memory
-    delete[] this->local_csr_offs;
   }
 
   // DEPRECATED; to be removed in future versions
