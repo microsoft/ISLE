@@ -436,20 +436,21 @@ namespace ISLE
                 word_begin = word_end;
             }
             assert(num_word_chunks <= divide_round_up(offsets_CSR[vocab_size], chunk_size));
-            #ifndef NO_PAR
-            #pragma omp parallel for reduction(+:new_nnzs)
-            #endif
-            for(int64_t chunk = 0; chunk < num_word_chunks; ++chunk) {
+
+            offset_t *new_nnzs_in_chunk = new offset_t[num_word_chunks];
+            pfor(int64_t chunk = 0; chunk < num_word_chunks; ++chunk) {
                 A_sp->list_word_freqs_from_CSR(word_begins[chunk], word_ends[chunk],
                     normalized_vals_CSR + offsets_CSR[word_begins[chunk]], 
                     offsets_CSR + word_begins[chunk], freqs);
-                new_nnzs += A_sp->compute_thresholds(word_begins[chunk], word_ends[chunk],
+                new_nnzs_in_chunk[chunk] += A_sp->compute_thresholds(word_begins[chunk], word_ends[chunk],
                     freqs, thresholds, num_topics);
                 for (word_id_t word = word_begins[chunk]; word < word_ends[chunk]; ++word)
                     freqs[word].clear();
             }
+            new_nnzs = std::accumulate(new_nnzs_in_chunk, new_nnzs_in_chunk + num_word_chunks, 0);
             delete[] word_begins;
             delete[] word_ends;
+            delete[] new_nnzs_in_chunk;
         }
         delete[] freqs;
         assert(thresholds.size() == vocab_size);
