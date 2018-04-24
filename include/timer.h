@@ -80,7 +80,7 @@ namespace ISLE
                 << usert_secs << "s(user)  " << syst_secs << "s(sys)" ;
             std::cout << ostr.str() << std::endl;
             if (is_log_file_open)	
-                LOG_TIMER(ostr.str());
+                ISLE_LOG_TIMER(ostr.str());
             return std::make_pair(usert_secs, syst_secs);
         }
 
@@ -116,7 +116,7 @@ namespace ISLE
                 << text << user_secs << "s(user)  " << sys_secs << "s(secs)";
             std::cout << ostr.str() << std::endl;
             if (is_log_file_open)
-                LOG_TIMER(ostr.str());
+                ISLE_LOG_TIMER(ostr.str());
             return std::make_pair(user_secs, sys_secs);
         }
     };

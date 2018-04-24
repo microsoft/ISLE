@@ -57,24 +57,24 @@ namespace ISLE
     bool openDiagnosticLogFile(const std::string& outDir);
   };
 
-#define LOG_INFO(msg)		global_log_info		  (msg, __FILE__, __func__, __LINE__)
-#define LOG_TRACE(msg)		global_log_trace	  (msg, __FILE__, __func__, __LINE__)
-#define LOG_WARNING(msg)	global_log_warning	  (msg, __FILE__, __func__, __LINE__)
-#define LOG_ERROR(msg)		global_log_error	  (msg, __FILE__, __func__, __LINE__)
+#define ISLE_LOG_INFO(msg)		global_log_info		  (msg, __FILE__, __func__, __LINE__)
+#define ISLE_LOG_TRACE(msg)		global_log_trace	  (msg, __FILE__, __func__, __LINE__)
+#define ISLE_LOG_WARNING(msg)	global_log_warning	  (msg, __FILE__, __func__, __LINE__)
+#define ISLE_LOG_ERROR(msg)		global_log_error	  (msg, __FILE__, __func__, __LINE__)
 
-#define LOG_DIAGNOSTIC(var)			 global_log_diagnostic(var, #var, __FILE__, __LINE__)
-#define LOG_DIAGNOSTIC_MSG(msg)		 global_log_diagnostic(msg, __FILE__, __func__, __LINE__)
-#define OPEN_DIAGNOSTIC_LOGFILE(dir) global_open_diagnostic_log_file(dir)
+#define ISLE_LOG_DIAGNOSTIC(var)			 global_log_diagnostic(var, #var, __FILE__, __LINE__)
+#define ISLE_LOG_DIAGNOSTIC_MSG(msg)		 global_log_diagnostic(msg, __FILE__, __func__, __LINE__)
+#define ISLE_OPEN_DIAGNOSTIC_LOGFILE(dir) global_open_diagnostic_log_file(dir)
 
-#define LOG_TIMER(msg)          global_log_timer(msg, __FILE__, __func__, __LINE__)
-#define OPEN_TIMER_LOGFILE(dir) global_open_timer_log_file(dir)
+#define ISLE_LOG_TIMER(msg)          global_log_timer(msg, __FILE__, __func__, __LINE__)
+#define ISLE_OPEN_TIMER_LOGFILE(dir) global_open_timer_log_file(dir)
 
 #define NAME(var) (#var)
 
-#define LOG_SET_TRACE_FUNC(func_)	global_set_trace_func	(func_)
-#define LOG_SET_INFO_FUNC(func_)	global_set_info_func	(func_)
-#define LOG_SET_WARNING_FUNC(func_) global_set_warning_func (func_)
-#define LOG_SET_ERROR_FUNC(func_)	global_set_error_func	(func_)
+#define ISLE_LOG_SET_TRACE_FUNC(func_)	global_set_trace_func	(func_)
+#define ISLE_LOG_SET_INFO_FUNC(func_)	global_set_info_func	(func_)
+#define ISLE_LOG_SET_WARNING_FUNC(func_) global_set_warning_func (func_)
+#define ISLE_LOG_SET_ERROR_FUNC(func_)	global_set_error_func	(func_)
 
   void global_log_info(const std::string& msg, const std::string& fileName, const std::string& fnName, int lineNo);
   void global_log_trace(const std::string& msg, const std::string& fileName, const std::string& fnName, int lineNo);

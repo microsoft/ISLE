@@ -33,16 +33,16 @@ namespace ISLE
             const std::string& str,
             const bool print_to_terminal = true)
         {
-            LOG_DIAGNOSTIC(str);
-            LOG_INFO(str);
+            ISLE_LOG_DIAGNOSTIC(str);
+            ISLE_LOG_INFO(str);
         }
 
         void print_stringstream(
             const std::ostringstream& stream,
             const bool print_to_terminal = true)
         {
-            LOG_DIAGNOSTIC(stream.str());
-            LOG_INFO(stream.str());
+            ISLE_LOG_DIAGNOSTIC(stream.str());
+            ISLE_LOG_INFO(stream.str());
         }
 
         template <class catchT>

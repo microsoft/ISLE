@@ -25,7 +25,7 @@ ISLE::Logger::Logger(std::string fnName)
   std::string msg;
   for (int i = 0; i < level_; ++i) msg += "\t";
   msg += "Logging in " + fn;
-  LOG_DIAGNOSTIC_MSG(msg);
+  ISLE_LOG_DIAGNOSTIC_MSG(msg);
 #endif
 }
 
@@ -173,7 +173,7 @@ ISLE::Logger::~Logger()
   std::string msg;
   for (int i = 0; i < level_; ++i) msg += "\t";
   msg += "Done logging in " + fn;
-  LOG_DIAGNOSTIC_MSG(msg);
+  ISLE_LOG_DIAGNOSTIC_MSG(msg);
 #endif
   //level -= 1;
   if (isTimerFileOpen)
