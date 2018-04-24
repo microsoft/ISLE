@@ -325,8 +325,9 @@ namespace ISLE
         std::vector<A_TYPE>* freqs)
     {
         for(int64_t word = word_begin; word < word_end; ++word) {
-            freqs[word].insert(freqs[word].begin(),
-                normalized_vals_CSR + offsets_CSR[word], normalized_vals_CSR + offsets_CSR[word + 1]);
+            freqs[word].insert(freqs[word].begin(), 
+                normalized_vals_CSR + offsets_CSR[word - word_begin] - offsets_CSR[0],
+                normalized_vals_CSR + offsets_CSR[word - word_begin + 1] - offsets_CSR[0]);
             std::sort(freqs[word].begin(), freqs[word].end(), std::greater<>());
         }
     }
