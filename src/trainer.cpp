@@ -6,6 +6,7 @@
 #include "flash_tasks/rth_highest.h"
 #include "blas-on-flash/include/pointers/pointer.h"
 #include "blas-on-flash/include/utils.h"
+#include "blas-on-flash/include/lib_funcs.h"
 #include "blas-on-flash/include/scheduler/scheduler.h"
 
 namespace flash{
@@ -420,6 +421,7 @@ namespace ISLE
 
     void ISLETrainer::train()
     {
+		flash::flash_setup("/raid/tmp/");
         flash::flash_ptr<FPTYPE> base_csr_vals = normalized_vals_CSR_fptr;
         flash::flash_ptr<doc_id_t> base_csr_cols = cols_CSR_fptr;
 
@@ -451,21 +453,20 @@ namespace ISLE
             assert(num_word_chunks <= divide_round_up(offsets_CSR[vocab_size], chunk_size));
 
             offset_t *new_nnzs_in_chunk = new offset_t[num_word_chunks];
-            /*
-            pfor(int64_t chunk = 0; chunk < num_word_chunks; ++chunk) {
-                A_sp->list_word_freqs_from_CSR(word_begins[chunk], word_ends[chunk],
-                    normalized_vals_CSR + offsets_CSR[word_begins[chunk]], 
-                    offsets_CSR + word_begins[chunk], freqs);
-                new_nnzs_in_chunk[chunk] = A_sp->compute_thresholds(word_begins[chunk], word_ends[chunk],
-                    freqs, thresholds, num_topics);
-                for (word_id_t word = word_begins[chunk]; word < word_ends[chunk]; ++word)
-                    freqs[word].clear();
-            }
-            */
-           
+            
+            // pfor(int64_t chunk = 0; chunk < num_word_chunks; ++chunk) {
+            //     A_sp->list_word_freqs_from_CSR(word_begins[chunk], word_ends[chunk],
+            //         normalized_vals_CSR + offsets_CSR[word_begins[chunk]], 
+            //         offsets_CSR + word_begins[chunk], freqs);
+            //     new_nnzs_in_chunk[chunk] = A_sp->compute_thresholds(word_begins[chunk], word_ends[chunk],
+            //         freqs, thresholds, num_topics);
+            //     for (word_id_t word = word_begins[chunk]; word < word_ends[chunk]; ++word)
+            //         freqs[word].clear();
+            // }
 
             // compute thresholds using flash
             {
+                GLOG_DEBUG("using num_word_chunks=", num_word_chunks);
                 ThresholdTask **threshold_tasks = new ThresholdTask *[num_word_chunks];
                 for (uint64_t chunk = 0; chunk < num_word_chunks; ++chunk)
                 {
@@ -473,7 +474,7 @@ namespace ISLE
                     uint64_t chunk_size = word_ends[chunk] - chunk_start;
                     threshold_tasks[chunk] = new ThresholdTask(A_sp, offsets_CSR, base_csr_vals,
                                                                chunk_start, chunk_size, thresholds,
-                                                               freqs, num_topics, new_nnzs_in_chunk + chunk);
+                                                               freqs, num_topics, new_nnzs_in_chunk + chunk, avg_doc_sz);
                     flash::sched.add_task(threshold_tasks[chunk]);
                 }
 
@@ -487,9 +488,10 @@ namespace ISLE
                 }
                 delete[] threshold_tasks;
             }
-            
+
             // compute new nnzs
             new_nnzs = std::accumulate(new_nnzs_in_chunk, new_nnzs_in_chunk + num_word_chunks, 0);
+            GLOG_DEBUG("new_nnzs=", new_nnzs);
             delete[] word_begins;
             delete[] word_ends;
             delete[] new_nnzs_in_chunk;
@@ -650,7 +652,7 @@ namespace ISLE
             //         offsets_CSR + word_begins[chunk],
             //         cluster_ids, threshold_matrix_tr);
             // }
-            
+
             // rth highest using flash
             {
                 // create tasks to compute rth_highest
@@ -659,10 +661,10 @@ namespace ISLE
                 {
                     uint64_t chunk_start = word_begins[chunk];
                     uint64_t chunk_size = word_ends[chunk] - chunk_start;
-                    rth_highest_tasks[chunk] = new RthHighest(A_sp, offsets_CSR,
-                                                              base_csr_cols, base_csr_vals,
-                                                              chunk_start, chunk_size, num_topics, r,
-                                                              closest_docs, cluster_ids, threshold_matrix_tr);
+                    rth_highest_tasks[chunk] = new RthHighest(A_sp, offsets_CSR, base_csr_cols,
+                                                              base_csr_vals, chunk_start, chunk_size,
+                                                              num_topics, r, closest_docs, cluster_ids,
+                                                              threshold_matrix_tr, avg_doc_sz);
                     flash::sched.add_task(rth_highest_tasks[chunk]);
                 }
                 // wait for rth highest tasks to complete
@@ -674,7 +676,6 @@ namespace ISLE
                 }
                 delete[] rth_highest_tasks;
             }
-            
 
             pfor_dynamic_8192(int64_t w = 0; w < vocab_size; ++w)
                 for (int t = 0; t < num_topics; ++t)
