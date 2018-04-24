@@ -269,20 +269,6 @@ namespace ISLE
     }
 
     template<class T>
-    void SparseMatrix<T>::list_word_freqs_from_CSR(
-        FPTYPE *normalized_vals_CSR,
-        offset_t *offsets_CSR,
-        FPTYPE avg_doc_size,
-        std::vector<A_TYPE>* freqs)
-    {
-        pfor_dynamic_256 (int64_t word = 0; word < vocab_size(); ++word) {
-            freqs[word].insert(freqs[word].begin(),
-                normalized_vals_CSR + offsets_CSR[word], normalized_vals_CSR + offsets_CSR[word + 1]);
-            std::sort(freqs[word].begin(), freqs[word].end(), std::greater<>());
-        }
-    }
-
-    template<class T>
     void SparseMatrix<T>::list_word_freqs_by_sorting(std::vector<A_TYPE>* freqs)
     {
         Timer timer;
@@ -329,17 +315,35 @@ namespace ISLE
         delete[] entries;
     }
 
+
+    template<class T>
+    void SparseMatrix<T>::list_word_freqs_from_CSR(
+        const word_id_t word_begin,
+        const word_id_t word_end,
+        const FPTYPE *const normalized_vals_CSR,
+        const offset_t *const offsets_CSR,
+        std::vector<A_TYPE>* freqs)
+    {
+        for(int64_t word = word_begin; word < word_end; ++word) {
+            freqs[word].insert(freqs[word].begin(),
+                normalized_vals_CSR + offsets_CSR[word], normalized_vals_CSR + offsets_CSR[word + 1]);
+            std::sort(freqs[word].begin(), freqs[word].end(), std::greater<>());
+        }
+    }
+
+
     // Input: @num_topics, @freqs: one vector for each word listing its non-zero freqs in docs
     // Output: @zetas: Reference to cutoffs frequencies for each word
     // Return: Total number of entries that are above threshold
     template<class T>
     offset_t SparseMatrix<T>::compute_thresholds(
+        word_id_t word_begin,
+        word_id_t word_end,
         std::vector<A_TYPE> *const freqs,
         std::vector<T>& zetas,
         const doc_id_t num_topics)
     {
-        assert(zetas.size() == 0);
-        zetas.resize(vocab_size(), (T)0);
+        assert(zetas[word_begin] == 0);
 
         offset_t new_nnzs = 0;
         word_id_t freq_less_words = 0;
@@ -348,7 +352,7 @@ namespace ISLE
         const doc_id_t count_gr = (doc_id_t)(w0_c * (FPTYPE)num_docs() / (2.0 * (FPTYPE)num_topics));
         const doc_id_t count_eq = (doc_id_t)std::ceil(3.0 * eps1_c * w0_c * (FPTYPE)num_docs() / (FPTYPE)num_topics);
 
-        for (word_id_t word = 0; word < vocab_size(); ++word) {
+        for (word_id_t word = word_begin; word < word_end; ++word) {
             assert(std::is_sorted(freqs[word].begin(), freqs[word].end(), std::greater<>()));
 
             if (std::is_same<T, FPTYPE>::value) {
@@ -455,11 +459,8 @@ namespace ISLE
                 //assert(false);
             }
         }
-
         if (freq_less_words > 0)
             std::cout << "\n ==== WARNING: " << freq_less_words << " words do not occur in the corpus.\n\n";
-
-        assert(zetas.size() == vocab_size());
         return new_nnzs;
     }
 

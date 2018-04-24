@@ -413,15 +413,43 @@ namespace ISLE
         //
         // Threshold
         //
-        std::vector<A_TYPE> thresholds;
+        std::vector<A_TYPE> thresholds(vocab_size,0);
         auto freqs = new std::vector<A_TYPE>[vocab_size];
+        offset_t new_nnzs = 0;
         if (how_data_loaded == data_ingest::FILE_DATA_LOAD) {
             A_sp->list_word_freqs_by_sorting(freqs);
+            new_nnzs = A_sp->compute_thresholds(0, vocab_size, freqs, thresholds, num_topics);
         }
         else if (how_data_loaded == data_ingest::PREPROCESSED_DATA_LOAD) {
-            A_sp->list_word_freqs_from_CSR(normalized_vals_CSR, offsets_CSR, avg_doc_sz, freqs);
+            offset_t chunk_size = 1 << 23;
+            word_id_t *word_begins = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
+            word_id_t *word_ends = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
+            word_id_t word_begin = 0; 
+            word_id_t word_end = 0;
+            word_id_t num_word_chunks = 0;
+            while (word_begin < vocab_size) {
+                while (offsets_CSR[word_end] - offsets_CSR[word_begin] < (1 << 23) && word_end < vocab_size)
+                    ++word_end;
+                word_begins[num_word_chunks] = word_begin;
+                word_ends[num_word_chunks] = word_end;
+                ++num_word_chunks;
+                word_begin = word_end;
+            }
+            assert(num_word_chunks <= divide_round_up(offsets_CSR[vocab_size], chunk_size));
+            #ifndef NO_PAR
+            #pragma omp parallel for reduction(+:new_nnzs)
+            #endif
+            for(int64_t chunk = 0; chunk < num_word_chunks; ++chunk) {
+                A_sp->list_word_freqs_from_CSR(word_begins[chunk], word_ends[chunk],
+                    normalized_vals_CSR, offsets_CSR, freqs);
+                new_nnzs += A_sp->compute_thresholds(word_begins[chunk], word_ends[chunk],
+                    freqs, thresholds, num_topics);
+                for (word_id_t word = word_begins[chunk]; word < word_ends[chunk]; ++word)
+                    freqs[word].clear();
+            }
+            delete[] word_begins;
+            delete[] word_ends;
         }
-        offset_t new_nnzs = A_sp->compute_thresholds(freqs, thresholds, num_topics);
         delete[] freqs;
         assert(thresholds.size() == vocab_size);
         timer->next_time_secs("Computing thresholds");
