@@ -10,6 +10,8 @@
 
 #include <mkl.h>
 
+#include "blas-on-flash/include/pointers/pointer.h"
+
 #include "Eigen/Core"
 #include "Eigen/SparseCore"
 #include "spectra-master/include/SymEigsSolver.h"
@@ -70,6 +72,10 @@ namespace ISLE
         FPTYPE              *normalized_vals_CSR;
         doc_id_t            *cols_CSR;
         offset_t            *offsets_CSR;
+
+        // flash pointers to CSR form on disk
+        flash::flash_ptr<FPTYPE> normalized_vals_CSR_fptr;
+        flash::flash_ptr<doc_id_t> cols_CSR_fptr;
 
         std::vector<std::string> vocab_words;
 

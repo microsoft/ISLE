@@ -350,10 +350,11 @@ namespace ISLE
 
             assert(offsets_CSR[vocab_size] == offsets_CSC[num_docs]);
             FPscal(offsets_CSR[vocab_size], avg_doc_sz, normalized_vals_CSR, 1);
+            normalized_vals_CSR_fptr = flash::map_file<FPTYPE>(std::string(input_file) + ".csr", flash::Mode::READ);
+            cols_CSR_fptr = flash::map_file<FPTYPE>(std::string(input_file) + ".col", flash::Mode::READ);
 
-            A_sp->populate_preprocessed_CSC(
-                max_entries, avg_doc_sz,
-                normalized_vals_CSC, rows_CSC, offsets_CSC);
+            A_sp->populate_preprocessed_CSC(max_entries, avg_doc_sz,
+                                            normalized_vals_CSC, rows_CSC, offsets_CSC);
         } 
         else assert(false);
         is_data_loaded = true;
@@ -419,8 +420,8 @@ namespace ISLE
 
     void ISLETrainer::train()
     {
-        flash::flash_ptr<FPTYPE> base_csr_vals;
-        flash::flash_ptr<doc_id_t> base_csr_cols;
+        flash::flash_ptr<FPTYPE> base_csr_vals = normalized_vals_CSR_fptr;
+        flash::flash_ptr<doc_id_t> base_csr_cols = cols_CSR_fptr;
 
         //
         // Threshold
