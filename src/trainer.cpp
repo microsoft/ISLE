@@ -2,6 +2,14 @@
 // Licensed under the MIT license.
 
 #include "trainer.h"
+#include "flash_tasks/threshold.h"
+#include "blas-on-flash/include/pointers/pointer.h"
+#include "blas-on-flash/include/utils.h"
+#include "blas-on-flash/include/scheduler/scheduler.h"
+
+namespace flash{
+    extern Scheduler sched;
+} // namespace flash
 
 namespace ISLE
 {
@@ -438,6 +446,7 @@ namespace ISLE
             assert(num_word_chunks <= divide_round_up(offsets_CSR[vocab_size], chunk_size));
 
             offset_t *new_nnzs_in_chunk = new offset_t[num_word_chunks];
+            /*
             pfor(int64_t chunk = 0; chunk < num_word_chunks; ++chunk) {
                 A_sp->list_word_freqs_from_CSR(word_begins[chunk], word_ends[chunk],
                     normalized_vals_CSR + offsets_CSR[word_begins[chunk]], 
@@ -447,6 +456,23 @@ namespace ISLE
                 for (word_id_t word = word_begins[chunk]; word < word_ends[chunk]; ++word)
                     freqs[word].clear();
             }
+            */
+            flash::flash_ptr<FPTYPE> base_csr_vals;
+            ThresholdTask** threshold_tasks = new ThresholdTask*[num_word_chunks];
+            for (uint64_t chunk = 0; chunk < num_word_chunks; ++chunk){
+                uint64_t chunk_start = word_begins[chunk];
+                uint64_t chunk_size = word_ends[chunk] - chunk_start;
+                threshold_tasks[chunk] = new ThresholdTask(A_sp, offsets_CSR, base_csr_vals,
+                                                       chunk_start, chunk_size, thresholds,
+                                                       freqs, num_topics);
+                flash::sched.add_task(threshold_tasks[chunk]);
+            }
+            flash::sleep_wait_for_complete(threshold_tasks, num_word_chunks);
+            for (uint64_t chunk = 0; chunk < num_word_chunks; ++chunk){
+                delete threshold_tasks[chunk];
+            }
+            delete[] threshold_tasks;
+
             new_nnzs = std::accumulate(new_nnzs_in_chunk, new_nnzs_in_chunk + num_word_chunks, 0);
             delete[] word_begins;
             delete[] word_ends;
