@@ -520,7 +520,8 @@ namespace ISLE
         auto freqs = new std::vector<T>[num_topics];
 
         for (word_id_t word = word_begin; word < word_end; ++word) {
-            for (auto pos = offsets_CSR[word]; pos < offsets_CSR[word + 1]; ++pos)
+            for (auto pos = offsets_CSR[word - word_begin] - offsets_CSR[word_begin];
+                pos < offsets_CSR[word + 1 - word_begin] - offsets_CSR[word_begin]; ++pos)
                 if (cluster_ids[cols_CSR[pos]] != -1)
                     freqs[cluster_ids[cols_CSR[pos]]].push_back(normalized_vals_CSR[pos]);
 
