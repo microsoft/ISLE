@@ -428,7 +428,7 @@ namespace ISLE
             word_id_t word_end = 0;
             word_id_t num_word_chunks = 0;
             while (word_begin < vocab_size) {
-                while (offsets_CSR[word_end] - offsets_CSR[word_begin] < (1 << 23) && word_end < vocab_size)
+                while (offsets_CSR[word_end] - offsets_CSR[word_begin] < chunk_size && word_end < vocab_size)
                     ++word_end;
                 word_begins[num_word_chunks] = word_begin;
                 word_ends[num_word_chunks] = word_end;
@@ -591,7 +591,7 @@ namespace ISLE
             word_id_t word_end = 0;
             word_id_t num_word_chunks = 0;
             while (word_begin < vocab_size) {
-                while (offsets_CSR[word_end] - offsets_CSR[word_begin] < (1 << 23) && word_end < vocab_size)
+                while (offsets_CSR[word_end] - offsets_CSR[word_begin] < chunk_size && word_end < vocab_size)
                     ++word_end;
                 word_begins[num_word_chunks] = word_begin;
                 word_ends[num_word_chunks] = word_end;
@@ -603,8 +603,10 @@ namespace ISLE
             pfor(int64_t chunk = 0; chunk < num_word_chunks; ++chunk) {
                 A_sp->rth_highest_element_using_CSR(word_begins[chunk], word_ends[chunk],
                     num_topics, r, closest_docs,
-                    normalized_vals_CSR, cols_CSR, offsets_CSR, cluster_ids,
-                    threshold_matrix_tr);
+                    normalized_vals_CSR + offsets_CSR[word_begins[chunk]],
+                    cols_CSR + offsets_CSR[word_begins[chunk]],
+                    offsets_CSR + word_begins[chunk],
+                    cluster_ids, threshold_matrix_tr);
             }
             pfor_dynamic_8192(int64_t w = 0; w < vocab_size; ++w)
                 for (int t = 0; t < num_topics; ++t)
