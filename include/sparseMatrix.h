@@ -111,15 +111,18 @@ namespace ISLE
         void list_word_freqs_by_sorting(std::vector<A_TYPE>* freqs);
 
         void list_word_freqs_from_CSR(
-            FPTYPE *normalized_vals_CSR,
-            offset_t *offsets_CSR,
-            FPTYPE avg_doc_size,
+            const word_id_t word_begin,
+            const word_id_t word_end,
+            const FPTYPE *const normalized_vals_CSR,
+            const offset_t *const offsets_CSR,
             std::vector<A_TYPE>* freqs);
 
         // Input: @num_topics, @freqs: one vector for each word listing its non-zero freqs in docs
         // Output: @zetas: Reference to cutoffs frequencies for each word
         // Return: Total number of entries that are above threshold
         offset_t compute_thresholds(
+            word_id_t word_begin,
+            word_id_t word_end,
             std::vector<A_TYPE> *const freqs,
             std::vector<T>& zetas,
             const doc_id_t num_topics);
