@@ -1981,8 +1981,8 @@ SparseMatrix<T>::SparseMatrix(
         word_id_t *shifted_rows_CSC = new word_id_t[nnzs];
         FPTYPE *shifted_vals_CSC = new FPTYPE[nnzs];
 
-        flash_ptr<word_id_t> shifted_rows_CSC_fptr = this->rows_CSC_fptr + nnzs;
-        flash_ptr<FPTYPE> shifted_vals_CSC_fptr = this->vals_CSC_fptr + nnzs;
+        flash_ptr<word_id_t> shifted_rows_CSC_fptr = this->rows_CSC_fptr + offsets_CSC[doc_begin];
+        flash_ptr<FPTYPE> shifted_vals_CSC_fptr = this->vals_CSC_fptr + offsets_CSC[doc_begin];
         flash::read_sync(shifted_rows_CSC, shifted_rows_CSC_fptr, nnzs);
         flash::read_sync(shifted_vals_CSC, shifted_vals_CSC_fptr, nnzs);
 
