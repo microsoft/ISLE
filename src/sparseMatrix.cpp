@@ -2136,9 +2136,11 @@ namespace ISLE
         while (centers.size() < k) {
             std::cout << "centers.size():  " << centers.size() 
                 << "   new_centers_added: " << new_centers_added << std::endl;
-            update_min_distsq_to_projected_centers(
-                U_cols, new_centers_added, centers_coords + (size_t)(centers.size() - new_centers_added) * (size_t)U_cols,
-                0, num_docs(), projected_docs_l2sq, min_dist, NULL);
+            pfor(int64_t block = 0; block < divide_round_up(num_docs(), (doc_id_t)DOC_BLOCK_SIZE); ++block)
+                update_min_distsq_to_projected_centers(U_cols, new_centers_added,
+                    centers_coords + (size_t)(centers.size() - new_centers_added) * (size_t)U_cols,
+                    block*DOC_BLOCK_SIZE, std::min(((doc_id_t)block + 1)*(doc_id_t)DOC_BLOCK_SIZE, num_docs()),
+                    projected_docs_l2sq, min_dist, NULL);
             dist_cumul[0] = 0;
             for (doc_id_t doc = 0; doc < num_docs(); ++doc)
                 dist_cumul[doc + 1] = dist_cumul[doc] + min_dist[doc];
