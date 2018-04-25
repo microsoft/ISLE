@@ -2087,7 +2087,7 @@ namespace ISLE
             projected_dist = new FPTYPE[(size_t)(doc_end - doc_begin) * (size_t)num_centers];
             dist_alloc = true;
         }
-        FPTYPE* projected_center_l2sq = new FPTYPE[num_centers];
+        FPTYPE *projected_center_l2sq = new FPTYPE[num_centers];
         for (auto c = 0; c < num_centers; ++c)
             projected_center_l2sq[c] = FPdot(dim,
                 projected_centers + (size_t)c * (size_t)dim, 1,
@@ -2226,7 +2226,6 @@ namespace ISLE
         for (doc_id_t d = 0; d < num_centers; ++d)
             UT_times_docs(best_seed[d], best_seed[d] + 1,
                 best_centers_coords + (size_t)d * (size_t)num_centers);
-            //copy_col_to(best_centers_coords + (size_t)d * (size_t)num_centers, best_seed[d]);
         delete[] kmeans_seeds;
         
         return min_total_dist_to_centers;

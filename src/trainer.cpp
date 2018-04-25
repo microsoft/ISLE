@@ -306,9 +306,6 @@ namespace ISLE
             offsets_CSC_stream.read((char*)offsets_CSC, offsets_CSC_len);
             offsets_CSC_stream.close();
 
-            FPscal(offsets_CSC[num_docs], avg_doc_sz, normalized_vals_CSC, 1);
-
-
             //
             // Load CSR files
             //
@@ -340,7 +337,6 @@ namespace ISLE
             offsets_CSR_stream.close();
 
             assert(offsets_CSR[vocab_size] == offsets_CSC[num_docs]);
-            FPscal(offsets_CSR[vocab_size], avg_doc_sz, normalized_vals_CSR, 1);
 
             A_sp->populate_preprocessed_CSC(
                 max_entries, avg_doc_sz,
