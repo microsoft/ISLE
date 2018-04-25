@@ -1975,8 +1975,19 @@ SparseMatrix<T>::SparseMatrix(
             shifted_offsets_CSC[d - doc_begin] = offsets_CSC[d] - offsets_CSC[doc_begin];
         }
 
+        uint64_t doc_blk_size = doc_end - doc_begin;
+
+        uint64_t nnzs = shifted_offsets_CSC[doc_blk_size];
+        word_id_t *shifted_rows_CSC = new word_id_t[nnzs];
+        FPTYPE *shifted_vals_CSC = new FPTYPE[nnzs];
+
+        flash_ptr<word_id_t> shifted_rows_CSC_fptr = this->rows_CSC_fptr + nnzs;
+        flash_ptr<FPTYPE> shifted_vals_CSC_fptr = this->vals_CSC_fptr + nnzs;
+        flash::read_sync(shifted_rows_CSC, shifted_rows_CSC_fptr, nnzs);
+        flash::read_sync(shifted_vals_CSC, shifted_vals_CSC_fptr, nnzs);
+
         const char transa = 'N';
-        const MKL_INT m = doc_end - doc_begin;
+        const MKL_INT m = doc_blk_size;
         const MKL_INT n = cols;
         const MKL_INT k = vocab_size();
         const char matdescra[6] = { 'G',0,0,'C',0,0 };
@@ -1987,11 +1998,13 @@ SparseMatrix<T>::SparseMatrix(
         assert(sizeof(offset_t) == sizeof(MKL_INT));
 
         FPcsrmm(&transa, &m, &n, &k, &alpha, matdescra,
-            vals_CSC + offsets_CSC[doc_begin], (const MKL_INT*)rows_CSC + offsets_CSC[doc_begin],
+            shifted_vals_CSC, (const MKL_INT*)shifted_rows_CSC,
             (const MKL_INT*)shifted_offsets_CSC, (const MKL_INT*)(shifted_offsets_CSC + 1),
             in, &n, &beta, out, &n);
 
         delete[] shifted_offsets_CSC;
+        delete[] shifted_rows_CSC;
+        delete[] shifted_vals_CSC;
     }
 
     template<class FPTYPE>

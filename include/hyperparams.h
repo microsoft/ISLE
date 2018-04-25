@@ -14,12 +14,12 @@ namespace ISLE
 #define USE_INT_NORMALIZED_COUNTS false
 
     /// FEW_SAMPLES_THRESHOLD_DROP: If the number of occurrences of the word
-    /// across documents is too low(below both the “greater than” and “equal to”
+    /// across documents is too low(below both the ï¿½greater thanï¿½ and ï¿½equal toï¿½
     /// constraints), do we leave out all occurrences of the word or leave it out
     /// entirely ? Leaving out seems to be going against the goal of filtering out noise.
 #define FEW_SAMPLES_THRESHOLD_DROP false
 
-    ///  BAD_THRESHOLD_DROP: Requires that "#(freqs == zeta) <3 * eps * w_0* #num_docs”
+    ///  BAD_THRESHOLD_DROP: Requires that "#(freqs == zeta) <3 * eps * w_0* #num_docsï¿½
     ///	or else drop this data.Another variant not programmed "<=" instead of "<".
 #define BAD_THRESHOLD_DROP false
 
@@ -83,7 +83,7 @@ namespace ISLE
 }
 
 /*
-1. 	Throw in freq counts that are >= zeta, as opposed to the paper which uses “>zeta”.
+1. 	Throw in freq counts that are >= zeta, as opposed to the paper which uses ï¿½>zetaï¿½.
     (easy to flip, no flag needed, except minor edits to memory allocation).
 
 2.	Instead of taking the eps2_c*w_0*num_docs/2*num_topics - ranked element from
