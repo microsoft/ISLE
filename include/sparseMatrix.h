@@ -276,6 +276,18 @@ namespace ISLE
             std::vector<doc_id_t>& original_cols);
 
         template <class fromT>
+        void threshold_and_copy_doc_block(
+            const doc_id_t doc_begin,
+            const doc_id_t doc_end,
+            offset_t& this_pos,
+            doc_id_t& nz_docs,
+            const bool* select_docs,             // pass NULL to pick all docs
+            const SparseMatrix<fromT>& from,
+            const std::vector<fromT>& zetas,
+            const offset_t nnzs,
+            std::vector<doc_id_t>& original_cols);
+
+        template <class fromT>
         void sampled_threshold_and_copy(
             const SparseMatrix<fromT>& from,
             const std::vector<fromT>& zetas,

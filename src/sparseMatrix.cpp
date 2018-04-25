@@ -1264,30 +1264,17 @@ namespace ISLE
         size_t extra = 1000;
         allocate(nnzs + extra);
         offsets_CSC[0] = 0;
-        offset_t pos = 0, this_pos = 0;
+        offset_t this_pos = 0;
         doc_id_t nz_docs = 0;
 
-        for (doc_id_t doc = 0; doc < num_docs(); ++doc) {
-            for (offset_t pos = from.offsets_CSC[doc]; pos < from.offsets_CSC[doc + 1]; ++pos) {
-                fromT val;
-                if (std::is_same<fromT, FPTYPE>::value)
-                    val = std::round(from.normalized_vals_CSC[pos]);
-                else if (std::is_same<fromT, count_t>::value)
-                    val = from.normalized_vals_CSC[pos];
-                else assert(false);
-                if (val >= zetas[from.rows_CSC[pos]]) {
-                    vals_CSC[this_pos] = (FPTYPE)std::sqrt(zetas[from.rows_CSC[pos]]);
-                    rows_CSC[this_pos] = from.rows_CSC[pos];
-                    ++this_pos;
-                }
-            }
+        doc_id_t doc_block_size = (1 << 13);
+        doc_id_t num_doc_blocks = divide_round_up(num_docs(), doc_block_size);
 
-            if (this_pos > offsets_CSC[nz_docs]) {
-                offsets_CSC[nz_docs + 1] = this_pos;
-                nz_docs++;
-                original_cols.push_back(doc);
-            }
-        }
+        // Do not parallelize this loop.
+        for (doc_id_t block = 0; block < num_doc_blocks; ++block)
+            threshold_and_copy_doc_block(block * doc_block_size,
+                std::min((block + 1) * doc_block_size, num_docs()),
+                this_pos, nz_docs, NULL, from, zetas, nnzs, original_cols);
 
         _num_docs = nz_docs;
         assert(original_cols.size() == nz_docs);
@@ -1303,6 +1290,46 @@ namespace ISLE
         }
         _nnzs = offsets_CSC[nz_docs];
         //avg_doc_sz = (count_t)get_nnzs() / num_docs();
+    }
+
+    //
+    // Do not call this function in parallel. IT must be called by document block left to right
+    //
+    template<class FPTYPE>
+    template <class fromT>
+    void FPSparseMatrix<FPTYPE>::threshold_and_copy_doc_block(
+        const doc_id_t doc_begin,
+        const doc_id_t doc_end,
+        offset_t& this_pos,
+        doc_id_t& nz_docs,
+        const bool* select_docs,             // pass NULL to pick all docs
+        const SparseMatrix<fromT>& from,
+        const std::vector<fromT>& zetas,
+        const offset_t nnzs,
+        std::vector<doc_id_t>& original_cols)
+    {
+        for (doc_id_t doc = doc_begin; doc < doc_end; ++doc) {
+            if (select_docs == NULL || select_docs[doc]) {
+                for (offset_t pos = from.offsets_CSC[doc]; pos < from.offsets_CSC[doc + 1]; ++pos) {
+                    fromT val;
+                    if (std::is_same<fromT, FPTYPE>::value)
+                        val = std::round(from.normalized_vals_CSC[pos]);
+                    else if (std::is_same<fromT, count_t>::value)
+                        val = from.normalized_vals_CSC[pos];
+                    else assert(false);
+                    if (val >= zetas[from.rows_CSC[pos]]) {
+                        vals_CSC[this_pos] = (FPTYPE)std::sqrt(zetas[from.rows_CSC[pos]]);
+                        rows_CSC[this_pos] = from.rows_CSC[pos];
+                        ++this_pos;
+                    }
+                }
+            }
+            if (this_pos > offsets_CSC[nz_docs]) {
+                offsets_CSC[nz_docs + 1] = this_pos;
+                nz_docs++;
+                original_cols.push_back(doc);
+            }
+        }
     }
 
     template<class FPTYPE>
@@ -1354,8 +1381,23 @@ namespace ISLE
         auto pivot = dice[(size_t)(sample_rate*(FPTYPE)from.num_docs())];
         std::cout << "sampling docs: pivot: " << pivot << std::endl;
 
-        for (doc_id_t doc = 0; doc < num_docs(); ++doc) {
-            if (doc_weights[doc] >= pivot) {
+        auto select_docs = new bool[num_docs()];
+        pfor_dynamic_131072(int64_t doc = 0; doc < num_docs(); ++doc) {
+            select_docs[doc] = (doc_weights[doc] >= pivot);
+        }
+
+
+        doc_id_t doc_block_size = (1 << 13);
+        doc_id_t num_doc_blocks = divide_round_up(num_docs(), doc_block_size);
+
+        // Do not parallelize this loop.
+        for (doc_id_t block = 0; block < num_doc_blocks; ++block)
+            threshold_and_copy_doc_block(block * doc_block_size,
+                std::min((block + 1) * doc_block_size, num_docs()),
+                this_pos, nz_docs, select_docs, from, zetas, nnzs, original_cols);
+
+        /*for (doc_id_t doc = 0; doc < num_docs(); ++doc) {
+            if (select_doc[doc]) {
                 for (offset_t pos = from.offsets_CSC[doc]; pos < from.offsets_CSC[doc + 1]; ++pos) {
                     fromT val;
                     if (std::is_same<fromT, FPTYPE>::value)
@@ -1375,7 +1417,7 @@ namespace ISLE
                 nz_docs++;
                 original_cols.push_back(doc);
             }
-        }
+        }*/
 
         _num_docs = nz_docs;
         assert(original_cols.size() == nz_docs);
@@ -1386,6 +1428,7 @@ namespace ISLE
 
         // TODO: RESIZE vals to something smaller.
 
+        delete[] select_docs;
         delete[] doc_weights;
         delete[] dice;
     }
