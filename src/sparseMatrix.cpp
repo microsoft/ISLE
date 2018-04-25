@@ -42,7 +42,15 @@ namespace ISLE
         vals_CSC = new T[get_nnzs()];
         rows_CSC = new word_id_t[get_nnzs()];
         offsets_CSC = new offset_t[num_docs() + 1];
-        // TODO: Wipes vals and normalized_vals, just in case.
+    }
+
+    template<class T>
+    void SparseMatrix<T>::shrink(const offset_t new_nnzs_)
+    {
+        assert(_nnzs >= new_nnzs_);
+        vals_CSC = (T*)realloc(vals_CSC, sizeof(T)*new_nnzs_);
+        rows_CSC = (word_id_t*)realloc(rows_CSC, sizeof(word_id_t)*new_nnzs_);
+        assert(offset_CSC != NULL);
     }
 
     template<class T>
@@ -1267,13 +1275,11 @@ namespace ISLE
         offset_t this_pos = 0;
         doc_id_t nz_docs = 0;
 
-        doc_id_t doc_block_size = (1 << 13);
-        doc_id_t num_doc_blocks = divide_round_up(num_docs(), doc_block_size);
-
+        doc_id_t num_doc_blocks = divide_round_up(num_docs(), (doc_id_t)DOC_BLOCK_SIZE);
         // Do not parallelize this loop.
         for (doc_id_t block = 0; block < num_doc_blocks; ++block)
-            threshold_and_copy_doc_block(block * doc_block_size,
-                std::min((block + 1) * doc_block_size, num_docs()),
+            threshold_and_copy_doc_block(block * DOC_BLOCK_SIZE,
+                std::min((block + 1) * DOC_BLOCK_SIZE, num_docs()),
                 this_pos, nz_docs, NULL, from, zetas, nnzs, original_cols);
 
         _num_docs = nz_docs;
@@ -1286,7 +1292,6 @@ namespace ISLE
             std::cout << " ************ WARNING: last offset != allocation ************* \n"
                 << " ************ Resetting nnzs ********************************* \n\n";
             assert(get_nnzs() >= offsets_CSC[nz_docs]);
-
         }
         _nnzs = offsets_CSC[nz_docs];
         //avg_doc_sz = (count_t)get_nnzs() / num_docs();
@@ -1386,38 +1391,12 @@ namespace ISLE
             select_docs[doc] = (doc_weights[doc] >= pivot);
         }
 
-
-        doc_id_t doc_block_size = (1 << 13);
-        doc_id_t num_doc_blocks = divide_round_up(num_docs(), doc_block_size);
-
+        doc_id_t num_doc_blocks = divide_round_up(num_docs(), (doc_id_t)DOC_BLOCK_SIZE);
         // Do not parallelize this loop.
         for (doc_id_t block = 0; block < num_doc_blocks; ++block)
-            threshold_and_copy_doc_block(block * doc_block_size,
-                std::min((block + 1) * doc_block_size, num_docs()),
+            threshold_and_copy_doc_block(block * DOC_BLOCK_SIZE,
+                std::min((block + 1) * DOC_BLOCK_SIZE, num_docs()),
                 this_pos, nz_docs, select_docs, from, zetas, nnzs, original_cols);
-
-        /*for (doc_id_t doc = 0; doc < num_docs(); ++doc) {
-            if (select_doc[doc]) {
-                for (offset_t pos = from.offsets_CSC[doc]; pos < from.offsets_CSC[doc + 1]; ++pos) {
-                    fromT val;
-                    if (std::is_same<fromT, FPTYPE>::value)
-                        val = std::round(from.normalized_vals_CSC[pos]);
-                    else if (std::is_same<fromT, count_t>::value)
-                        val = from.normalized_vals_CSC[pos];
-                    else assert(false);
-                    if (val >= zetas[from.rows_CSC[pos]]) {
-                        vals_CSC[this_pos] = (FPTYPE)std::sqrt(zetas[from.rows_CSC[pos]]);
-                        rows_CSC[this_pos] = from.rows_CSC[pos];
-                        ++this_pos;
-                    }
-                }
-            }
-            if (this_pos > offsets_CSC[nz_docs]) {
-                offsets_CSC[nz_docs + 1] = this_pos;
-                nz_docs++;
-                original_cols.push_back(doc);
-            }
-        }*/
 
         _num_docs = nz_docs;
         assert(original_cols.size() == nz_docs);
@@ -1425,8 +1404,7 @@ namespace ISLE
 
         assert(offsets_CSC[nz_docs] < get_nnzs() + extra);
         _nnzs = offsets_CSC[nz_docs];
-
-        // TODO: RESIZE vals to something smaller.
+        shrink(offsets_CSC[nz_docs]);
 
         delete[] select_docs;
         delete[] doc_weights;
