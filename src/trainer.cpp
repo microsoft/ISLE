@@ -57,6 +57,8 @@ namespace ISLE
         flag_print_top_two_topics(flag_print_top_two_topics_),
         is_training_complete(false)
     {
+        flash::flash_setup("/tmp/");
+
         //
         // Check size alignments
         //
@@ -90,9 +92,11 @@ namespace ISLE
 
     ISLETrainer::~ISLETrainer()
     {
+        flash::flash_destroy();
         //
         // Clean up data matrices
         //
+        A_sp->unmap_flash();
         delete A_sp;
         delete B_fl_CSC;
         delete Model;
@@ -315,9 +319,8 @@ namespace ISLE
             offset_t *offsets_CSC = new offset_t[num_docs + 1];
             offsets_CSC_stream.read((char*)offsets_CSC, offsets_CSC_len);
             offsets_CSC_stream.close();
-
-            FPscal(offsets_CSC[num_docs], avg_doc_sz, normalized_vals_CSC, 1);
-
+            
+            // FPscal(offsets_CSC[num_docs], avg_doc_sz, normalized_vals_CSC, 1);
 
             //
             // Load CSR files
@@ -350,12 +353,14 @@ namespace ISLE
             offsets_CSR_stream.close();
 
             assert(offsets_CSR[vocab_size] == offsets_CSC[num_docs]);
-            FPscal(offsets_CSR[vocab_size], avg_doc_sz, normalized_vals_CSR, 1);
+            // FPscal(offsets_CSR[vocab_size], avg_doc_sz, normalized_vals_CSR, 1);
             normalized_vals_CSR_fptr = flash::map_file<FPTYPE>(std::string(input_file) + ".csr", flash::Mode::READ);
             cols_CSR_fptr = flash::map_file<FPTYPE>(std::string(input_file) + ".col", flash::Mode::READ);
 
             A_sp->populate_preprocessed_CSC(max_entries, avg_doc_sz,
                                             normalized_vals_CSC, rows_CSC, offsets_CSC);
+            // map CSC files on flash
+            A_sp->map_flash(std::string(input_file) + "_tr.off", std::string(input_file) + "_tr.col", std::string(input_file) + "_tr.csr");
         } 
         else assert(false);
         is_data_loaded = true;
@@ -421,7 +426,7 @@ namespace ISLE
 
     void ISLETrainer::train()
     {
-		flash::flash_setup("/raid/tmp/");
+		// flash::flash_setup("/raid/tmp/");
         flash::flash_ptr<FPTYPE> base_csr_vals = normalized_vals_CSR_fptr;
         flash::flash_ptr<doc_id_t> base_csr_cols = cols_CSR_fptr;
 
@@ -529,7 +534,6 @@ namespace ISLE
         out_log->print_eigen_data(evalues, num_topics);
         auto &B_fl = B_fl_CSC;
         timer->next_time_secs("Spectra eigen solve");
-
 
         //
         // k-means++ on the column space (Simga*VT) of k-rank approx of B

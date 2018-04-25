@@ -8,6 +8,8 @@
 #include <set>
 #include <limits>
 
+#include "blas-on-flash/include/pointers/pointer.h"
+
 #include "types.h"
 // types.h is included before influences the behavior of Eigen and, therefore, Spectra
 #include "spectra-master/include/SymEigsSolver.h"
@@ -32,7 +34,16 @@ namespace ISLE
         word_id_t	*rows_CSC;		// Row array for non-zero word count
         offset_t	*offsets_CSC;		// offsets_CSC array
 
-        T			*normalized_vals_CSC;	// normalized values
+        flash::flash_ptr<T> vals_CSC_fptr;          // flash-backed vals_CSC
+        flash::flash_ptr<word_id_t> rows_CSC_fptr;  // flash-backed rows_CSC
+        flash::flash_ptr<offset_t> offsets_CSC_fptr;// flash-backed offsets_CSC
+        offset_t* offsets_CSC_ptr;                  // in-mem offsets_CSC
+        word_id_t* rows_CSC_ptr;                    // in-mem offsets_CSC
+        T* vals_CSC_ptr;                            // in-mem offsets_CSC
+        bool flash_malloc = false;
+
+        T			*normalized_vals_CSC;	           // normalized values
+        flash::flash_ptr<T> normalized_vals_CSC_fptr;  // flash-backed normalized values
 
         T			avg_doc_sz;	// Average size of a doc
 
@@ -44,7 +55,20 @@ namespace ISLE
 
         ~SparseMatrix();
 
-        inline offset_t  get_nnzs()		const { return _nnzs; }
+        // maps <offs_CSC_fname, rows_CSC_fname, vals_CSC_fname> to
+        // <offsets_CSC_fptr, rows_CSC_fptr, vals_CSC_fptr>
+        // Also reads offsets_CSC_fptr into offsets_CSC_ptr
+        void map_flash(const std::string &offs_CSC_fname,
+                       const std::string &rows_CSC_fname,
+                       const std::string &vals_CSC_fname);
+        void read_flash();
+        
+        void unmap_flash();
+
+        inline offset_t get_nnzs() const
+        {
+            return _nnzs;
+        }
         inline doc_id_t  num_docs()		const { return _num_docs; }
         inline word_id_t vocab_size()	const { return _vocab_size; }
 
@@ -67,6 +91,7 @@ namespace ISLE
         }
 
         void allocate(const offset_t nnzs_);
+        void allocate_flash(const offset_t nnzs_);
 
         inline T elem(
             const word_id_t& word,

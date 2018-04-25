@@ -3,25 +3,37 @@
 #include "sparseMatrix.h"
 #include "restarted_block_ks.h"
 
+#include "blas-on-flash/include/utils.h"
+#include "blas-on-flash/include/lib_funcs.h"
+#include "blas-on-flash/include/scheduler/scheduler.h"
+#include "flash_tasks/l2_thresh_norm.h"
+
+namespace flash{
+    extern Scheduler sched;
+} // namespace flash
+
 namespace ISLE
 {
     // SparseMatrix
 
-    template<class T>
-    SparseMatrix<T>::SparseMatrix(
-        const word_id_t d,
-        const doc_id_t s,
-        const offset_t nnzs)
-        :
-        _vocab_size(d),
-        _num_docs(s),
-        _nnzs(nnzs),
-        vals_CSC(NULL),
-        rows_CSC(NULL),
-        offsets_CSC(NULL),
-        normalized_vals_CSC(NULL),
-        avg_doc_sz((T)0.0)
-    {}
+template <class T>
+SparseMatrix<T>::SparseMatrix(
+    const word_id_t d,
+    const doc_id_t s,
+    const offset_t nnzs)
+    : _vocab_size(d),
+      _num_docs(s),
+      _nnzs(nnzs),
+      vals_CSC(NULL),
+      rows_CSC(NULL),
+      offsets_CSC(NULL),
+      normalized_vals_CSC(NULL),
+      offsets_CSC_ptr(NULL),
+      rows_CSC_ptr(NULL),
+      vals_CSC_ptr(NULL),
+      flash_malloc(false),
+      avg_doc_sz((T)0.0)
+{}
 
     template<class T>
     SparseMatrix<T>::~SparseMatrix()
@@ -30,6 +42,60 @@ namespace ISLE
         if (rows_CSC) delete[] rows_CSC;
         if (offsets_CSC) delete[] offsets_CSC;
         if (normalized_vals_CSC) delete[] normalized_vals_CSC;
+
+        if (offsets_CSC_ptr) delete[] offsets_CSC_ptr;
+        if (rows_CSC_ptr) delete[] rows_CSC_ptr;
+        if (vals_CSC_ptr) delete[] vals_CSC_ptr;
+        if(flash_malloc){
+            flash::flash_free<offset_t>(this->offsets_CSC_fptr);
+            flash::flash_free<word_id_t>(this->rows_CSC_fptr);
+            flash::flash_free<T>(this->vals_CSC_fptr);
+        }
+    }
+
+    template <class T>
+    void SparseMatrix<T>::map_flash(const std::string &offs_CSC_fname,
+                                    const std::string &rows_CSC_fname,
+                                    const std::string &vals_CSC_fname){
+        GLOG_DEBUG("Mapping & reading offsets_CSC from ", offs_CSC_fname);
+        this->offsets_CSC_fptr = flash::map_file<offset_t>(offs_CSC_fname, flash::Mode::READWRITE);
+        this->offsets_CSC_ptr = new offset_t[num_docs() + 1];
+        flash::read_sync(this->offsets_CSC_ptr, this->offsets_CSC_fptr, num_docs() + 1);
+        _nnzs = this->offsets_CSC_ptr[num_docs()];
+        GLOG_DEBUG("Mapping nnzs=", get_nnzs());
+        GLOG_DEBUG("Mapping rows_CSC from ", rows_CSC_fname);
+        this->rows_CSC_fptr = flash::map_file<word_id_t>(rows_CSC_fname, flash::Mode::READWRITE);
+        GLOG_DEBUG("Mapping normalized_vals_CSC_fptr from ", vals_CSC_fname);
+        this->normalized_vals_CSC_fptr = flash::map_file<T>(vals_CSC_fname, flash::Mode::READWRITE);
+    }
+    
+    
+    template <class T>
+    void SparseMatrix<T>::read_flash() {
+        if(this->offsets_CSC == nullptr){
+            GLOG_DEBUG("Reading offsets_CSC");
+            this->offsets_CSC = new offset_t[num_docs() + 1];
+            flash::read_sync(this->offsets_CSC, this->offsets_CSC_fptr, num_docs() + 1);
+        }
+
+        _nnzs = this->offsets_CSC[num_docs()];
+        GLOG_DEBUG("Reading nnzs=", _nnzs);
+        GLOG_DEBUG("Reading rows_CSC");
+        this->rows_CSC = new word_id_t[_nnzs];
+        flash::read_sync(this->rows_CSC, this->rows_CSC_fptr, _nnzs);
+        GLOG_DEBUG("Reading vals_CSC");
+        this->vals_CSC = new T[_nnzs];
+        flash::read_sync(this->vals_CSC, this->vals_CSC_fptr, _nnzs);
+    }
+
+    template <class T>
+    void SparseMatrix<T>::unmap_flash(){
+        GLOG_DEBUG("Unmapping offsets_CSC");
+        flash::unmap_file<offset_t>(this->offsets_CSC_fptr);
+        GLOG_DEBUG("Unmapping rows_CSC");
+        flash::unmap_file<word_id_t>(this->rows_CSC_fptr);
+        GLOG_DEBUG("Unmapping normalized_vals_CSC_fptr");
+        flash::unmap_file<T>(this->normalized_vals_CSC_fptr);
     }
 
     template<class T>
@@ -44,6 +110,24 @@ namespace ISLE
         offsets_CSC = new offset_t[num_docs() + 1];
         // TODO: Wipes vals and normalized_vals, just in case.
     }
+    
+
+    template<class T>
+    void SparseMatrix<T>::allocate_flash(const offset_t nnzs_)
+    {
+        assert(_nnzs == 0);
+        assert(flash_malloc == false);
+
+        _nnzs = nnzs_;
+        this->offsets_CSC = new offset_t[num_docs() + 1];
+        this->offsets_CSC_fptr = flash::flash_malloc<offset_t>((num_docs() + 1) * sizeof(offset_t), "offs_CSC");
+        this->rows_CSC_fptr = flash::flash_malloc<word_id_t>(_nnzs * sizeof(word_id_t), "rows_CSC");
+        this->vals_CSC_fptr = flash::flash_malloc<T>(_nnzs * sizeof(T), "vals_CSC");
+
+        // set flag to clear flash malloc
+        flash_malloc = true;
+    }
+    
 
     template<class T>
     void SparseMatrix<T>::populate_CSC(const std::vector<DocWordEntry<count_t> >& entries)
@@ -96,6 +180,7 @@ namespace ISLE
         this->normalized_vals_CSC = normalized_vals_CSC_;
         this->rows_CSC = rows_CSC_;
         this->offsets_CSC = offsets_CSC_;
+        GLOG_DEBUG("Adding nnzs=", _nnzs);
     }
 
     template<class T>
@@ -1262,7 +1347,9 @@ namespace ISLE
 
         // In case filtration has small error
         size_t extra = 1000;
-        allocate(nnzs + extra);
+        
+        this->allocate_flash(nnzs + extra);
+        
         offsets_CSC[0] = 0;
         offset_t this_pos = 0;
         doc_id_t nz_docs = 0;
@@ -1290,6 +1377,9 @@ namespace ISLE
         }
         _nnzs = offsets_CSC[nz_docs];
         //avg_doc_sz = (count_t)get_nnzs() / num_docs();
+
+        // for continuity
+        this->read_flash();
     }
 
     //
@@ -1308,28 +1398,85 @@ namespace ISLE
         const offset_t nnzs,
         std::vector<doc_id_t>& original_cols)
     {
-        for (doc_id_t doc = doc_begin; doc < doc_end; ++doc) {
-            if (select_docs == NULL || select_docs[doc]) {
-                for (offset_t pos = from.offsets_CSC[doc]; pos < from.offsets_CSC[doc + 1]; ++pos) {
+        offset_t  from_blk_offset = from.offsets_CSC[doc_begin];
+        offset_t  from_blk_nnzs = from.offsets_CSC[doc_end] - from.offsets_CSC[doc_begin];
+        word_id_t *from_blk_rows_CSC = new word_id_t[from_blk_nnzs];
+        fromT     *from_blk_vals_CSC = new fromT[from_blk_nnzs];
+
+        offset_t  to_blk_offset = this_pos;
+        offset_t  to_blk_nnzs = 0;
+        word_id_t *to_blk_rows_CSC = new word_id_t[from_blk_nnzs];
+        FPTYPE    *to_blk_vals_CSC = new FPTYPE[from_blk_nnzs];
+
+        // read from_block_*_CSC
+        flash::read_sync(from_blk_rows_CSC, from.rows_CSC_fptr + from_blk_offset, from_blk_nnzs);
+        flash::read_sync(from_blk_vals_CSC, from.normalized_vals_CSC_fptr + from_blk_offset, from_blk_nnzs);
+
+        // for (doc_id_t doc = doc_begin; doc < doc_end; ++doc) {
+        //     if (select_docs == NULL || select_docs[doc]) {
+        //         for (offset_t pos = from.offsets_CSC[doc]; pos < from.offsets_CSC[doc + 1]; ++pos) {
+        //             fromT val;
+        //             if (std::is_same<fromT, FPTYPE>::value)
+        //                 val = std::round(from.normalized_vals_CSC[pos]);
+        //             else if (std::is_same<fromT, count_t>::value)
+        //                 val = from.normalized_vals_CSC[pos];
+        //             else assert(false);
+        //             if (val >= zetas[from.rows_CSC[pos]]) {
+        //                 vals_CSC[this_pos] = (FPTYPE)std::sqrt(zetas[from.rows_CSC[pos]]);
+        //                 rows_CSC[this_pos] = from.rows_CSC[pos];
+        //                 ++this_pos;
+        //             }
+        //         }
+        //     }
+        //     if (this_pos > offsets_CSC[nz_docs]) {
+        //         offsets_CSC[nz_docs + 1] = this_pos;
+        //         nz_docs++;
+        //         original_cols.push_back(doc);
+        //     }
+        // }
+        for (doc_id_t doc = doc_begin; doc < doc_end; ++doc){
+            if (select_docs == NULL || select_docs[doc]){
+                for (offset_t pos = from.offsets_CSC[doc] - from_blk_offset;
+                            pos < from.offsets_CSC[doc + 1] - from_blk_offset; ++pos){
+                    word_id_t from_row_at_pos = from_blk_rows_CSC[pos];
+                    fromT from_val_at_pos = from_blk_vals_CSC[pos];
+
                     fromT val;
                     if (std::is_same<fromT, FPTYPE>::value)
-                        val = std::round(from.normalized_vals_CSC[pos]);
+                        val = std::round(from_val_at_pos);
                     else if (std::is_same<fromT, count_t>::value)
-                        val = from.normalized_vals_CSC[pos];
-                    else assert(false);
-                    if (val >= zetas[from.rows_CSC[pos]]) {
-                        vals_CSC[this_pos] = (FPTYPE)std::sqrt(zetas[from.rows_CSC[pos]]);
-                        rows_CSC[this_pos] = from.rows_CSC[pos];
-                        ++this_pos;
+                        val = from_val_at_pos;
+                    else
+                        assert(false);
+                    if (val >= zetas[from_row_at_pos])
+                    {
+                        to_blk_vals_CSC[to_blk_nnzs] = (FPTYPE)std::sqrt(zetas[from_row_at_pos]);
+                        to_blk_rows_CSC[to_blk_nnzs] = from_row_at_pos;
+                        ++to_blk_nnzs;
                     }
                 }
             }
-            if (this_pos > offsets_CSC[nz_docs]) {
-                offsets_CSC[nz_docs + 1] = this_pos;
+            if (this_pos + to_blk_nnzs > offsets_CSC[nz_docs])
+            {
+                offsets_CSC[nz_docs + 1] = this_pos + to_blk_nnzs;
                 nz_docs++;
                 original_cols.push_back(doc);
             }
         }
+
+        // write nz-docs from cur-block
+        flash::write_sync(this->rows_CSC_fptr + to_blk_offset, to_blk_rows_CSC, to_blk_nnzs);
+        flash::write_sync(this->vals_CSC_fptr + to_blk_offset, to_blk_vals_CSC, to_blk_nnzs);
+
+        // update this_pos
+        this_pos += to_blk_nnzs;
+        GLOG_INFO("added nnzs=", to_blk_nnzs, ", range=[", to_blk_offset, ", ", this_pos, "]");
+
+        // cleanup
+        delete[] from_blk_rows_CSC;
+        delete[] from_blk_vals_CSC;
+        delete[] to_blk_rows_CSC;
+        delete[] to_blk_vals_CSC;
     }
 
     template<class FPTYPE>
@@ -1347,7 +1494,7 @@ namespace ISLE
         //TODO: Need to cut down this buffer size.
         // In case filtration has small error
         size_t extra = 1000;
-        allocate(nnzs + extra);
+        this->allocate_flash(nnzs + extra);
         offsets_CSC[0] = 0;
         offset_t pos = 0, this_pos = 0;
         doc_id_t nz_docs = 0;
@@ -1355,17 +1502,44 @@ namespace ISLE
         auto doc_weights = new FPTYPE[from.num_docs()];
         FPscal(from.num_docs(), 0.0, doc_weights, 1);
         // Compute weights
-        pfor_dynamic_131072(int64_t doc = 0; doc < num_docs(); ++doc) {
-            for (offset_t pos = from.offsets_CSC[doc]; pos < from.offsets_CSC[doc + 1]; ++pos) {
-                fromT val;
-                if (std::is_same<fromT, FPTYPE>::value)
-                    val = std::round(from.normalized_vals_CSC[pos]);
-                else if (std::is_same<fromT, count_t>::value)
-                    val = from.normalized_vals_CSC[pos];
-                else assert(false);
-                if (val >= zetas[from.rows_CSC[pos]])
-                    doc_weights[doc] += zetas[from.rows_CSC[pos]];
+        {
+            // pfor_dynamic_131072(int64_t doc = 0; doc < num_docs(); ++doc) {
+            //     for (offset_t pos = from.offsets_CSC[doc]; pos < from.offsets_CSC[doc + 1]; ++pos) {
+            //         fromT val;
+            //         if (std::is_same<fromT, FPTYPE>::value)
+            //             val = std::round(from.normalized_vals_CSC[pos]);
+            //         else if (std::is_same<fromT, count_t>::value)
+            //             val = from.normalized_vals_CSC[pos];
+            //         else assert(false);
+            //         if (val >= zetas[from.rows_CSC[pos]])
+            //             doc_weights[doc] += zetas[from.rows_CSC[pos]];
+            //     }
+            // }
+        }
+        // Compute weights using flash
+        {
+            uint64_t doc_blk_size = ((uint64_t)1 << 20);
+            uint64_t from_num_docs = from.num_docs();
+            uint64_t n_blks = divide_round_up(from_num_docs, doc_blk_size);
+
+            // create and launch l2 compute tasks
+            L2ThresholdedTask<fromT>** l2_tasks = new L2ThresholdedTask<fromT>*[n_blks];
+            for(uint64_t blk = 0; blk < n_blks; blk++){
+                uint64_t blk_start = doc_blk_size * blk;
+                uint64_t blk_size = std::min(from_num_docs - blk_start, doc_blk_size);
+                l2_tasks[blk] = new L2ThresholdedTask<fromT>(from.offsets_CSC, from.rows_CSC_fptr, from.normalized_vals_CSC_fptr,
+                                                      zetas, doc_weights, blk_start, blk_size);
+                flash::sched.add_task(l2_tasks[blk]);
             }
+            
+            // wait for tasks to complete
+            flash::sleep_wait_for_complete(l2_tasks, n_blks);
+
+            // cleanup
+            for(uint64_t blk = 0; blk < n_blks; blk++){
+                delete l2_tasks[blk];
+            }
+            delete[] l2_tasks;
         }
 
         auto dice = new FPTYPE[from.num_docs()];
@@ -1431,6 +1605,9 @@ namespace ISLE
         delete[] select_docs;
         delete[] doc_weights;
         delete[] dice;
+
+        // for continuity
+        this->read_flash();
     }
 
     template<class FPTYPE>

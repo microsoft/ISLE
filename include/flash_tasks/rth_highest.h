@@ -62,7 +62,7 @@ public:
   {
     doc_id_t *local_csr_cols_ptr = (doc_id_t *)this->in_mem_ptrs[this->local_csr_cols];
     FPTYPE *local_csr_vals_ptr = (FPTYPE *)this->in_mem_ptrs[this->local_csr_vals];
-    FPscal(local_csr_offs[blk_size] - local_csr_offs[0], avg_doc_size, local_csr_vals_ptr, 1);
+    // FPscal(local_csr_offs[blk_size] - local_csr_offs[0], avg_doc_size, local_csr_vals_ptr, 1);
 
     // list word freqs from CSR
     this->A_sp->rth_highest_element_using_CSR(start_row, start_row + blk_size,
