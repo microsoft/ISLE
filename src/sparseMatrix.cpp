@@ -2,9 +2,11 @@
 
 #include "sparseMatrix.h"
 #include "restarted_block_ks.h"
+#include "flash_prod_op.h"
 
 #include "blas-on-flash/include/utils.h"
 #include "blas-on-flash/include/lib_funcs.h"
+#include "blas-on-flash/include/flash_blas.h"
 #include "blas-on-flash/include/scheduler/scheduler.h"
 #include "flash_tasks/l2_thresh_norm.h"
 
@@ -1254,15 +1256,48 @@ SparseMatrix<T>::SparseMatrix(
         const doc_id_t num_topics,
         std::vector<FPTYPE>& evalues)
     {
-        MKL_SpSpTrProd<FPTYPE> op(vals_CSC, rows_CSC, offsets_CSC,
-            vocab_size(), num_docs(), get_nnzs());
+        // MKL_SpSpTrProd<FPTYPE> op(vals_CSC, rows_CSC, offsets_CSC,
+        //     vocab_size(), num_docs(), get_nnzs());
+        // BlockKs<MKL_SpSpTrProd<FPTYPE>> eigensolver(&op, num_topics, 2 * num_topics + BLOCK_KS_BLOCK_SIZE,
+        //                                             BLOCK_KS_MAX_ITERS, BLOCK_KS_BLOCK_SIZE, BLOCK_KS_TOLERANCE);
+
+        // enumerate params for FlashProdOp    
+        uint64_t n_rows = vocab_size();
+        uint64_t n_cols = num_docs();
+        std::swap(n_rows, n_cols);
+        uint64_t nnzs = get_nnzs();
+
+        MKL_INT* a_off_ptr = this->offsets_CSC;
+        flash_ptr<MKL_INT> a_off = this->offsets_CSC_fptr;
+        flash_ptr<MKL_INT> a_col = this->rows_CSC_fptr;
+        flash_ptr<FPTYPE> a_csr = this->vals_CSC_fptr;
+        
+        // convert CSC to CSR
+        flash_ptr<MKL_INT> a_tr_off = flash::flash_malloc<MKL_INT>((n_cols + 1) * sizeof(MKL_INT), "a_tr_off");
+        flash_ptr<MKL_INT> a_tr_col = flash::flash_malloc<MKL_INT>(nnzs * sizeof(MKL_INT), "a_tr_col");
+        flash_ptr<FPTYPE> a_tr_csr = flash::flash_malloc<FPTYPE>(nnzs * sizeof(FPTYPE), "a_tr_csr");
+        flash::csrcsc(n_rows, n_cols, a_off, a_col, a_csr, a_tr_off, a_tr_col, a_tr_csr);
+        MKL_INT* a_tr_off_ptr = new MKL_INT[n_cols + 1];
+        flash::read_sync(a_tr_off_ptr, a_tr_off, n_cols + 1);
+        GLOG_ASSERT(a_tr_off_ptr[n_cols] == a_off_ptr[n_rows],
+                    "expected nnzs=", nnzs, ", got=", a_tr_off_ptr[n_cols]);
+        
+        // create FlashProdOp
+        FlashProdOp op(a_csr, a_col, a_tr_csr, a_tr_col, a_off_ptr, a_tr_off_ptr,
+                        n_rows, n_cols, nnzs, BLOCK_KS_BLOCK_SIZE);
+
         std::cout << "Op init done" << std::endl;
-        BlockKs<MKL_SpSpTrProd<FPTYPE> > eigensolver(&op,
-            num_topics, 2 * num_topics + BLOCK_KS_BLOCK_SIZE,
-            BLOCK_KS_MAX_ITERS, BLOCK_KS_BLOCK_SIZE, BLOCK_KS_TOLERANCE);
+
+        BlockKs<FlashProdOp> eigensolver(&op,num_topics, 2 * num_topics + BLOCK_KS_BLOCK_SIZE,
+                                         BLOCK_KS_MAX_ITERS, BLOCK_KS_BLOCK_SIZE, BLOCK_KS_TOLERANCE);
         eigensolver.init();
         eigensolver.compute();
         assert(eigensolver.num_converged() == num_topics);
+
+        // cleanup from FlashProdOp
+        flash::flash_free(a_tr_off);
+        flash::flash_free(a_tr_col);
+        flash::flash_free(a_tr_csr);
 
         ARMA_FPMAT sevecs = eigensolver.eigenvectors();
         ARMA_FPVEC sevs = eigensolver.eigenvalues();
@@ -1376,6 +1411,8 @@ SparseMatrix<T>::SparseMatrix(
 
         }
         _nnzs = offsets_CSC[nz_docs];
+        // write to disk
+        flash::write_sync(this->offsets_CSC_fptr, this->offsets_CSC, this->num_docs() + 1);
         //avg_doc_sz = (count_t)get_nnzs() / num_docs();
 
         // for continuity
@@ -1599,6 +1636,9 @@ SparseMatrix<T>::SparseMatrix(
 
         assert(offsets_CSC[nz_docs] < get_nnzs() + extra);
         _nnzs = offsets_CSC[nz_docs];
+        
+        // write to disk
+        flash::write_sync(this->offsets_CSC_fptr, this->offsets_CSC, this->num_docs() + 1);
 
         // TODO: RESIZE vals to something smaller.
 

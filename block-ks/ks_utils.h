@@ -40,7 +40,7 @@ namespace utils {
    * R - NxR upper-triangular matrix
    * rank - optional, to obtain rank of matrix
    */
-  void compute_qr(ARMA_FPMAT A, ARMA_FPMAT &P, ARMA_FPMAT &Q_out, ARMA_FPMAT &R_out,
+  inline void compute_qr(ARMA_FPMAT A, ARMA_FPMAT &P, ARMA_FPMAT &Q_out, ARMA_FPMAT &R_out,
                   uint64_t *rank = nullptr) {
     if (A.n_cols == A.n_rows && A.n_cols == 1) {
       P = {1};
@@ -133,7 +133,7 @@ for(uint64_t j=i;j<A.n_cols;j++){
    *      - 2 : Zipf (sqrt) distribution in [0, 1]
    *      - 3 : evenly spaced in [0, 1]
    */
-  void get_seed_eigs(uint64_t dim, uint64_t type, ARMA_FPVEC &evs) {
+  inline void get_seed_eigs(uint64_t dim, uint64_t type, ARMA_FPVEC &evs) {
     switch (type) {
       case 0:
         evs = arma::randu<ARMA_FPVEC>(dim);
