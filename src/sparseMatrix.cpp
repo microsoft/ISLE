@@ -640,7 +640,7 @@ namespace ISLE
 
 
         // Can we use a sparse matrix here?
-        size_t doc_block_size = 1 << 19;
+        size_t doc_block_size = DOC_BLOCK_SIZE;
         size_t doc_blocks = ((size_t)num_docs()) / doc_block_size;
         if (doc_blocks * doc_block_size != (size_t)num_docs()) doc_blocks++;
 
