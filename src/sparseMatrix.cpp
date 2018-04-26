@@ -1624,7 +1624,7 @@ SparseMatrix<T>::SparseMatrix(
         flash::write_sync(this->offsets_CSC_fptr, this->offsets_CSC, this->num_docs() + 1);
 
         // TODO: RESIZE vals to something smaller.
-        shrink(offsets_CSC[nz_docs]);
+        this->shrink(offsets_CSC[nz_docs]);
 
         delete[] select_docs;
         delete[] doc_weights;
