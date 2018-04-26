@@ -110,7 +110,19 @@ SparseMatrix<T>::SparseMatrix(
         vals_CSC = new T[get_nnzs()];
         rows_CSC = new word_id_t[get_nnzs()];
         offsets_CSC = new offset_t[num_docs() + 1];
-        // TODO: Wipes vals and normalized_vals, just in case.
+    }
+
+    template<class T>
+    void SparseMatrix<T>::shrink(const offset_t new_nnzs_)
+    {
+        assert(_nnzs >= new_nnzs_);
+        vals_CSC = (T*)realloc(vals_CSC, sizeof(T)*new_nnzs_);
+        rows_CSC = (word_id_t*)realloc(rows_CSC, sizeof(word_id_t)*new_nnzs_);
+        assert(offset_CSC != NULL);
+
+        // flash shrink
+        flash::flash_truncate(vals_CSC_fptr, new_nnzs_ * sizeof(T));
+        flash::flash_truncate(rows_CSC_fptr, new_nnzs_ * sizeof(word_id_t));
     }
     
 
@@ -1389,13 +1401,11 @@ SparseMatrix<T>::SparseMatrix(
         offset_t this_pos = 0;
         doc_id_t nz_docs = 0;
 
-        doc_id_t doc_block_size = (1 << 13);
-        doc_id_t num_doc_blocks = divide_round_up(num_docs(), doc_block_size);
-
+        doc_id_t num_doc_blocks = divide_round_up(num_docs(), (doc_id_t)DOC_BLOCK_SIZE);
         // Do not parallelize this loop.
         for (doc_id_t block = 0; block < num_doc_blocks; ++block)
-            threshold_and_copy_doc_block(block * doc_block_size,
-                std::min((block + 1) * doc_block_size, num_docs()),
+            threshold_and_copy_doc_block(block * DOC_BLOCK_SIZE,
+                std::min((block + 1) * DOC_BLOCK_SIZE, num_docs()),
                 this_pos, nz_docs, NULL, from, zetas, nnzs, original_cols);
 
         _num_docs = nz_docs;
@@ -1408,7 +1418,6 @@ SparseMatrix<T>::SparseMatrix(
             std::cout << " ************ WARNING: last offset != allocation ************* \n"
                 << " ************ Resetting nnzs ********************************* \n\n";
             assert(get_nnzs() >= offsets_CSC[nz_docs]);
-
         }
         _nnzs = offsets_CSC[nz_docs];
         // write to disk
@@ -1597,38 +1606,12 @@ SparseMatrix<T>::SparseMatrix(
             select_docs[doc] = (doc_weights[doc] >= pivot);
         }
 
-
-        doc_id_t doc_block_size = (1 << 13);
-        doc_id_t num_doc_blocks = divide_round_up(num_docs(), doc_block_size);
-
+        doc_id_t num_doc_blocks = divide_round_up(num_docs(), (doc_id_t)DOC_BLOCK_SIZE);
         // Do not parallelize this loop.
         for (doc_id_t block = 0; block < num_doc_blocks; ++block)
-            threshold_and_copy_doc_block(block * doc_block_size,
-                std::min((block + 1) * doc_block_size, num_docs()),
+            threshold_and_copy_doc_block(block * DOC_BLOCK_SIZE,
+                std::min((block + 1) * DOC_BLOCK_SIZE, num_docs()),
                 this_pos, nz_docs, select_docs, from, zetas, nnzs, original_cols);
-
-        /*for (doc_id_t doc = 0; doc < num_docs(); ++doc) {
-            if (select_doc[doc]) {
-                for (offset_t pos = from.offsets_CSC[doc]; pos < from.offsets_CSC[doc + 1]; ++pos) {
-                    fromT val;
-                    if (std::is_same<fromT, FPTYPE>::value)
-                        val = std::round(from.normalized_vals_CSC[pos]);
-                    else if (std::is_same<fromT, count_t>::value)
-                        val = from.normalized_vals_CSC[pos];
-                    else assert(false);
-                    if (val >= zetas[from.rows_CSC[pos]]) {
-                        vals_CSC[this_pos] = (FPTYPE)std::sqrt(zetas[from.rows_CSC[pos]]);
-                        rows_CSC[this_pos] = from.rows_CSC[pos];
-                        ++this_pos;
-                    }
-                }
-            }
-            if (this_pos > offsets_CSC[nz_docs]) {
-                offsets_CSC[nz_docs + 1] = this_pos;
-                nz_docs++;
-                original_cols.push_back(doc);
-            }
-        }*/
 
         _num_docs = nz_docs;
         assert(original_cols.size() == nz_docs);
@@ -1641,6 +1624,7 @@ SparseMatrix<T>::SparseMatrix(
         flash::write_sync(this->offsets_CSC_fptr, this->offsets_CSC, this->num_docs() + 1);
 
         // TODO: RESIZE vals to something smaller.
+        shrink(offsets_CSC[nz_docs]);
 
         delete[] select_docs;
         delete[] doc_weights;
@@ -2317,7 +2301,7 @@ SparseMatrix<T>::SparseMatrix(
             projected_dist = new FPTYPE[(size_t)(doc_end - doc_begin) * (size_t)num_centers];
             dist_alloc = true;
         }
-        FPTYPE* projected_center_l2sq = new FPTYPE[num_centers];
+        FPTYPE *projected_center_l2sq = new FPTYPE[num_centers];
         for (auto c = 0; c < num_centers; ++c)
             projected_center_l2sq[c] = FPdot(dim,
                 projected_centers + (size_t)c * (size_t)dim, 1,
@@ -2388,9 +2372,11 @@ SparseMatrix<T>::SparseMatrix(
         while (centers.size() < k) {
             std::cout << "centers.size():  " << centers.size() 
                 << "   new_centers_added: " << new_centers_added << std::endl;
-            update_min_distsq_to_projected_centers(
-                U_cols, new_centers_added, centers_coords + (size_t)(centers.size() - new_centers_added) * (size_t)U_cols,
-                0, num_docs(), projected_docs_l2sq, min_dist, NULL);
+            pfor(int64_t block = 0; block < divide_round_up(num_docs(), (doc_id_t)DOC_BLOCK_SIZE); ++block)
+                update_min_distsq_to_projected_centers(U_cols, new_centers_added,
+                    centers_coords + (size_t)(centers.size() - new_centers_added) * (size_t)U_cols,
+                    block*DOC_BLOCK_SIZE, std::min(((doc_id_t)block + 1)*(doc_id_t)DOC_BLOCK_SIZE, num_docs()),
+                    projected_docs_l2sq, min_dist, NULL);
             dist_cumul[0] = 0;
             for (doc_id_t doc = 0; doc < num_docs(); ++doc)
                 dist_cumul[doc + 1] = dist_cumul[doc] + min_dist[doc];
@@ -2456,7 +2442,6 @@ SparseMatrix<T>::SparseMatrix(
         for (doc_id_t d = 0; d < num_centers; ++d)
             UT_times_docs(best_seed[d], best_seed[d] + 1,
                 best_centers_coords + (size_t)d * (size_t)num_centers);
-            //copy_col_to(best_centers_coords + (size_t)d * (size_t)num_centers, best_seed[d]);
         delete[] kmeans_seeds;
         
         return min_total_dist_to_centers;

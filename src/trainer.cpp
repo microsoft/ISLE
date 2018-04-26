@@ -319,8 +319,6 @@ namespace ISLE
             offset_t *offsets_CSC = new offset_t[num_docs + 1];
             offsets_CSC_stream.read((char*)offsets_CSC, offsets_CSC_len);
             offsets_CSC_stream.close();
-            
-            // FPscal(offsets_CSC[num_docs], avg_doc_sz, normalized_vals_CSC, 1);
 
             //
             // Load CSR files

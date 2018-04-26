@@ -93,6 +93,9 @@ namespace ISLE
         void allocate(const offset_t nnzs_);
         void allocate_flash(const offset_t nnzs_);
 
+        void shrink(const offset_t new_nnzs_);
+
+
         inline T elem(
             const word_id_t& word,
             const doc_id_t& doc) const
