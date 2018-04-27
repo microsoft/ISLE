@@ -57,7 +57,7 @@ namespace ISLE
         flag_print_top_two_topics(flag_print_top_two_topics_),
         is_training_complete(false)
     {
-        flash::flash_setup("/tmp/");
+        flash::flash_setup("/raid/tmp/");
 
         //
         // Check size alignments

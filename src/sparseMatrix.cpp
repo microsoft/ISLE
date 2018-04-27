@@ -3,6 +3,7 @@
 #include "sparseMatrix.h"
 #include "restarted_block_ks.h"
 #include "flash_prod_op.h"
+#include "kmeans.h"
 
 #include "blas-on-flash/include/utils.h"
 #include "blas-on-flash/include/lib_funcs.h"
@@ -118,7 +119,7 @@ SparseMatrix<T>::SparseMatrix(
         assert(_nnzs >= new_nnzs_);
         vals_CSC = (T*)realloc(vals_CSC, sizeof(T)*new_nnzs_);
         rows_CSC = (word_id_t*)realloc(rows_CSC, sizeof(word_id_t)*new_nnzs_);
-        assert(offset_CSC != NULL);
+        assert(offsets_CSC != NULL);
 
         // flash shrink
         flash::flash_truncate(vals_CSC_fptr, new_nnzs_ * sizeof(T));
@@ -731,7 +732,7 @@ SparseMatrix<T>::SparseMatrix(
 
 
         // Can we use a sparse matrix here?
-        size_t doc_block_size = 1 << 19;
+        size_t doc_block_size = DOC_BLOCK_SIZE;
         size_t doc_blocks = ((size_t)num_docs()) / doc_block_size;
         if (doc_blocks * doc_block_size != (size_t)num_docs()) doc_blocks++;
 
@@ -1953,42 +1954,49 @@ SparseMatrix<T>::SparseMatrix(
         assert(doc_begin < doc_end);
         assert(doc_end <= num_docs());
 
-        // create shifted copy of offsets array
-        MKL_INT * shifted_offsets_CSC = new MKL_INT[doc_end - doc_begin + 1];
-        for (doc_id_t d = doc_begin; d <= doc_end; ++d) {
-            shifted_offsets_CSC[d - doc_begin] = offsets_CSC[d] - offsets_CSC[doc_begin];
-        }
-
-        uint64_t doc_blk_size = doc_end - doc_begin;
-
-        uint64_t nnzs = shifted_offsets_CSC[doc_blk_size];
-        word_id_t *shifted_rows_CSC = new word_id_t[nnzs];
-        FPTYPE *shifted_vals_CSC = new FPTYPE[nnzs];
-
-        flash_ptr<word_id_t> shifted_rows_CSC_fptr = this->rows_CSC_fptr + offsets_CSC[doc_begin];
-        flash_ptr<FPTYPE> shifted_vals_CSC_fptr = this->vals_CSC_fptr + offsets_CSC[doc_begin];
-        flash::read_sync(shifted_rows_CSC, shifted_rows_CSC_fptr, nnzs);
-        flash::read_sync(shifted_vals_CSC, shifted_vals_CSC_fptr, nnzs);
-
-        const char transa = 'N';
-        const MKL_INT m = doc_blk_size;
-        const MKL_INT n = cols;
-        const MKL_INT k = vocab_size();
-        const char matdescra[6] = { 'G',0,0,'C',0,0 };
-        FPTYPE alpha = 1.0; FPTYPE beta = 0.0;
-
         assert(sizeof(MKL_INT) == sizeof(offset_t));
         assert(sizeof(word_id_t) == sizeof(MKL_INT));
         assert(sizeof(offset_t) == sizeof(MKL_INT));
 
-        FPcsrmm(&transa, &m, &n, &k, &alpha, matdescra,
-            shifted_vals_CSC, (const MKL_INT*)shifted_rows_CSC,
-            (const MKL_INT*)shifted_offsets_CSC, (const MKL_INT*)(shifted_offsets_CSC + 1),
-            in, &n, &beta, out, &n);
+        offset_t* offsets_CSC = this->offsets_CSC + doc_begin;
+        flash_ptr<word_id_t> shifted_rows_CSC_fptr = this->rows_CSC_fptr + this->offsets_CSC[doc_begin];
+        flash_ptr<FPTYPE> shifted_vals_CSC_fptr = this->vals_CSC_fptr + this->offsets_CSC[doc_begin];
+        const doc_id_t doc_blk_size = doc_end - doc_begin;
+        const word_id_t vocab_sz = vocab_size();
+        Kmeans::multiply_with(offsets_CSC, shifted_rows_CSC_fptr, shifted_vals_CSC_fptr, doc_blk_size,
+                              vocab_sz, in, out, cols);
+        // // create shifted copy of offsets array
+        // MKL_INT * shifted_offsets_CSC = new MKL_INT[doc_end - doc_begin + 1];
+        // for (doc_id_t d = doc_begin; d <= doc_end; ++d) {
+        //     shifted_offsets_CSC[d - doc_begin] = offsets_CSC[d] - offsets_CSC[doc_begin];
+        // }
 
-        delete[] shifted_offsets_CSC;
-        delete[] shifted_rows_CSC;
-        delete[] shifted_vals_CSC;
+        // uint64_t doc_blk_size = doc_end - doc_begin;
+
+        // uint64_t nnzs = shifted_offsets_CSC[doc_blk_size];
+        // word_id_t *shifted_rows_CSC = new word_id_t[nnzs];
+        // FPTYPE *shifted_vals_CSC = new FPTYPE[nnzs];
+
+        // flash_ptr<word_id_t> shifted_rows_CSC_fptr = this->rows_CSC_fptr + offsets_CSC[doc_begin];
+        // flash_ptr<FPTYPE> shifted_vals_CSC_fptr = this->vals_CSC_fptr + offsets_CSC[doc_begin];
+        // flash::read_sync(shifted_rows_CSC, shifted_rows_CSC_fptr, nnzs);
+        // flash::read_sync(shifted_vals_CSC, shifted_vals_CSC_fptr, nnzs);
+
+        // const char transa = 'N';
+        // const MKL_INT m = doc_blk_size;
+        // const MKL_INT n = cols;
+        // const MKL_INT k = vocab_size();
+        // const char matdescra[6] = { 'G',0,0,'C',0,0 };
+        // FPTYPE alpha = 1.0; FPTYPE beta = 0.0;
+
+        // FPcsrmm(&transa, &m, &n, &k, &alpha, matdescra,
+        //     shifted_vals_CSC, (const MKL_INT*)shifted_rows_CSC,
+        //     (const MKL_INT*)shifted_offsets_CSC, (const MKL_INT*)(shifted_offsets_CSC + 1),
+        //     in, &n, &beta, out, &n);
+
+        // delete[] shifted_offsets_CSC;
+        // delete[] shifted_rows_CSC;
+        // delete[] shifted_vals_CSC;
     }
 
     template<class FPTYPE>
@@ -2016,46 +2024,56 @@ SparseMatrix<T>::SparseMatrix(
         //assert(num_centers == U_cols);
         assert(sizeof(MKL_INT) == sizeof(offset_t));
         //assert(num_docs() >= num_centers);
+        offset_t *offsets_CSC = this->offsets_CSC + doc_begin;
+        flash_ptr<word_id_t> shifted_rows_CSC_fptr = this->rows_CSC_fptr + this->offsets_CSC[doc_begin];
+        flash_ptr<FPTYPE> shifted_vals_CSC_fptr = this->vals_CSC_fptr + this->offsets_CSC[doc_begin];
+        const doc_id_t doc_blk_size = doc_end - doc_begin;
+        const word_id_t vocab_sz = vocab_size();
+        Kmeans::distsq_projected_docs_to_projected_centers(projected_centers_tr, projected_centers_l2sq,
+                                                           offsets_CSC, shifted_rows_CSC_fptr,
+                                                           shifted_vals_CSC_fptr, doc_blk_size,
+                                                           projected_docs_l2sq, projected_dist_matrix,
+                                                           dim, num_centers, U_rowmajor, U_rows, U_cols);
 
-        FPTYPE *ones_vec = new FPTYPE[std::max(doc_end - doc_begin, num_centers)];
-        std::fill_n(ones_vec, std::max(doc_end - doc_begin, num_centers), (FPTYPE)1.0);
+        // FPTYPE *ones_vec = new FPTYPE[std::max(doc_end - doc_begin, num_centers)];
+        // std::fill_n(ones_vec, std::max(doc_end - doc_begin, num_centers), (FPTYPE)1.0);
 
-        const char transa = 'N';
-        const MKL_INT m = (doc_end - doc_begin);
-        const MKL_INT n = num_centers;
-        const MKL_INT k = U_cols;
-        const char matdescra[6] = {'G',0,0,'C',0,0};
+        // const char transa = 'N';
+        // const MKL_INT m = (doc_end - doc_begin);
+        // const MKL_INT n = num_centers;
+        // const MKL_INT k = U_cols;
+        // const char matdescra[6] = {'G',0,0,'C',0,0};
 
-        FPTYPE *UUTrC = new FPTYPE[U_rows * num_centers];
-        FPgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-            U_rows, num_centers, U_cols, (FPTYPE)-2.0,
-            U_rowmajor, U_cols, projected_centers_tr, num_centers,
-            (FPTYPE)0.0, UUTrC, num_centers);
-        multiply_with(doc_begin, doc_end, UUTrC,
-            projected_dist_matrix, num_centers);
-        delete[] UUTrC;
+        // FPTYPE *UUTrC = new FPTYPE[U_rows * num_centers];
+        // FPgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+        //     U_rows, num_centers, U_cols, (FPTYPE)-2.0,
+        //     U_rowmajor, U_cols, projected_centers_tr, num_centers,
+        //     (FPTYPE)0.0, UUTrC, num_centers);
+        // multiply_with(doc_begin, doc_end, UUTrC,
+        //     projected_dist_matrix, num_centers);
+        // delete[] UUTrC;
 
-        /*FPTYPE *projected_docs = new FPTYPE[U_cols * (doc_end - doc_begin) * sizeof(FPTYPE)];
-        // projected_docs : (doc_end-doc_begin) x num_topics (U_cols) [row-major]
-        UT_times_docs(doc_begin, doc_end, projected_docs);   
-        // data_block^T, U (data block is in col_major, 
-        FPgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
-            m, n, k, (FPTYPE)-2.0,
-            projected_docs, k, projected_centers_tr, n,
-            (FPTYPE)0.0, projected_dist_matrix, n);
-        delete[] projected_docs;*/
+        // /*FPTYPE *projected_docs = new FPTYPE[U_cols * (doc_end - doc_begin) * sizeof(FPTYPE)];
+        // // projected_docs : (doc_end-doc_begin) x num_topics (U_cols) [row-major]
+        // UT_times_docs(doc_begin, doc_end, projected_docs);   
+        // // data_block^T, U (data block is in col_major, 
+        // FPgemm(CblasRowMajor, CblasNoTrans, CblasNoTrans,
+        //     m, n, k, (FPTYPE)-2.0,
+        //     projected_docs, k, projected_centers_tr, n,
+        //     (FPTYPE)0.0, projected_dist_matrix, n);
+        // delete[] projected_docs;*/
 
-        FPgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
-            m, n, 1, (FPTYPE)1.0,
-            ones_vec, m, projected_centers_l2sq, n,
-            (FPTYPE)1.0, projected_dist_matrix, n);
+        // FPgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
+        //     m, n, 1, (FPTYPE)1.0,
+        //     ones_vec, m, projected_centers_l2sq, n,
+        //     (FPTYPE)1.0, projected_dist_matrix, n);
 
-        FPgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
-            m, n, 1, (FPTYPE)1.0,
-            projected_docs_l2sq, m, ones_vec, n,
-            (FPTYPE)1.0, projected_dist_matrix, n);
+        // FPgemm(CblasRowMajor, CblasTrans, CblasNoTrans,
+        //     m, n, 1, (FPTYPE)1.0,
+        //     projected_docs_l2sq, m, ones_vec, n,
+        //     (FPTYPE)1.0, projected_dist_matrix, n);
 
-        delete[] ones_vec;
+        // delete[] ones_vec;
     }
 
     template<class FPTYPE>
@@ -2071,13 +2089,24 @@ SparseMatrix<T>::SparseMatrix(
     {
         assert(doc_begin < doc_end);
         assert(doc_end <= num_docs());
-        distsq_projected_docs_to_projected_centers(vocab_size(),
-            num_centers, projected_centers_tr, projected_centers_l2sq,
-            doc_begin, doc_end, projected_docs_l2sq, projected_dist_matrix);
 
-        pfor_static_131072(int64_t d = 0; d < doc_end - doc_begin; ++d)
-            center_index[d] = (doc_id_t)FPimin(num_centers,
-                projected_dist_matrix + (size_t)d * (size_t)num_centers, 1);
+        offset_t *offsets_CSC = this->offsets_CSC + doc_begin;
+        flash_ptr<word_id_t> shifted_rows_CSC_fptr = this->rows_CSC_fptr + this->offsets_CSC[doc_begin];
+        flash_ptr<FPTYPE> shifted_vals_CSC_fptr = this->vals_CSC_fptr + this->offsets_CSC[doc_begin];
+        const doc_id_t doc_blk_size = doc_end - doc_begin;
+        const word_id_t vocab_sz = vocab_size();
+        Kmeans::projected_closest_centers(projected_centers_tr, projected_centers_l2sq,
+                                          offsets_CSC, shifted_rows_CSC_fptr, shifted_vals_CSC_fptr,
+                                          doc_blk_size, num_centers, vocab_sz, U_rowmajor, 
+                                          U_rows, U_cols, projected_docs_l2sq, center_index,
+                                          projected_dist_matrix);
+        // distsq_projected_docs_to_projected_centers(vocab_size(),
+        //     num_centers, projected_centers_tr, projected_centers_l2sq,
+        //     doc_begin, doc_end, projected_docs_l2sq, projected_dist_matrix);
+
+        // pfor_static_131072(int64_t d = 0; d < doc_end - doc_begin; ++d)
+        //     center_index[d] = (doc_id_t)FPimin(num_centers,
+        //         projected_dist_matrix + (size_t)d * (size_t)num_centers, 1);
     }
 
     template<class FPTYPE>
@@ -2323,14 +2352,14 @@ SparseMatrix<T>::SparseMatrix(
             if (num_centers == 1) {
                 // Round about for small negative distances
                 size_t pos = (size_t)d - (size_t)doc_begin;
-                projected_dist[pos] = projected_dist[pos] >(FPTYPE)0.0 ? projected_dist[pos] : (FPTYPE)0.0;
-                min_dist[d] = min_dist[d] > projected_dist[pos] ? projected_dist[pos] : min_dist[d];
+                projected_dist[pos] = std::max(projected_dist[pos], (FPTYPE)0.0);
+                min_dist[d] = std::min(min_dist[d], projected_dist[pos]);
             }
             else {
                 for (doc_id_t c = 0; c < num_centers; ++c) {
                     size_t pos = (size_t)c + (size_t)d * (size_t)num_centers - (size_t)doc_begin * (size_t)num_centers;
-                    projected_dist[pos] = projected_dist[pos] >(FPTYPE)0.0 ? projected_dist[pos] : (FPTYPE)0.0;
-                    min_dist[d] = projected_dist[pos] < min_dist[d] ? projected_dist[pos] : min_dist[d];
+                    projected_dist[pos] = std::max(projected_dist[pos], (FPTYPE)0.0);
+                    min_dist[d] = std::min(min_dist[d], projected_dist[pos]);
                 }
             }
         }
@@ -2364,6 +2393,7 @@ SparseMatrix<T>::SparseMatrix(
 
         const doc_id_t doc_block_size = DOC_BLOCK_SIZE;
         const doc_id_t num_doc_blocks = divide_round_up(num_docs(), doc_block_size);
+        GLOG_DEBUG("num_doc_blks=", num_doc_blocks);
 
         FPTYPE *dist_scratch_space = new FPTYPE[num_docs()];
         FPTYPE *ones_vec = new FPTYPE[num_docs()];
@@ -2372,11 +2402,11 @@ SparseMatrix<T>::SparseMatrix(
         while (centers.size() < k) {
             std::cout << "centers.size():  " << centers.size() 
                 << "   new_centers_added: " << new_centers_added << std::endl;
-            pfor(int64_t block = 0; block < divide_round_up(num_docs(), (doc_id_t)DOC_BLOCK_SIZE); ++block)
+            for(int64_t block = 0; block < divide_round_up(num_docs(), (doc_id_t)DOC_BLOCK_SIZE); ++block)
                 update_min_distsq_to_projected_centers(U_cols, new_centers_added,
                     centers_coords + (size_t)(centers.size() - new_centers_added) * (size_t)U_cols,
                     block*DOC_BLOCK_SIZE, std::min(((doc_id_t)block + 1)*(doc_id_t)DOC_BLOCK_SIZE, num_docs()),
-                    projected_docs_l2sq, min_dist, NULL);
+                    projected_docs_l2sq + block*DOC_BLOCK_SIZE, min_dist, NULL);
             dist_cumul[0] = 0;
             for (doc_id_t doc = 0; doc < num_docs(); ++doc)
                 dist_cumul[doc + 1] = dist_cumul[doc] + min_dist[doc];

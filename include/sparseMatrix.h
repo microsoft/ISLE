@@ -95,7 +95,6 @@ namespace ISLE
 
         void shrink(const offset_t new_nnzs_);
 
-
         inline T elem(
             const word_id_t& word,
             const doc_id_t& doc) const
