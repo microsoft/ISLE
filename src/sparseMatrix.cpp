@@ -2325,47 +2325,62 @@ SparseMatrix<T>::SparseMatrix(
         assert(doc_end <= num_docs());
         assert(min_dist != NULL);
 
-        bool dist_alloc = false;
-        if (projected_dist == NULL) {
-            projected_dist = new FPTYPE[(size_t)(doc_end - doc_begin) * (size_t)num_centers];
-            dist_alloc = true;
-        }
-        FPTYPE *projected_center_l2sq = new FPTYPE[num_centers];
-        for (auto c = 0; c < num_centers; ++c)
-            projected_center_l2sq[c] = FPdot(dim,
-                projected_centers + (size_t)c * (size_t)dim, 1,
-                projected_centers + (size_t)c * (size_t)dim, 1);
+        offset_t *offsets_CSC = this->offsets_CSC + doc_begin;
+        flash_ptr<word_id_t> shifted_rows_CSC_fptr = this->rows_CSC_fptr + this->offsets_CSC[doc_begin];
+        flash_ptr<FPTYPE> shifted_vals_CSC_fptr = this->vals_CSC_fptr + this->offsets_CSC[doc_begin];
+        const doc_id_t doc_blk_size = doc_end - doc_begin;
+        const word_id_t vocab_sz = vocab_size();
+        Kmeans::update_min_distsq_to_projected_centers(projected_centers, projected_docs_l2sq,
+                                                       offsets_CSC, shifted_rows_CSC_fptr, shifted_vals_CSC_fptr,
+                                                       U_rowmajor, U_rows, U_cols, min_dist + doc_begin, projected_dist,
+                                                       dim, doc_blk_size, num_centers);
 
-        FPTYPE *projected_centers_tr = new FPTYPE[(size_t)num_centers * (size_t)U_cols];
-        // Improve this
-        for (word_id_t r = 0; r < U_cols; ++r)
-            for (auto c = 0; c < num_centers; ++c)
-                projected_centers_tr[(size_t)c + (size_t)r * (size_t)num_centers]
-                = projected_centers[(size_t)r + (size_t)c * (size_t)U_cols];
+        // bool dist_alloc = false;
+        // if (projected_dist == NULL) {
+        //     projected_dist = new FPTYPE[(size_t)(doc_end - doc_begin) * (size_t)num_centers];
+        //     dist_alloc = true;
+        // }
+        // FPTYPE *projected_center_l2sq = new FPTYPE[num_centers];
+        // for (auto c = 0; c < num_centers; ++c)
+        //     projected_center_l2sq[c] = FPdot(dim,
+        //         projected_centers + (size_t)c * (size_t)dim, 1,
+        //         projected_centers + (size_t)c * (size_t)dim, 1);
 
-        distsq_projected_docs_to_projected_centers(dim,
-            num_centers, projected_centers_tr, projected_center_l2sq,
-            doc_begin, doc_end, projected_docs_l2sq,
-            projected_dist);
+        // FPTYPE *projected_centers_tr = new FPTYPE[(size_t)num_centers * (size_t)U_cols];
+        
+        // // // Improve this
+        // // for (word_id_t r = 0; r < U_cols; ++r)
+        // //     for (auto c = 0; c < num_centers; ++c)
+        // //         projected_centers_tr[(size_t)c + (size_t)r * (size_t)num_centers]
+        // //         = projected_centers[(size_t)r + (size_t)c * (size_t)U_cols];
+        
+        // // compute transpose of `projected_centers` and store in `projected_centers_tr`
+        // FPomatcopy('C', 'T', U_cols, num_centers, 1.0f, projected_centers,
+        //            U_cols, projected_centers_tr, num_centers);
 
-        pfor_static_131072(int d = doc_begin; d < doc_end; ++d) {
-            if (num_centers == 1) {
-                // Round about for small negative distances
-                size_t pos = (size_t)d - (size_t)doc_begin;
-                projected_dist[pos] = std::max(projected_dist[pos], (FPTYPE)0.0);
-                min_dist[d] = std::min(min_dist[d], projected_dist[pos]);
-            }
-            else {
-                for (doc_id_t c = 0; c < num_centers; ++c) {
-                    size_t pos = (size_t)c + (size_t)d * (size_t)num_centers - (size_t)doc_begin * (size_t)num_centers;
-                    projected_dist[pos] = std::max(projected_dist[pos], (FPTYPE)0.0);
-                    min_dist[d] = std::min(min_dist[d], projected_dist[pos]);
-                }
-            }
-        }
-        delete[] projected_center_l2sq;
-        delete[] projected_centers_tr;
-        if (dist_alloc) delete[] projected_dist;
+        // distsq_projected_docs_to_projected_centers(dim,
+        //     num_centers, projected_centers_tr, projected_center_l2sq,
+        //     doc_begin, doc_end, projected_docs_l2sq,
+        //     projected_dist);
+
+        // pfor_static_131072(int d = doc_begin; d < doc_end; ++d) {
+        //     if (num_centers == 1) {
+        //         // Round about for small negative distances
+        //         size_t pos = (size_t)d - (size_t)doc_begin;
+        //         projected_dist[pos] = std::max(projected_dist[pos], (FPTYPE)0.0);
+        //         min_dist[d] = std::min(min_dist[d], projected_dist[pos]);
+        //     }
+        //     else {
+        //         for (doc_id_t c = 0; c < num_centers; ++c) {
+        //             size_t pos = (size_t)c + (size_t)d * (size_t)num_centers - (size_t)doc_begin * (size_t)num_centers;
+        //             projected_dist[pos] = std::max(projected_dist[pos], (FPTYPE)0.0);
+        //             min_dist[d] = std::min(min_dist[d], projected_dist[pos]);
+        //         }
+        //     }
+        // }
+        // delete[] projected_center_l2sq;
+        // delete[] projected_centers_tr;
+        // if (dist_alloc) delete[] projected_dist;
     }
 
     template<class FPTYPE>
@@ -2396,12 +2411,12 @@ SparseMatrix<T>::SparseMatrix(
         GLOG_DEBUG("num_doc_blks=", num_doc_blocks);
 
         FPTYPE *dist_scratch_space = new FPTYPE[num_docs()];
-        FPTYPE *ones_vec = new FPTYPE[num_docs()];
-        std::fill_n(ones_vec, num_docs(), (FPTYPE)1.0);
         int new_centers_added = 1;
+
         while (centers.size() < k) {
             std::cout << "centers.size():  " << centers.size() 
                 << "   new_centers_added: " << new_centers_added << std::endl;
+
             for(int64_t block = 0; block < divide_round_up(num_docs(), (doc_id_t)DOC_BLOCK_SIZE); ++block)
                 update_min_distsq_to_projected_centers(U_cols, new_centers_added,
                     centers_coords + (size_t)(centers.size() - new_centers_added) * (size_t)U_cols,
@@ -2439,7 +2454,6 @@ SparseMatrix<T>::SparseMatrix(
             }
 
         }
-        delete[] ones_vec;
         delete[] dist_scratch_space;
         delete[] centers_l2sq;
         delete[] projected_docs_l2sq;

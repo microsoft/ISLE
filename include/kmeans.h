@@ -93,6 +93,60 @@ namespace Kmeans {
   }
 
   template <class FPTYPE>
+  void update_min_distsq_to_projected_centers(
+      const FPTYPE *const projected_centers,
+      const FPTYPE *const projected_docs_l2sq,
+      offset_t *offsets_CSC, flash::flash_ptr<word_id_t> shifted_rows_CSC_fptr,
+      flash::flash_ptr<FPTYPE> shifted_vals_CSC_fptr,
+      FPTYPE *U_rowmajor, uint64_t U_rows, uint64_t U_cols,
+      FPTYPE *min_dist, FPTYPE *projected_dist, // pre-allocated for `doc_blk_size` or NULL
+      const uint64_t dim, const uint64_t doc_blk_size, const uint64_t num_centers) {
+    bool dist_alloc = false;
+    if (projected_dist == NULL) {
+      projected_dist = new FPTYPE[doc_blk_size * num_centers];
+      dist_alloc = true;
+    }
+
+    FPTYPE *projected_center_l2sq = new FPTYPE[num_centers];
+    for (uint64_t c = 0; c < num_centers; ++c){
+      projected_center_l2sq[c] = FPdot(dim,
+                                       projected_centers + (c * dim), 1,
+                                       projected_centers + (c * dim), 1);
+    }
+
+    // compute transpose of `projected_centers`
+    FPTYPE *projected_centers_tr = new FPTYPE[num_centers * U_cols];
+    FPomatcopy('C', 'T', U_cols, num_centers, 1.0f, projected_centers,
+               U_cols, projected_centers_tr, num_centers);
+
+    Kmeans::distsq_projected_docs_to_projected_centers(projected_centers_tr, projected_center_l2sq,
+                                                       offsets_CSC, shifted_rows_CSC_fptr, shifted_vals_CSC_fptr,
+                                                       doc_blk_size, projected_docs_l2sq, projected_dist,
+                                                       dim, num_centers, U_rowmajor, U_rows, U_cols);
+
+    pfor_static_131072(uint64_t d = 0; d < doc_blk_size; ++d) {
+      if (num_centers == 1) {
+        // Round about for small negative distances
+        projected_dist[d] = std::max(projected_dist[d], (FPTYPE)0.0);
+        min_dist[d] = std::min(min_dist[d], projected_dist[d]);
+      } else {
+        for (uint64_t c = 0; c < num_centers; ++c) {
+          uint64_t pos = (uint64_t)c + (uint64_t)d * (uint64_t)num_centers;
+          projected_dist[pos] = std::max(projected_dist[pos], (FPTYPE)0.0);
+          min_dist[d] = std::min(min_dist[d], projected_dist[pos]);
+        }
+      }
+    }
+
+    delete[] projected_center_l2sq;
+    delete[] projected_centers_tr;
+
+    if (dist_alloc) {
+      delete[] projected_dist;
+    }
+  }
+
+  template <class FPTYPE>
   void projected_closest_centers(
       const FPTYPE *const projected_centers_tr, const FPTYPE *const projected_centers_l2sq,
       offset_t *offsets_CSC, flash::flash_ptr<word_id_t> shifted_rows_CSC_fptr,
@@ -120,8 +174,11 @@ namespace Kmeans {
     const doc_id_t doc_blk_size;
     const word_id_t vocab_size;
     doc_id_t num_centers;
+
     const FPTYPE *UUTrC = nullptr;
     uint64_t U_rows, U_cols;
+
+    FPTYPE* ones_vec = nullptr;
 
   public:
     ProjClosestCentersTask(const FPTYPE *const projected_docs_l2sq, doc_id_t *center_index,
@@ -146,6 +203,10 @@ namespace Kmeans {
       }
       uint64_t nnzs = shifted_offsets_CSC[doc_blk_size];
 
+      const uint64_t ones_vec_size = std::max(this->doc_blk_size, this->num_centers);
+      this->ones_vec = new FPTYPE[ones_vec_size];
+      std::fill_n(ones_vec, ones_vec_size, (FPTYPE)1.0);
+
       flash::StrideInfo sinfo = {1, 1, 1};
       sinfo.len_per_stride = nnzs * sizeof(word_id_t);
       this->add_read(this->shifted_rows_CSC_fptr, sinfo);
@@ -156,10 +217,18 @@ namespace Kmeans {
     ~ProjClosestCentersTask(){
       // release mem for local offsets copy
       delete[] this->shifted_offsets_CSC;
+      delete[] this->ones_vec;
     }
 
     void execute(){
       GLOG_ASSERT(this->UUTrC != nullptr, "UUTrC is nullptr");
+      GLOG_ASSERT(this->ones_vec != nullptr, "ones_vec is nullptr");
+      GLOG_ASSERT(this->projected_centers_tr != nullptr, "projected_centers_tr is nullptr");
+      GLOG_ASSERT(this->projected_centers_l2sq != nullptr, "projected_centers_l2sq is nullptr");
+      GLOG_ASSERT(this->shifted_offsets_CSC != nullptr, "shifted_offsets_CSC is nullptr");
+      GLOG_ASSERT(this->projected_docs_l2sq != nullptr, "projected_docs_l2sq is nullptr");
+      GLOG_ASSERT(this->center_index != nullptr, "center_index is nullptr");
+
       // Init
       word_id_t *shifted_rows_CSC = (word_id_t *) this->in_mem_ptrs[this->shifted_rows_CSC_fptr];
       FPTYPE *shifted_vals_CSC = (FPTYPE *) this->in_mem_ptrs[this->shifted_vals_CSC_fptr];
@@ -169,10 +238,6 @@ namespace Kmeans {
       {
         /* distsq_projected_docs_to_projected_centers -- BEGIN  */
         {
-          const uint64_t ones_vec_size = std::max(this->doc_blk_size, this->num_centers);
-          FPTYPE *ones_vec = new FPTYPE[ones_vec_size];
-          std::fill_n(ones_vec, ones_vec_size, (FPTYPE)1.0);
-
           const char transa = 'N';
           const MKL_INT m = doc_blk_size;
           const MKL_INT n = num_centers;
