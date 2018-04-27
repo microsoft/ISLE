@@ -50,7 +50,7 @@ namespace ISLE
         assert(_nnzs >= new_nnzs_);
         vals_CSC = (T*)realloc(vals_CSC, sizeof(T)*new_nnzs_);
         rows_CSC = (word_id_t*)realloc(rows_CSC, sizeof(word_id_t)*new_nnzs_);
-        assert(offset_CSC != NULL);
+        assert(offsets_CSC != NULL);
     }
 
     template<class T>
@@ -2087,14 +2087,14 @@ namespace ISLE
             if (num_centers == 1) {
                 // Round about for small negative distances
                 size_t pos = (size_t)d - (size_t)doc_begin;
-                projected_dist[pos] = projected_dist[pos] >(FPTYPE)0.0 ? projected_dist[pos] : (FPTYPE)0.0;
-                min_dist[d] = min_dist[d] > projected_dist[pos] ? projected_dist[pos] : min_dist[d];
+                projected_dist[pos] = std::max(projected_dist[pos], (FPTYPE)0.0);
+                min_dist[d] = std::min(min_dist[d], projected_dist[pos]);
             }
             else {
                 for (doc_id_t c = 0; c < num_centers; ++c) {
                     size_t pos = (size_t)c + (size_t)d * (size_t)num_centers - (size_t)doc_begin * (size_t)num_centers;
-                    projected_dist[pos] = projected_dist[pos] >(FPTYPE)0.0 ? projected_dist[pos] : (FPTYPE)0.0;
-                    min_dist[d] = projected_dist[pos] < min_dist[d] ? projected_dist[pos] : min_dist[d];
+                    projected_dist[pos] = std::max(projected_dist[pos], (FPTYPE)0.0);
+                    min_dist[d] = std::min(min_dist[d], projected_dist[pos]);
                 }
             }
         }
@@ -2140,7 +2140,7 @@ namespace ISLE
                 update_min_distsq_to_projected_centers(U_cols, new_centers_added,
                     centers_coords + (size_t)(centers.size() - new_centers_added) * (size_t)U_cols,
                     block*DOC_BLOCK_SIZE, std::min(((doc_id_t)block + 1)*(doc_id_t)DOC_BLOCK_SIZE, num_docs()),
-                    projected_docs_l2sq, min_dist, NULL);
+                    projected_docs_l2sq + block*DOC_BLOCK_SIZE, min_dist, NULL);
             dist_cumul[0] = 0;
             for (doc_id_t doc = 0; doc < num_docs(); ++doc)
                 dist_cumul[doc + 1] = dist_cumul[doc] + min_dist[doc];
