@@ -1407,7 +1407,7 @@ namespace ISLE
 
         assert(offsets_CSC[nz_docs] < get_nnzs() + extra);
         _nnzs = offsets_CSC[nz_docs];
-        shrink(offsets_CSC[nz_docs]);
+        this->shrink(offsets_CSC[nz_docs]);
 
         delete[] select_docs;
         delete[] doc_weights;
