@@ -598,23 +598,7 @@ namespace ISLE
         assert(Model.num_docs() == num_topics);
         assert(normalized_vals_CSC != NULL);
 
-        std::fill_n(Model.data(), (size_t)Model.vocab_size() * (size_t)Model.num_docs(), (FPTYPE)0.0);
-
-        pfor_dynamic_1(int topic = 0; topic < num_topics; ++topic) {
-            if (catchwords[topic].size() == 0) {
-                if (avg_null_topics) {
-                    for (auto d_iter = closest_docs[topic].begin();
-                        d_iter != closest_docs[topic].end(); ++d_iter)
-                        for (offset_t pos = offsets_CSC[*d_iter];
-                            pos < offsets_CSC[(*d_iter) + 1]; ++pos)
-                            Model.elem_ref(rows_CSC[pos], topic) += (FPTYPE)normalized_vals_CSC[pos];
-                    for (word_id_t word = 0; word < vocab_size(); ++word)
-                        Model.elem_ref(word, topic) /= closest_docs[topic].size();
-                }
-            }
-        }
-        timer.next_time_secs("c TM: catchless", 30);
-
+        memset(Model.data(), 0, sizeof(FPTYPE) * (size_t)Model.vocab_size() * (size_t)num_topics);
         
         bool free_catchword_topics = false;
         if (catchword_topics == NULL) {
@@ -670,7 +654,6 @@ namespace ISLE
                         ++c_pos;
                     if (c_pos == num_catchwords)
                         break;
-
                     if (all_catchwords[c_pos] == rows_CSC[pos])
                         DocTopicSumArray[catchword_topic[c_pos] + num_topics * (doc - block*doc_block_size)]
                         += normalized_vals_CSC[pos];
@@ -694,10 +677,8 @@ namespace ISLE
             if (top_topic_pairs != NULL) {
                 FPTYPE max = 0.0, max2 = 0.0; // second max 
                 int max_topic = -1, max2_topic = -1;
-
                 for (auto iter = doc_topic_sum->begin() + doc_start_index[doc];
                     iter < doc_topic_sum->begin() + doc_start_index[doc + 1]; ++iter) {
-
                     if (std::get<2>(*iter) > max) {
                         max2 = max; max2_topic = max_topic;
                         max = std::get<2>(*iter);
@@ -719,21 +700,8 @@ namespace ISLE
         timer.next_time_secs("c TM: top2 topics/doc", 30);
 
 
-
-        // This is expensive for large matrices, parallelize this
-        /*FPTYPE *sorted_doc_topic_sums = new FPTYPE[(size_t)num_topics * (size_t)num_docs()];
-        std::cout << "contruct topic model: sorted_doc_topic_sums alloc succeeded" << std::endl;
-        size_t doc_block_size = 64;
-        size_t num_doc_blocks = num_docs() % doc_block_size == 0
-            ? num_docs() / doc_block_size : num_docs() / doc_block_size + 1;
-        for (auto topic = 0; topic < num_topics; ++topic)
-            for (size_t block = 0; block < num_doc_blocks; ++block)
-                for (doc_id_t doc = block*doc_block_size;
-                    doc < num_docs() && doc < (block + 1)*doc_block_size; ++doc)
-                    sorted_doc_topic_sums[(size_t)doc + (size_t)topic * (size_t)num_docs()]
-                    = DocTopicSums.elem(topic, doc);*/
         std::cout << "Size of doc_topic_sum array: " << doc_topic_sum->size() << std::endl;
-        std::sort(doc_topic_sum->begin(), doc_topic_sum->end(),
+        parallel_sort(doc_topic_sum->begin(), doc_topic_sum->end(),
             [](const auto& l, const auto& r)
         { return std::get<1>(l) < std::get<1>(r)
             || (std::get<1>(l) == std::get<1>(r) && std::get<2>(l) > std::get<2>(r)); });
@@ -742,17 +710,15 @@ namespace ISLE
 
         const size_t rank_threshold = (doc_id_t)(eps3_c*w0_c*(FPTYPE)num_docs() / ((FPTYPE)num_topics * 2.0));
         assert(rank_threshold > 0);
-        //std::vector<T> model_thresholds(num_topics);
-
+        std::vector<FPTYPE> model_threshold(num_topics, 0.0);
         doc_id_t topic_block_size = 10;
         doc_id_t num_topic_blocks = num_topics / topic_block_size;
         if (num_topic_blocks * topic_block_size < num_topics)
             ++num_topic_blocks;
 
-        pfor_dynamic_1(long long topic_block = 0; topic_block < num_topic_blocks; ++topic_block) {
+        pfor_dynamic_1(int64_t topic_block = 0; topic_block < num_topic_blocks; ++topic_block) {
             auto topic_begin = topic_block * topic_block_size;
-            auto topic_end = (topic_block + 1) * topic_block_size;
-            if (topic_end > num_topics) topic_end = num_topics;
+            auto topic_end = std::min((topic_block + 1) * topic_block_size, num_topics);
 
             auto iter = std::lower_bound(doc_topic_sum->begin(), doc_topic_sum->end(), topic_begin,
                 [](const auto& l, const auto& r) {return std::get<1>(l) < r; });
@@ -760,56 +726,93 @@ namespace ISLE
 
             for (auto topic = topic_begin; topic < topic_end; ++topic) {
                 if (catchwords[topic].size() > 0) {
-                    
                     auto end = std::upper_bound(iter, doc_topic_sum->end(), topic,
-                        [](const auto& l, const auto& r)  {return l < std::get<1>(r); });
-
-                    FPTYPE model_threshold = 0.0;
+                        [](const auto& l, const auto& r) {return l < std::get<1>(r); });
                     if (end - iter < rank_threshold) {
                         std::cout << "\n==== Warning: Topic " << topic << " threshold is 0.\n";
-                        model_threshold = 0.0;
+                        assert(model_threshold[topic] == 0.0);
                     }
                     else {
-                        model_threshold = std::get<2>(*(iter + (size_t)rank_threshold - 1));
+                        model_threshold[topic] = std::get<2>(*(iter + (size_t)rank_threshold - 1));
                         assert(std::get<1>(*(iter + (size_t)rank_threshold - 1)) == topic);
                     }
-
-                    int num_cols_used = 0;
-                    while (iter < end && std::get<2>(*iter) > model_threshold) {
-                        ++num_cols_used;
-                        doc_id_t doc = std::get<0>(*iter);
-                        for (offset_t pos = offsets_CSC[doc]; pos < offsets_CSC[doc + 1]; ++pos)
-                            Model.elem_ref(rows_CSC[pos], topic) += (FPTYPE)normalized_vals_CSC[pos];
-                        ++iter;
-                    }
-
-                    for (word_id_t word = 0; word < vocab_size(); ++word)
-                        Model.elem_ref(word, topic) /= num_cols_used;
-
                     iter = end;
-                }
-                else {
-                    //assert(std::get<1>(*iter) > topic);
                 }
             }
         }
-        timer.next_time_secs("c TM: threshold and add", 30);
+        timer.next_time_secs("c TM: threshold", 30);
+
+        /*auto begin = doc_topic_sum->begin();
+        for (int64_t topic = 0; topic < num_topics; ++topic) {
+            assert(begin == std::lower_bound(doc_topic_sum->begin(), doc_topic_sum->end(), topic,
+                [](const auto& l, const auto& r) {return std::get<1>(l) < r; }));
+            auto end = std::upper_bound(begin, doc_topic_sum->end(), topic,
+                [](const auto& l, const auto& r) {return l < std::get<1>(r); });
+
+            int num_cols_used = 0;
+            for (auto iter = begin; iter < end && std::get<2>(*iter) > model_threshold[topic]; ++iter) {
+                ++num_cols_used;
+                doc_id_t doc = std::get<0>(*iter);
+                for (offset_t pos = offsets_CSC[doc]; pos < offsets_CSC[doc + 1]; ++pos)
+                    Model.elem_ref(rows_CSC[pos], topic) += (FPTYPE)normalized_vals_CSC[pos];
+            }
+            for (word_id_t word = 0; word < vocab_size(); ++word)
+                Model.elem_ref(word, topic) /= num_cols_used;
+            begin = end;
+        }
+        timer.next_time_secs("c TM: add", 30);*/
 
         /*pfor_dynamic_1(int topic = 0; topic < num_topics; ++topic) {
-            if (catchwords[topic].size() > 0) {
-                int num_cols_used = 0;
-                for (doc_id_t doc = 0; doc < num_docs(); ++doc) {
-                    if (DocTopicSums.elem(topic, doc) >= model_thresholds[topic]) {
-                        num_cols_used++;
-                        for (offset_t pos = offsets_CSC[doc]; pos < offsets_CSC[doc + 1]; ++pos)
+            if (catchwords[topic].size() == 0) {
+                if (avg_null_topics) {
+                    for (auto d_iter = closest_docs[topic].begin();
+                        d_iter != closest_docs[topic].end(); ++d_iter)
+                        for (offset_t pos = offsets_CSC[*d_iter];
+                            pos < offsets_CSC[(*d_iter) + 1]; ++pos)
                             Model.elem_ref(rows_CSC[pos], topic) += (FPTYPE)normalized_vals_CSC[pos];
-                    }
+                    for (word_id_t word = 0; word < vocab_size(); ++word)
+                        Model.elem_ref(word, topic) /= closest_docs[topic].size();
                 }
-
-                for (word_id_t word = 0; word < vocab_size(); ++word)
-                    Model.elem_ref(word, topic) /= num_cols_used;
             }
-        }*/
+        }
+        timer.next_time_secs("c TM: catchless", 30);*/
+
+
+        std::vector<int> doc_in_catchless_topic(num_docs(), -1);
+        for (int topic = 0; topic < num_topics; ++topic)
+            for (auto d_iter = closest_docs[topic].begin(); d_iter != closest_docs[topic].end(); ++d_iter) {
+                assert(doc_in_catchless_topic[*d_iter] == -1);
+                doc_in_catchless_topic[*d_iter] = topic;
+            }
+
+        parallel_sort(doc_topic_sum->begin(), doc_topic_sum->end(),
+            [](const auto &l, const auto& r)
+        {return std::get<0>(l) < std::get<0>(r)
+            || (std::get<0>(l) == std::get<0>(r) && std::get<1>(l) < std::get<1>(r))
+            || (std::get<0>(l) == std::get<0>(r) && std::get<1>(l) == std::get<1>(r) && std::get<2>(l) > std::get<2>(r)); });
+
+        std::vector<doc_id_t> num_cols_per_topic(num_topics, 0);
+        auto begin = doc_topic_sum->begin();
+        for (doc_id_t doc = 0; doc < num_docs(); ++doc) {
+            auto end = std::upper_bound(begin, doc_topic_sum->end(), doc,
+                [](const auto& l, const auto& r) {return l < std::get<0>(r); });
+            for (auto iter = begin; iter < end; ++iter) {
+                assert(doc == std::get<0>(*iter));
+                auto topic = std::get<1>(*iter);
+                if (std::get<2>(*iter) > model_threshold[topic]) {
+                    for (offset_t pos = offsets_CSC[doc]; pos < offsets_CSC[doc + 1]; ++pos)
+                        Model.elem_ref(rows_CSC[pos], topic) += (FPTYPE)normalized_vals_CSC[pos];
+                }
+            }
+            if (doc_in_catchless_topic[doc] != -1) 
+                for (offset_t pos = offsets_CSC[doc]; pos < offsets_CSC[doc + 1]; ++pos)
+                    Model.elem_ref(rows_CSC[pos], doc_in_catchless_topic[doc]) += (FPTYPE)normalized_vals_CSC[pos];
+            begin = end;
+        }
+        timer.next_time_secs("c TM: add", 30);
+
+      
+
 
         pfor_dynamic_1(int t = 0; t < num_topics; ++t) {
             auto topic_vector_sum = FPasum(Model.vocab_size(), Model.data() + (size_t)Model.vocab_size() * (size_t)t, 1);
