@@ -46,7 +46,7 @@ add_executable(ISLETrain drivers/ISLETrain.cpp)
 add_executable(ISLEInfer drivers/ISLEInfer.cpp)
 
 # Generate library
-add_library(ISLE STATIC src/trainer.cpp src/utils.cpp src/denseMatrix.cpp src/sparseMatrix.cpp src/logger.cpp src/infer.cpp block-ks/flash_prod_op.cpp)
+add_library(ISLE STATIC src/trainer.cpp src/utils.cpp src/denseMatrix.cpp src/sparseMatrix.cpp src/logger.cpp src/infer.cpp block-ks/flash_prod_op.cpp src/tasks.cpp)
 target_include_directories(ISLE BEFORE PUBLIC ${CMAKE_SOURCE_DIR} armadillo-8.400.0/include spectra-master block-ks)
 
 target_link_libraries(ISLETrain ISLE)

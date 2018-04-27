@@ -2171,57 +2171,69 @@ SparseMatrix<T>::SparseMatrix(
         doc_id_t num_doc_blocks = divide_round_up(num_docs(), doc_block_size);
 
         FPTYPE *const projected_centers_l2sq = new FPTYPE[num_centers];
-        FPTYPE *projected_dist_matrix = new FPTYPE[(size_t)num_centers * (size_t)doc_block_size];
+        // FPTYPE *projected_dist_matrix = new FPTYPE[(size_t)num_centers * (size_t)doc_block_size];
         doc_id_t *const closest_center = new doc_id_t[num_docs()];
 
         compute_projected_centers_l2sq(projected_centers, projected_centers_l2sq, num_centers);
         
         // projected_centers_tr = num_centers x num_topics [row-major, each column a center]
         FPTYPE *projected_centers_tr = new FPTYPE[(size_t)num_centers * (size_t)U_cols];
-        for (word_id_t r = 0; r < U_cols; ++r)
-            for (auto c = 0; c < num_centers; ++c)
-                projected_centers_tr[(size_t)c + (size_t)r * (size_t)num_centers]
-                = projected_centers[(size_t)r + (size_t)c * (size_t)U_cols];
+        FPomatcopy('C', 'T', U_cols, num_centers, 1.0f, projected_centers,
+                   U_cols, projected_centers_tr, num_centers);
+        // for (word_id_t r = 0; r < U_cols; ++r)
+        //     for (auto c = 0; c < num_centers; ++c)
+        //         projected_centers_tr[(size_t)c + (size_t)r * (size_t)num_centers]
+        //         = projected_centers[(size_t)r + (size_t)c * (size_t)U_cols];
 
-        for (doc_id_t block = 0; block < num_doc_blocks; ++block) {
-            projected_closest_centers(num_centers, projected_centers_tr, projected_centers_l2sq,
-                block * doc_block_size, std::min((block + 1) * doc_block_size, num_docs()),
-                projected_docs_l2sq + block * doc_block_size,
-                closest_center + block * doc_block_size, projected_dist_matrix);
-        }
+        // for (doc_id_t block = 0; block < num_doc_blocks; ++block) {
+        //     projected_closest_centers(num_centers, projected_centers_tr, projected_centers_l2sq,
+        //         block * doc_block_size, std::min((block + 1) * doc_block_size, num_docs()),
+        //         projected_docs_l2sq + block * doc_block_size,
+        //         closest_center + block * doc_block_size, projected_dist_matrix);
+        // }
+        Kmeans::projected_closest_centers_full(projected_centers_tr, projected_centers_l2sq, this->offsets_CSC,
+                                       this->rows_CSC_fptr, this->vals_CSC_fptr, num_docs(), doc_block_size,
+                                       num_centers, vocab_size(), U_rowmajor, U_rows, U_cols,
+                                       projected_docs_l2sq, closest_center);
         timer.next_time_secs("lloyd: closest center", 30);
 
         memset(projected_centers, 0, sizeof(FPTYPE) * (size_t)num_centers * (size_t)num_centers);
         std::vector<size_t> cluster_sizes(num_centers, 0);
+        
+        Kmeans::projected_compute_new_centers_full(this->offsets_CSC, this->rows_CSC_fptr,
+                                                   this->vals_CSC_fptr, num_docs(),doc_block_size,
+                                                   num_centers, vocab_size(), U_rowmajor, 
+                                                   U_rows, U_cols, closest_center,
+                                                   closest_docs, projected_centers, cluster_sizes);
 
-        FPTYPE *projected_docs = new FPTYPE[doc_block_size * num_centers];
-        for (doc_id_t block = 0; block < num_doc_blocks; ++block) {
+        // FPTYPE *projected_docs = new FPTYPE[doc_block_size * num_centers];
+        // for (doc_id_t block = 0; block < num_doc_blocks; ++block) {
 
-            if (closest_docs == NULL)
-                closest_docs = new std::vector<doc_id_t>[num_centers];
-            else
-                for (doc_id_t c = 0; c < num_centers; ++c)
-                    closest_docs[c].clear();
+        //     if (closest_docs == NULL)
+        //         closest_docs = new std::vector<doc_id_t>[num_centers];
+        //     else
+        //         for (doc_id_t c = 0; c < num_centers; ++c)
+        //             closest_docs[c].clear();
 
-            doc_id_t num_docs_in_block = std::min(doc_block_size, num_docs() - block*doc_block_size);
+        //     doc_id_t num_docs_in_block = std::min(doc_block_size, num_docs() - block*doc_block_size);
 
-            for (doc_id_t d = block * doc_block_size; d < block*doc_block_size + num_docs_in_block; ++d)
-                closest_docs[closest_center[d]].push_back(d);
+        //     for (doc_id_t d = block * doc_block_size; d < block*doc_block_size + num_docs_in_block; ++d)
+        //         closest_docs[closest_center[d]].push_back(d);
 
-            for (size_t c = 0; c < num_centers; ++c)
-                cluster_sizes[c] += closest_docs[c].size();
+        //     for (size_t c = 0; c < num_centers; ++c)
+        //         cluster_sizes[c] += closest_docs[c].size();
 
-            UT_times_docs(block * doc_block_size,
-                block * doc_block_size + num_docs_in_block,
-                projected_docs);
+        //     UT_times_docs(block * doc_block_size,
+        //         block * doc_block_size + num_docs_in_block,
+        //         projected_docs);
 
-            pfor_dynamic_1(int c = 0; c < num_centers; ++c) {
-                FPTYPE* center = projected_centers + (size_t)c * (size_t)num_centers;
-                for (auto diter = closest_docs[c].begin(); diter != closest_docs[c].end(); ++diter)
-                    FPaxpy(num_centers, 1.0, projected_docs + ((*diter) - block*doc_block_size)*num_centers, 1, center, 1);
-            }
-        }
-        delete[] projected_docs;
+        //     pfor_dynamic_1(int c = 0; c < num_centers; ++c) {
+        //         FPTYPE* center = projected_centers + (size_t)c * (size_t)num_centers;
+        //         for (auto diter = closest_docs[c].begin(); diter != closest_docs[c].end(); ++diter)
+        //             FPaxpy(num_centers, 1.0, projected_docs + ((*diter) - block*doc_block_size)*num_centers, 1, center, 1);
+        //     }
+        // }
+        // delete[] projected_docs;
 
         // divide by number of points to obtain centroid
         for (auto center_id = 0; center_id < num_centers; ++center_id) {
@@ -2246,7 +2258,7 @@ SparseMatrix<T>::SparseMatrix(
         }
         delete[] closest_center;
         delete[] projected_centers_tr;
-        delete[] projected_dist_matrix;
+        // delete[] projected_dist_matrix;
         delete[] projected_centers_l2sq;
         return residual;
     }
@@ -2416,7 +2428,6 @@ SparseMatrix<T>::SparseMatrix(
         while (centers.size() < k) {
             std::cout << "centers.size():  " << centers.size() 
                 << "   new_centers_added: " << new_centers_added << std::endl;
-
             for(int64_t block = 0; block < divide_round_up(num_docs(), (doc_id_t)DOC_BLOCK_SIZE); ++block)
                 update_min_distsq_to_projected_centers(U_cols, new_centers_added,
                     centers_coords + (size_t)(centers.size() - new_centers_added) * (size_t)U_cols,
