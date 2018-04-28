@@ -219,13 +219,11 @@ namespace {
     FPTYPE *projected_centers = nullptr;
     offset_t *shifted_offsets_CSC = nullptr;
     doc_id_t *center_index = nullptr;
-    std::vector<doc_id_t> *closest_docs = nullptr;
 
     flash::flash_ptr<word_id_t> shifted_rows_CSC_fptr;
     flash::flash_ptr<FPTYPE> shifted_vals_CSC_fptr;
 
     const doc_id_t doc_blk_size = 0;
-    const doc_id_t doc_blk_start = 0;
     const word_id_t vocab_size = 0;
     doc_id_t num_centers = 0;
 
@@ -236,18 +234,16 @@ namespace {
 
   public:
     ProjComputeNewCentersTask(doc_id_t *center_index, FPTYPE* projected_centers,
-                              std::vector<doc_id_t> *closest_docs, std::vector<size_t> &cluster_sizes, offset_t *offsets_CSC,
+                              std::vector<size_t> &cluster_sizes, offset_t *offsets_CSC,
                               flash::flash_ptr<word_id_t> shifted_rows_CSC_fptr,
                               flash::flash_ptr<FPTYPE> shifted_vals_CSC_fptr,
-                              const doc_id_t doc_blk_start, const doc_id_t doc_blk_size,
-                              const word_id_t vocab_sz, const doc_id_t num_centers, FPTYPE *U_rowmajor,
+                              const doc_id_t doc_blk_size, const word_id_t vocab_sz, const doc_id_t num_centers, FPTYPE *U_rowmajor,
                               uint64_t U_rows, uint64_t U_cols) : center_index(center_index),
                                                                   projected_centers(projected_centers),
-                                                                  closest_docs(closest_docs),
                                                                   cluster_sizes(cluster_sizes),
                                                                   shifted_rows_CSC_fptr(shifted_rows_CSC_fptr),
                                                                   shifted_vals_CSC_fptr(shifted_vals_CSC_fptr),
-                                                                  doc_blk_size(doc_blk_size), doc_blk_start(doc_blk_start),
+                                                                  doc_blk_size(doc_blk_size),
                                                                   vocab_size(vocab_sz), num_centers(num_centers),
                                                                   U_rowmajor(U_rowmajor),
                                                                   U_rows(U_rows), U_cols(U_cols) {
@@ -286,16 +282,10 @@ namespace {
       FPTYPE *shifted_vals_CSC = (FPTYPE *)this->in_mem_ptrs[this->shifted_vals_CSC_fptr];
       FPTYPE *projected_docs = new FPTYPE[doc_blk_size * num_centers];
 
-      if (closest_docs == nullptr){
-        closest_docs = new std::vector<doc_id_t>[num_centers];
-      } else{
-        for (doc_id_t c = 0; c < num_centers; ++c){
-          closest_docs[c].clear();
-        }
-      }
+      std::vector<std::vector<doc_id_t>> closest_docs(num_centers, std::vector<doc_id_t>());
 
       for (doc_id_t d = 0; d < doc_blk_size; ++d)
-        closest_docs[center_index[d]].push_back(d + doc_blk_start);
+        closest_docs[center_index[d]].push_back(d);
 
       // cluster sizes
       for (size_t c = 0; c < num_centers; ++c)
@@ -325,11 +315,10 @@ namespace {
       }
       /* `multiply_with` -- END  */
 
-      pfor_dynamic_1(uint64_t c = 0; c < num_centers; ++c)
-      {
+      pfor_dynamic_1(uint64_t c = 0; c < num_centers; ++c) {
         FPTYPE *center = projected_centers + c * num_centers;
         for (auto diter = closest_docs[c].begin(); diter != closest_docs[c].end(); ++diter)
-          FPaxpy(num_centers, 1.0, projected_docs + ((*diter) - doc_blk_start) * num_centers, 1, center, 1);
+          FPaxpy(num_centers, 1.0, projected_docs + (*diter) * num_centers, 1, center, 1);
       }
       delete[] projected_docs;
     }
@@ -366,7 +355,7 @@ namespace Kmeans{
       const FPTYPE *const projected_centers_tr, const FPTYPE *const projected_centers_l2sq,
       offset_t *offsets_CSC, flash::flash_ptr<word_id_t> rows_CSC_fptr,
       flash::flash_ptr<FPTYPE> vals_CSC_fptr, const doc_id_t num_docs,
-      const doc_id_t doc_blk_size, const doc_id_t num_centers,
+      const doc_id_t doc_block_size, const doc_id_t num_centers,
       const word_id_t vocab_size, FPTYPE *U_rowmajor, uint64_t U_rows, uint64_t U_cols,
       const FPTYPE *const projected_docs_l2sq, doc_id_t *center_index){
     
@@ -378,16 +367,16 @@ namespace Kmeans{
            (FPTYPE)0.0, UUTrC, num_centers);
     
     // create a common ones_vec
-    const uint64_t ones_vec_size = std::max(doc_blk_size, num_centers);
+    const uint64_t ones_vec_size = std::max(doc_block_size, num_centers);
     FPTYPE* ones_vec = new FPTYPE[ones_vec_size];
     std::fill_n(ones_vec, ones_vec_size, (FPTYPE)1.0f);
 
     // construct and issue tasks
-    uint64_t n_doc_blks = ROUND_UP(num_docs, doc_blk_size) / doc_blk_size;
+    uint64_t n_doc_blks = ROUND_UP(num_docs, doc_block_size) / doc_block_size;
     ProjClosestCentersTask **proj_tsks = new ProjClosestCentersTask *[n_doc_blks];
     for (MKL_INT i = 0; i < n_doc_blks; i++) {
-      MKL_INT doc_blk_start = doc_blk_size * i;
-      MKL_INT doc_blk_size = std::min(num_docs - doc_blk_start, (doc_id_t)doc_blk_size);
+      MKL_INT doc_blk_start = doc_block_size * i;
+      MKL_INT doc_blk_size = std::min(num_docs - doc_blk_start, (doc_id_t)doc_block_size);
       MKL_INT doc_blk_offset = offsets_CSC[doc_blk_start];
       proj_tsks[i] = new ProjClosestCentersTask(projected_docs_l2sq + doc_blk_start,
                                                 center_index + doc_blk_start,
@@ -420,24 +409,24 @@ namespace Kmeans{
   void projected_compute_new_centers_full(
       offset_t *offsets_CSC, flash::flash_ptr<word_id_t> rows_CSC_fptr,
       flash::flash_ptr<FPTYPE> vals_CSC_fptr, const doc_id_t num_docs,
-      const doc_id_t doc_blk_size, const doc_id_t num_centers,
+      const doc_id_t doc_block_size, const doc_id_t num_centers,
       const word_id_t vocab_size, FPTYPE *U_rowmajor, uint64_t U_rows, uint64_t U_cols,
-      doc_id_t *center_index, std::vector<doc_id_t> *closest_docs,
-      FPTYPE* projected_centers, std::vector<size_t> &cluster_sizes)
+      doc_id_t *center_index, FPTYPE* projected_centers, std::vector<size_t> &cluster_sizes)
   {
 
     // construct and issue tasks
-    uint64_t n_doc_blks = ROUND_UP(num_docs, doc_blk_size) / doc_blk_size;
+    uint64_t n_doc_blks = ROUND_UP(num_docs, doc_block_size) / doc_block_size;
     ProjComputeNewCentersTask **proj_tsks = new ProjComputeNewCentersTask *[n_doc_blks];
     for (MKL_INT i = 0; i < n_doc_blks; i++) {
-      MKL_INT doc_blk_start = doc_blk_size * i;
-      MKL_INT doc_blk_size = std::min(num_docs - doc_blk_start, (doc_id_t)doc_blk_size);
+      MKL_INT doc_blk_start = doc_block_size * i;
+      MKL_INT doc_blk_size = std::min(num_docs - doc_blk_start, (doc_id_t)doc_block_size);
       MKL_INT doc_blk_offset = offsets_CSC[doc_blk_start];
       proj_tsks[i] = new ProjComputeNewCentersTask(center_index + doc_blk_start,
-                                                   projected_centers, closest_docs,
+                                                   projected_centers,
                                                    cluster_sizes, offsets_CSC + doc_blk_start,
-                                                   rows_CSC_fptr + doc_blk_start, vals_CSC_fptr + doc_blk_start,
-                                                   doc_blk_start, doc_blk_size, vocab_size,
+                                                   rows_CSC_fptr + doc_blk_offset,
+                                                   vals_CSC_fptr + doc_blk_offset,
+                                                   doc_blk_size, vocab_size,
                                                    num_centers, U_rowmajor, U_rows, U_cols);
 
       if(i > 0){

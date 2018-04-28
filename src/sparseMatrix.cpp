@@ -1801,40 +1801,47 @@ SparseMatrix<T>::SparseMatrix(
         doc_id_t *const closest_center = new doc_id_t[num_docs()];
         
         compute_centers_l2sq(centers, centers_l2sq, num_centers);
-        for (doc_id_t block = 0; block < num_doc_blocks; ++block) {
-            closest_centers(num_centers, centers, centers_l2sq,
-                block * doc_block_size, std::min((block + 1) * doc_block_size, num_docs()),
-                docs_l2sq + block * doc_block_size,
-                closest_center + block * doc_block_size, dist_matrix);
-        }
+        Kmeans::closest_centers_full(centers, centers_l2sq, this->offsets_CSC,
+                                     this->rows_CSC_fptr, this->vals_CSC_fptr,
+                                     num_docs(), doc_block_size, num_centers, vocab_size(),
+                                     docs_l2sq, closest_center);
+        // for (doc_id_t block = 0; block < num_doc_blocks; ++block) {
+        //     closest_centers(num_centers, centers, centers_l2sq,
+        //         block * doc_block_size, std::min((block + 1) * doc_block_size, num_docs()),
+        //         docs_l2sq + block * doc_block_size,
+        //         closest_center + block * doc_block_size, dist_matrix);
+        // }
         timer.next_time_secs("lloyd: closest center", 30);
 
         memset(centers, 0, sizeof(FPTYPE) * (size_t)num_centers * (size_t)vocab_size());
         std::vector<size_t> cluster_sizes(num_centers, 0);
-        for (doc_id_t block = 0; block < num_doc_blocks; ++block) {
+        Kmeans::compute_new_centers_full(this->offsets_CSC, this->rows_CSC_fptr,
+                                         this->vals_CSC_fptr, num_docs(), doc_block_size, num_centers,
+                                         vocab_size(), closest_center, centers, cluster_sizes);
+        // for (doc_id_t block = 0; block < num_doc_blocks; ++block) {
 
-            if (closest_docs == NULL)
-                closest_docs = new std::vector<doc_id_t>[num_centers];
-            else
-                for (doc_id_t c = 0; c < num_centers; ++c)
-                    closest_docs[c].clear();
+        if (closest_docs == NULL)
+            closest_docs = new std::vector<doc_id_t>[num_centers];
+        else
+            for (doc_id_t c = 0; c < num_centers; ++c)
+                closest_docs[c].clear();
 
-            doc_id_t num_docs_in_block = std::min(doc_block_size, num_docs() - block*doc_block_size);
+        //     doc_id_t num_docs_in_block = std::min(doc_block_size, num_docs() - block*doc_block_size);
 
-            for (doc_id_t d = block * doc_block_size; d < block*doc_block_size + num_docs_in_block; ++d) 
-                closest_docs[closest_center[d]].push_back(d);
+        //     for (doc_id_t d = block * doc_block_size; d < block*doc_block_size + num_docs_in_block; ++d) 
+        //         closest_docs[closest_center[d]].push_back(d);
 
-            for (size_t c = 0; c < num_centers; ++c)
-                cluster_sizes[c] += closest_docs[c].size();
+        //     for (size_t c = 0; c < num_centers; ++c)
+        //         cluster_sizes[c] += closest_docs[c].size();
 
-            pfor_dynamic_1(int c = 0; c < num_centers; ++c) {
-                auto center = centers + (size_t)c * (size_t)vocab_size();
-                auto div = (FPTYPE)closest_docs[c].size();
-                for (auto diter = closest_docs[c].begin(); diter != closest_docs[c].end(); ++diter)
-                    for (auto witer = offsets_CSC[*diter]; witer < offsets_CSC[1 + *diter]; ++witer)
-                        *(center + rows_CSC[witer]) += vals_CSC[witer];
-            }
-        }
+        //     pfor_dynamic_1(int c = 0; c < num_centers; ++c) {
+        //         auto center = centers + (size_t)c * (size_t)vocab_size();
+        //         auto div = (FPTYPE)closest_docs[c].size();
+        //         for (auto diter = closest_docs[c].begin(); diter != closest_docs[c].end(); ++diter)
+        //             for (auto witer = offsets_CSC[*diter]; witer < offsets_CSC[1 + *diter]; ++witer)
+        //                 *(center + rows_CSC[witer]) += vals_CSC[witer];
+        //     }
+        // }
 
         // divide by number of points to obtain centroid
         pfor(auto center_id = 0; center_id < num_centers; ++center_id) {
@@ -2206,16 +2213,16 @@ SparseMatrix<T>::SparseMatrix(
                                                    this->vals_CSC_fptr, num_docs(),doc_block_size,
                                                    num_centers, vocab_size(), U_rowmajor, 
                                                    U_rows, U_cols, closest_center,
-                                                   closest_docs, projected_centers, cluster_sizes);
+                                                   projected_centers, cluster_sizes);
 
         // FPTYPE *projected_docs = new FPTYPE[doc_block_size * num_centers];
         // for (doc_id_t block = 0; block < num_doc_blocks; ++block) {
 
-        //     if (closest_docs == NULL)
-        //         closest_docs = new std::vector<doc_id_t>[num_centers];
-        //     else
-        //         for (doc_id_t c = 0; c < num_centers; ++c)
-        //             closest_docs[c].clear();
+        if (closest_docs == NULL)
+            closest_docs = new std::vector<doc_id_t>[num_centers];
+        else
+            for (doc_id_t c = 0; c < num_centers; ++c)
+                closest_docs[c].clear();
 
         //     doc_id_t num_docs_in_block = std::min(doc_block_size, num_docs() - block*doc_block_size);
 

@@ -248,7 +248,29 @@ namespace Kmeans {
       flash::flash_ptr<FPTYPE> vals_CSC_fptr, const doc_id_t num_docs,
       const doc_id_t doc_blk_size, const doc_id_t num_centers,
       const word_id_t vocab_size, FPTYPE *U_rowmajor, uint64_t U_rows, uint64_t U_cols,
-      doc_id_t *center_index, std::vector<doc_id_t> *closest_docs,
-      FPTYPE *projected_centers, std::vector<size_t> &cluster_sizes);
+      doc_id_t *center_index, FPTYPE *projected_centers, std::vector<size_t> &cluster_sizes);
 
+  void closest_centers_full(
+      const FPTYPE *const centers,
+      const FPTYPE *const centers_l2sq,
+      offset_t *offsets_CSC,
+      flash::flash_ptr<word_id_t> rows_CSC_fptr,
+      flash::flash_ptr<FPTYPE> vals_CSC_fptr,
+      const doc_id_t num_docs,
+      const doc_id_t doc_blk_size,
+      const doc_id_t num_centers,
+      const word_id_t vocab_size,
+      const FPTYPE *const docs_l2sq,
+      doc_id_t *const center_index);
+
+  void compute_new_centers_full(offset_t *offsets_CSC,
+                                flash::flash_ptr<word_id_t> rows_CSC_fptr,
+                                flash::flash_ptr<FPTYPE> vals_CSC_fptr,
+                                const doc_id_t num_docs,
+                                const doc_id_t doc_blk_size,
+                                const doc_id_t num_centers,
+                                const word_id_t vocab_size,
+                                doc_id_t *center_index,
+                                FPTYPE *centers,
+                                std::vector<size_t> &cluster_sizes);
 } // namespace kmeans

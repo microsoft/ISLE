@@ -22,9 +22,9 @@ include_directories(include ${INTEL_ROOT}/include ${MKL_ROOT}/include)
 link_directories(${INTEL_ROOT}/lib/intel64 ${MKL_ROOT}/lib/intel64)
 
 # Flash definitions
-add_definitions(-DFLASH_CSRMM_MKL_NTHREADS=2
+add_definitions(-DFLASH_CSRMM_MKL_NTHREADS=16
                 -DSECTOR_LEN=512
-                -DMAX_NNZS=1000000
+                -DMAX_NNZS=10000000
                 -DMAX_CSRMM_BLK_SIZE=131072
                 -DIS_ALIGNED=IS_512_ALIGNED)
 
@@ -46,7 +46,10 @@ add_executable(ISLETrain drivers/ISLETrain.cpp)
 add_executable(ISLEInfer drivers/ISLEInfer.cpp)
 
 # Generate library
-add_library(ISLE STATIC src/trainer.cpp src/utils.cpp src/denseMatrix.cpp src/sparseMatrix.cpp src/logger.cpp src/infer.cpp block-ks/flash_prod_op.cpp src/tasks.cpp)
+add_library(ISLE STATIC src/trainer.cpp src/utils.cpp src/denseMatrix.cpp src/sparseMatrix.cpp
+                        src/logger.cpp src/infer.cpp block-ks/flash_prod_op.cpp src/projected_tasks.cpp
+                        src/sparse_tasks.cpp)
+
 target_include_directories(ISLE BEFORE PUBLIC ${CMAKE_SOURCE_DIR} armadillo-8.400.0/include spectra-master block-ks)
 
 target_link_libraries(ISLETrain ISLE)
