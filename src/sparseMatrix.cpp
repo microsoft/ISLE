@@ -1311,6 +1311,7 @@ SparseMatrix<T>::SparseMatrix(
         flash::flash_free(a_tr_off);
         flash::flash_free(a_tr_col);
         flash::flash_free(a_tr_csr);
+        delete[] a_tr_off_ptr;
 
         ARMA_FPMAT sevecs = eigensolver.eigenvectors();
         ARMA_FPVEC sevs = eigensolver.eigenvalues();
@@ -2132,7 +2133,8 @@ SparseMatrix<T>::SparseMatrix(
         const doc_id_t doc_block_size = DOC_BLOCK_SIZE;
         const doc_id_t num_doc_blocks = divide_round_up(num_docs(), doc_block_size);
 
-        auto projected_doc_block = new FPTYPE[doc_block_size * U_cols * sizeof(FPTYPE)];
+        auto projected_doc_block = new FPTYPE[doc_block_size * U_cols];
+        GLOG_DEBUG("alloc'ing ", doc_block_size * U_cols * sizeof(FPTYPE));
 
         for (doc_id_t block = 0; block < num_doc_blocks; ++block) {
             const doc_id_t doc_begin = block * doc_block_size;
@@ -2149,7 +2151,7 @@ SparseMatrix<T>::SparseMatrix(
                     projected_doc_block + d * U_cols, 1);
 
             // reset buffer
-            memset(projected_doc_block, 0, doc_block_size * U_cols * sizeof(FPTYPE));
+            memset(projected_doc_block, 0, doc_block_size * U_cols);
         }
 
         // free mem
@@ -2280,13 +2282,19 @@ SparseMatrix<T>::SparseMatrix(
             closest_docs = new std::vector<doc_id_t>[num_centers];
 
         FPTYPE *projected_docs_l2sq = new FPTYPE[num_docs()];
+
+        GLOG_DEBUG("alloc'ing ", num_docs() * sizeof(FPTYPE));
+        
         compute_projected_docs_l2sq(projected_docs_l2sq);
         
         std::vector<size_t> prev_cl_sizes(num_centers, 0);
         auto prev_closest_docs = new std::vector<doc_id_t>[num_centers];
 
+        sched.flush_cache();
+
         Timer timer;
         for (int i = 0; i < max_reps; ++i) {
+            GLOG_DEBUG("iter=", i);
             residual = lloyds_iter_on_projected_space(num_centers, 
                 projected_centers, projected_docs_l2sq, closest_docs);
             timer.next_time_secs("run_lloyds: lloyds iter", 30);

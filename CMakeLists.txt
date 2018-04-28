@@ -5,7 +5,7 @@ add_definitions(-DLINUX)
 # Use -DCILK above if you are certain, Mixing Cilk + Intel MKL/OpenMP causes problems
 
 # Compiler options
-set(CXX g++)
+set(CXX g++-7)
 
 # CXX Config
 # set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g -DDEBUG -O0 -fsanitize=address -fsanitize=leak -fsanitize=undefined")
@@ -24,7 +24,7 @@ link_directories(${INTEL_ROOT}/lib/intel64 ${MKL_ROOT}/lib/intel64)
 # Flash definitions
 add_definitions(-DFLASH_CSRMM_MKL_NTHREADS=2
                 -DSECTOR_LEN=512
-                -DMAX_NNZS=100000
+                -DMAX_NNZS=1000000
                 -DMAX_CSRMM_BLK_SIZE=131072
                 -DIS_ALIGNED=IS_512_ALIGNED)
 

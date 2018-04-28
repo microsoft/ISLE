@@ -12,7 +12,6 @@ namespace Kmeans {
                     flash::flash_ptr<FPTYPE> shifted_vals_CSC_fptr, const doc_id_t doc_blk_size,
                     const word_id_t vocab_size, const FPTYPE *const in,
                     FPTYPE *const out, const MKL_INT n_cols) {
-    GLOG_DEBUG("here");
     // create shifted copy of offsets array
     MKL_INT *shifted_offsets_CSC = new MKL_INT[doc_blk_size + 1];
     for (doc_id_t d = 0; d <= doc_blk_size; ++d) {
@@ -26,6 +25,8 @@ namespace Kmeans {
     uint64_t nnzs = shifted_offsets_CSC[doc_blk_size];
     word_id_t *shifted_rows_CSC = new word_id_t[nnzs];
     FPTYPE *shifted_vals_CSC = new FPTYPE[nnzs];
+    uint64_t total_alloc_size = nnzs * (sizeof(word_id_t) + sizeof(FPTYPE));
+    GLOG_DEBUG("doc_blk_size=", doc_blk_size, ", nnzs=", nnzs);
 
     flash::read_sync(shifted_rows_CSC, shifted_rows_CSC_fptr, nnzs);
     flash::read_sync(shifted_vals_CSC, shifted_vals_CSC_fptr, nnzs);

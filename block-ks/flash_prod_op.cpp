@@ -138,6 +138,7 @@ FlashProdOp::FlashProdOp(flash_ptr<ARMA_FPTYPE> a_csr, flash_ptr<MKL_INT> a_col,
 
 FlashProdOp::~FlashProdOp() {
   destroy_tasks();
+  delete[] this->temp_ptr;
   SchedulerOptions opts;
   opts.enable_prioritizer = true;
   opts.enable_overlap_check = true;
