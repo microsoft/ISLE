@@ -1870,7 +1870,7 @@ namespace ISLE
         const doc_id_t doc_block_size = DOC_BLOCK_SIZE;
         const doc_id_t num_doc_blocks = divide_round_up(num_docs(), doc_block_size);
 
-        auto projected_doc_block = new FPTYPE[doc_block_size * U_cols * sizeof(FPTYPE)];
+        auto projected_doc_block = new FPTYPE[doc_block_size * U_cols];
 
         for (doc_id_t block = 0; block < num_doc_blocks; ++block) {
             const doc_id_t doc_begin = block * doc_block_size;
