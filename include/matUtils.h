@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <malloc.h>
+
 #include "types.h"
 #include "ks_types.h"
 #include "timer.h"
