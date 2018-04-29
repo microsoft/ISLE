@@ -193,10 +193,11 @@ SparseMatrix<T>::SparseMatrix(
     {
         this->_nnzs = nnzs_;
         this->avg_doc_sz = avg_doc_sz_;
-        this->normalized_vals_CSC = normalized_vals_CSC_;
-        this->rows_CSC = rows_CSC_;
         this->offsets_CSC = offsets_CSC_;
         GLOG_DEBUG("Adding nnzs=", _nnzs);
+        return;
+        this->normalized_vals_CSC = normalized_vals_CSC_;
+        this->rows_CSC = rows_CSC_;
     }
 
     template<class T>
@@ -630,6 +631,11 @@ SparseMatrix<T>::SparseMatrix(
             {
                 auto doc_partition = closest_docs[topic];
                 auto thresholds = threshold_matrix_tr + (size_t)word * (size_t)num_topics;
+                // if (doc_partition.size() == 0) {
+                //     for (word_id_t word = word_begin; word < word_end; ++word)
+                //         thresholds[word] = (T)0.0;
+                //     continue;
+                // }
 
                 if (freqs[topic].size() > r) {
                     std::sort(freqs[topic].begin(), freqs[topic].end(), std::greater<>());
@@ -689,7 +695,7 @@ SparseMatrix<T>::SparseMatrix(
         Timer timer;
         assert(Model.vocab_size() == vocab_size());
         assert(Model.num_docs() == num_topics);
-        assert(normalized_vals_CSC != NULL);
+        // assert(normalized_vals_CSC != NULL);
 
         memset(Model.data(), 0, sizeof(FPTYPE) * (size_t)Model.vocab_size() * (size_t)num_topics);
 
@@ -729,24 +735,28 @@ SparseMatrix<T>::SparseMatrix(
 
         std::vector<size_t> doc_start_index;
         doc_start_index.push_back(0);
-        uint64_t local_doc_blk_size = DOC_BLOCK_SIZE; //((uint64_t) 1) << 12;
-        uint64_t local_doc_blks = ROUND_UP(num_docs(), local_doc_blk_size) / local_doc_blk_size;
-        for(uint64_t i = 0; i < local_doc_blks; i++){
-            uint64_t doc_begin = local_doc_blk_size * i;
-            uint64_t doc_blk_size = std::min((uint64_t)num_docs() - doc_begin, local_doc_blk_size);
-            uint64_t doc_blk_offset = this->offsets_CSC[doc_begin];
-            TopicModel::fill_doc_start_index(doc_start_index,
-                                             num_topics,
-                                             doc_begin,
-                                             doc_blk_size,
-                                             this->offsets_CSC + doc_begin,
-                                             this->rows_CSC_fptr + doc_blk_offset,
-                                             this->normalized_vals_CSC_fptr + doc_blk_offset,
-                                             all_catchwords,
-                                             catchword_topic,
-                                             doc_topic_sum,
-                                             num_catchwords);
+        {
+            uint64_t doc_block_size = DOC_BLOCK_SIZE; //((uint64_t) 1) << 12;
+            uint64_t doc_blks = ROUND_UP(num_docs(), doc_block_size) / doc_block_size;
+            for (uint64_t i = 0; i < doc_blks; i++)
+            {
+                uint64_t doc_begin = doc_block_size * i;
+                uint64_t doc_blk_size = std::min((uint64_t)num_docs() - doc_begin, doc_block_size);
+                uint64_t doc_blk_offset = this->offsets_CSC[doc_begin];
+                TopicModel::fill_doc_start_index(doc_start_index,
+                                                 num_topics,
+                                                 doc_begin,
+                                                 doc_blk_size,
+                                                 this->offsets_CSC + doc_begin,
+                                                 this->rows_CSC_fptr + doc_blk_offset,
+                                                 this->normalized_vals_CSC_fptr + doc_blk_offset,
+                                                 all_catchwords,
+                                                 catchword_topic,
+                                                 doc_topic_sum,
+                                                 num_catchwords);
+            }
         }
+        
         // FPTYPE *DocTopicSumArray = new FPTYPE[(size_t)num_topics * num_docs_alloc];
 
         // for (size_t block = 0; block < doc_blocks; ++block) {
@@ -910,25 +920,28 @@ SparseMatrix<T>::SparseMatrix(
                       [](const auto &l, const auto &r) { return std::get<0>(l) < std::get<0>(r) || (std::get<0>(l) == std::get<0>(r) && std::get<1>(l) < std::get<1>(r)) || (std::get<0>(l) == std::get<0>(r) && std::get<1>(l) == std::get<1>(r) && std::get<2>(l) > std::get<2>(r)); });
 
         std::vector<doc_id_t> num_cols_per_topic(num_topics, 0);
-        uint64_t update_blk_size = 1 << 12; // DOC_BLOCK_SIZE;
-        uint64_t update_blks = ROUND_UP(num_docs(), update_blk_size) / update_blk_size;
-        uint64_t iter_offset = 0;
-        for (uint64_t i = 0; i < update_blks; i++)
         {
-            uint64_t doc_begin = update_blk_size * i;
-            uint64_t doc_blk_size = std::min((uint64_t)num_docs() - doc_begin, update_blk_size);
-            uint64_t doc_blk_offset = this->offsets_CSC[doc_begin];
-            TopicModel::model_update(Model,
-                                     doc_topic_sum, doc_in_catchless_topic,
-                                     model_threshold,
-                                     doc_begin,
-                                     doc_blk_size,
-                                     iter_offset,
-                                     offsets_CSC + doc_begin,
-                                     this->rows_CSC_fptr + doc_blk_offset,
-                                     this->normalized_vals_CSC_fptr + doc_blk_offset,
-                                     num_topics);
+            uint64_t doc_block_size = DOC_BLOCK_SIZE;
+            uint64_t doc_blocks = ROUND_UP(num_docs(), doc_block_size) / doc_block_size;
+            uint64_t iter_offset = 0;
+            for (uint64_t i = 0; i < doc_blocks; i++)
+            {
+                uint64_t doc_begin = doc_block_size * i;
+                uint64_t doc_blk_size = std::min((uint64_t)num_docs() - doc_begin, doc_block_size);
+                uint64_t doc_blk_offset = this->offsets_CSC[doc_begin];
+                TopicModel::model_update(Model,
+                                         doc_topic_sum, doc_in_catchless_topic,
+                                         model_threshold,
+                                         doc_begin,
+                                         doc_blk_size,
+                                         iter_offset,
+                                         offsets_CSC + doc_begin,
+                                         this->rows_CSC_fptr + doc_blk_offset,
+                                         this->normalized_vals_CSC_fptr + doc_blk_offset,
+                                         num_topics);
+            }
         }
+        
         // auto begin = doc_topic_sum->begin();
         // for (doc_id_t doc = 0; doc < num_docs(); ++doc)
         // {

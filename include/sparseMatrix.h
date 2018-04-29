@@ -75,7 +75,7 @@ namespace ISLE
         inline offset_t	 offset_CSC(doc_id_t doc)		const { return offsets_CSC[doc]; }
         inline word_id_t row_CSC(offset_t pos)			const { return rows_CSC[pos]; }
         inline T		 val_CSC(offset_t pos)			const { return vals_CSC[pos]; }
-        inline T		 normalized_val_CSC(offset_t pos)	const { return normalized_vals_CSC[pos]; }
+        inline T		normalized_val_CSC(offset_t pos)	const { return normalized_vals_CSC[pos]; }
 
         inline void set_row_CSC(const offset_t& pos, const word_id_t& word) { rows_CSC[pos] = word; }
         inline void set_val_CSC(const offset_t& pos, const T& val) { vals_CSC[pos] = val; }

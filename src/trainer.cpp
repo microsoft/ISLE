@@ -290,26 +290,26 @@ namespace ISLE
             timer->next_time_secs("Populating CSC");
         }
         else if (how_data_loaded == data_ingest::PREPROCESSED_DATA_LOAD) {
-            //
-            // Load CSC files
-            //
-            std::ifstream vals_CSC_stream(std::string(input_file) + "_tr.csr", std::ios::binary | std::ios::in);
-            vals_CSC_stream.seekg(0, std::ios::end);
-            offset_t vals_CSC_len = vals_CSC_stream.tellg();
-            assert(vals_CSC_len == sizeof(FPTYPE) * max_entries);
-            vals_CSC_stream.seekg(0, std::ios::beg);
-            FPTYPE *normalized_vals_CSC = new FPTYPE[max_entries];
-            vals_CSC_stream.read((char*)normalized_vals_CSC, vals_CSC_len);
-            vals_CSC_stream.close();
+            // //
+            // // Load CSC files
+            // //
+            // std::ifstream vals_CSC_stream(std::string(input_file) + "_tr.csr", std::ios::binary | std::ios::in);
+            // vals_CSC_stream.seekg(0, std::ios::end);
+            // offset_t vals_CSC_len = vals_CSC_stream.tellg();
+            // assert(vals_CSC_len == sizeof(FPTYPE) * max_entries);
+            // vals_CSC_stream.seekg(0, std::ios::beg);
+            // FPTYPE *normalized_vals_CSC = new FPTYPE[max_entries];
+            // vals_CSC_stream.read((char*)normalized_vals_CSC, vals_CSC_len);
+            // vals_CSC_stream.close();
 
-            std::ifstream rows_CSC_stream(std::string(input_file) + "_tr.col", std::ios::binary | std::ios::in);
-            rows_CSC_stream.seekg(0, std::ios::end);
-            offset_t rows_CSC_len = rows_CSC_stream.tellg();
-            assert(rows_CSC_len == sizeof(word_id_t) * max_entries);
-            rows_CSC_stream.seekg(0, std::ios::beg);
-            word_id_t *rows_CSC = new word_id_t[max_entries];
-            rows_CSC_stream.read((char*)rows_CSC, rows_CSC_len);
-            rows_CSC_stream.close();
+            // std::ifstream rows_CSC_stream(std::string(input_file) + "_tr.col", std::ios::binary | std::ios::in);
+            // rows_CSC_stream.seekg(0, std::ios::end);
+            // offset_t rows_CSC_len = rows_CSC_stream.tellg();
+            // assert(rows_CSC_len == sizeof(word_id_t) * max_entries);
+            // rows_CSC_stream.seekg(0, std::ios::beg);
+            // word_id_t *rows_CSC = new word_id_t[max_entries];
+            // rows_CSC_stream.read((char*)rows_CSC, rows_CSC_len);
+            // rows_CSC_stream.close();
 
             std::ifstream offsets_CSC_stream(std::string(input_file) + "_tr.off", std::ios::binary | std::ios::in);
             offsets_CSC_stream.seekg(0, std::ios::end);
@@ -323,23 +323,23 @@ namespace ISLE
             //
             // Load CSR files
             //
-            std::ifstream vals_CSR_stream(std::string(input_file) + ".csr", std::ios::binary | std::ios::in);
-            vals_CSR_stream.seekg(0, std::ios::end);
-            offset_t vals_CSR_len = vals_CSR_stream.tellg();
-            assert(vals_CSR_len == sizeof(FPTYPE) * max_entries);
-            vals_CSR_stream.seekg(0, std::ios::beg);
-            normalized_vals_CSR = new FPTYPE[max_entries];
-            vals_CSR_stream.read((char*)normalized_vals_CSR, vals_CSR_len);
-            vals_CSR_stream.close();
+            // std::ifstream vals_CSR_stream(std::string(input_file) + ".csr", std::ios::binary | std::ios::in);
+            // vals_CSR_stream.seekg(0, std::ios::end);
+            // offset_t vals_CSR_len = vals_CSR_stream.tellg();
+            // assert(vals_CSR_len == sizeof(FPTYPE) * max_entries);
+            // vals_CSR_stream.seekg(0, std::ios::beg);
+            // normalized_vals_CSR = new FPTYPE[max_entries];
+            // vals_CSR_stream.read((char*)normalized_vals_CSR, vals_CSR_len);
+            // vals_CSR_stream.close();
 
-            std::ifstream cols_CSR_stream(std::string(input_file) + ".col", std::ios::binary | std::ios::in);
-            cols_CSR_stream.seekg(0, std::ios::end);
-            offset_t cols_CSR_len = cols_CSR_stream.tellg();
-            assert(cols_CSR_len == sizeof(doc_id_t) * max_entries);
-            cols_CSR_stream.seekg(0, std::ios::beg);
-            cols_CSR = new word_id_t[max_entries];
-            cols_CSR_stream.read((char*)cols_CSR, cols_CSR_len);
-            cols_CSR_stream.close();
+            // std::ifstream cols_CSR_stream(std::string(input_file) + ".col", std::ios::binary | std::ios::in);
+            // cols_CSR_stream.seekg(0, std::ios::end);
+            // offset_t cols_CSR_len = cols_CSR_stream.tellg();
+            // assert(cols_CSR_len == sizeof(doc_id_t) * max_entries);
+            // cols_CSR_stream.seekg(0, std::ios::beg);
+            // cols_CSR = new word_id_t[max_entries];
+            // cols_CSR_stream.read((char*)cols_CSR, cols_CSR_len);
+            // cols_CSR_stream.close();
 
             std::ifstream offsets_CSR_stream(std::string(input_file) + ".off", std::ios::binary | std::ios::in);
             offsets_CSR_stream.seekg(0, std::ios::end);
@@ -356,9 +356,15 @@ namespace ISLE
             cols_CSR_fptr = flash::map_file<FPTYPE>(std::string(input_file) + ".col", flash::Mode::READ);
 
             A_sp->populate_preprocessed_CSC(max_entries, avg_doc_sz,
-                                            normalized_vals_CSC, rows_CSC, offsets_CSC);
+                                            nullptr, nullptr, offsets_CSC);
+            // A_sp->populate_preprocessed_CSC(max_entries, avg_doc_sz,
+            //                                 normalized_vals_CSC, rows_CSC, offsets_CSC);
             // map CSC files on flash
             A_sp->map_flash(std::string(input_file) + "_tr.off", std::string(input_file) + "_tr.col", std::string(input_file) + "_tr.csr");
+
+            // set in-mem ptrs to null
+            normalized_vals_CSR = nullptr;
+            cols_CSR = nullptr;
         } 
         else assert(false);
         is_data_loaded = true;
@@ -630,7 +636,7 @@ namespace ISLE
                     cluster_ids[*iter] = topic;
 
 
-            offset_t chunk_size = 1 << 24;
+            offset_t chunk_size = (offset_t) 1 << 26;
             word_id_t *word_begins = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
             word_id_t *word_ends = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
             word_id_t word_begin = 0;

@@ -36,7 +36,8 @@ int main(int argv, char **argc) {
             tdf_file, vocab_file, output_dir, compute_edge_topics, max_edge_topics);
         trainer.train();
         trainer.write_output_to_files();
-        trainer.output_cluster_summary();
+        // TODO :: convert this to flash variant
+        // trainer.output_cluster_summary();
     }
     catch (...) {
         std::cerr << "ISLE Trainer failed" << std::endl;
