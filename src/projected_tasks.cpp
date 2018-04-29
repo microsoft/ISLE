@@ -17,28 +17,20 @@ namespace {
   using namespace flash;
   using namespace ISLE;
   class BlockL2SqTask : public BaseTask{
-    MKL_INT *blk_offsets_CSC;
+    const MKL_INT *blk_offsets_CSC;
     flash_ptr<FPTYPE> blk_vals_CSC_fptr;
 
     FPTYPE *blk_l2sq;
     MKL_INT blk_size;
   public:
-    BlockL2SqTask(MKL_INT *offsets_CSC,  flash_ptr<FPTYPE> vals_CSC_fptr,
-                  FPTYPE *col_l2sq, MKL_INT col_start, MKL_INT col_blk_size)
+    BlockL2SqTask(const MKL_INT *offsets_CSC,  flash_ptr<FPTYPE> vals_CSC_fptr,
+                  FPTYPE *col_l2sq, MKL_INT col_blk_size)
     {
-      MKL_INT offset = offsets_CSC[col_start];
+      this->blk_offsets_CSC = offsets_CSC;
+      this->blk_vals_CSC_fptr = vals_CSC_fptr;
+      this->blk_l2sq = col_l2sq;
       this->blk_size = col_blk_size;
-
-      this->blk_offsets_CSC = new MKL_INT[col_blk_size + 1];
-      for(MKL_INT i=0;i<col_blk_size;i++){
-        this->blk_offsets_CSC[i] = offsets_CSC[col_start + i] - offsets_CSC[col_start];
-      }
-
-      this->blk_vals_CSC_fptr = vals_CSC_fptr + offset;
-
-      this->blk_l2sq = col_l2sq + col_start;
-      
-      MKL_INT nnzs = this->blk_offsets_CSC[this->blk_size];
+      MKL_INT nnzs = (this->blk_offsets_CSC[this->blk_size] - this->blk_offsets_CSC[0]);
 
       // add reads
       StrideInfo sinfo = {1, 1, 1};
@@ -46,16 +38,12 @@ namespace {
       this->add_read(this->blk_vals_CSC_fptr, sinfo);
     }
 
-    ~BlockL2SqTask(){
-      delete[] this->blk_offsets_CSC;
-    }
-
     void execute(){
       FPTYPE* blk_vals_CSC = (FPTYPE*) this->in_mem_ptrs[this->blk_vals_CSC_fptr];
 
       pfor(MKL_INT i=0;i<this->blk_size;i++){
         MKL_INT nnzs_i = this->blk_offsets_CSC[i+1] - this->blk_offsets_CSC[i];
-        FPTYPE* vec_start = blk_vals_CSC + this->blk_offsets_CSC[i];
+        FPTYPE* vec_start = blk_vals_CSC + (this->blk_offsets_CSC[i] - this->blk_offsets_CSC[0]);
         this->blk_l2sq[i] = FPnrm2(nnzs_i, vec_start, 1);
         // scale to get L2^2
         this->blk_l2sq[i] *= this->blk_l2sq[i];
@@ -331,14 +319,18 @@ namespace {
 } // namespace
 
 namespace Kmeans{
-  void compute_col_l2sq(MKL_INT *offsets_CSC, flash_ptr<FPTYPE> vals_CSC_fptr,
+  void compute_col_l2sq(const MKL_INT *offsets_CSC, flash_ptr<FPTYPE> vals_CSC_fptr,
                         FPTYPE *col_l2sq, MKL_INT n_cols, MKL_INT col_blk_size) {
+    memset(col_l2sq, 0, n_cols * sizeof(FPTYPE));
     uint64_t n_col_blks = ROUND_UP(n_cols, col_blk_size) / col_blk_size;
     BlockL2SqTask **l2sq_tsks = new BlockL2SqTask *[n_col_blks];
     for (MKL_INT i = 0; i < n_col_blks; i++) {
       MKL_INT col_start = col_blk_size * i;
-      MKL_INT col_blk_size = std::min(n_cols - col_start, col_blk_size);
-      l2sq_tsks[i] = new BlockL2SqTask(offsets_CSC, vals_CSC_fptr, col_l2sq, col_start, col_blk_size);
+      MKL_INT col_block_size = std::min(n_cols - col_start, col_blk_size);
+      l2sq_tsks[i] = new BlockL2SqTask(offsets_CSC + col_start,
+                                       vals_CSC_fptr + offsets_CSC[col_start],
+                                       col_l2sq + col_start,
+                                       col_block_size);
       flash::sched.add_task(l2sq_tsks[i]);
     }
     

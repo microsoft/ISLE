@@ -519,7 +519,7 @@ namespace ISLE
         //
         // Truncated SVD with Spectra (ARPACK) or Block KS
         //
-        out_log->print_string("Frob(B_fl_CSC): " + std::to_string(B_fl_CSC->frobenius()) + "\n");
+        // out_log->print_string("Frob(B_fl_CSC): " + std::to_string(B_fl_CSC->frobenius()) + "\n");
         std::vector<FPTYPE> evalues;
         B_fl_CSC->initialize_for_eigensolver(num_topics);
         timer->next_time_secs("eigen solver init");

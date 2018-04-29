@@ -425,7 +425,7 @@ SparseMatrix<T>::SparseMatrix(
         const offset_t *const offsets_CSR,
         std::vector<A_TYPE>* freqs)
     {
-        for(int64_t word = word_begin; word < word_end; ++word) {
+        pfor(int64_t word = word_begin; word < word_end; ++word) {
             freqs[word].insert(freqs[word].begin(), 
                 normalized_vals_CSR + offsets_CSR[word - word_begin] - offsets_CSR[0],
                 normalized_vals_CSR + offsets_CSR[word - word_begin + 1] - offsets_CSR[0]);
@@ -1397,6 +1397,8 @@ SparseMatrix<T>::SparseMatrix(
         if (!U_rowmajor)
             compute_U_rowmajor();
 
+        return;
+
         const char transa = 'N';
         const MKL_INT m = num_docs();
         const MKL_INT n = num_topics;
@@ -1683,7 +1685,7 @@ SparseMatrix<T>::SparseMatrix(
         delete[] dice;
 
         // for continuity
-        this->read_flash();
+        // this->read_flash();
     }
 
     template<class FPTYPE>
@@ -1936,10 +1938,12 @@ SparseMatrix<T>::SparseMatrix(
     void FPSparseMatrix<FPTYPE>::compute_docs_l2sq(FPTYPE *const docs_l2sq)
     {
         assert(docs_l2sq != NULL);
-        FPscal(num_docs(), 0.0, docs_l2sq, 1);
-        pfor_static_131072(int64_t d = 0; d < num_docs(); ++d)
-            for (auto witer = offsets_CSC[d]; witer < offsets_CSC[d + 1]; ++witer)
-                docs_l2sq[d] += vals_CSC[witer] * vals_CSC[witer];
+        // FPscal(num_docs(), 0.0, docs_l2sq, 1);
+        // pfor_static_131072(int64_t d = 0; d < num_docs(); ++d)
+        //     for (auto witer = offsets_CSC[d]; witer < offsets_CSC[d + 1]; ++witer)
+        //         docs_l2sq[d] += vals_CSC[witer] * vals_CSC[witer];
+        Kmeans::compute_col_l2sq(this->offsets_CSC, this->vals_CSC_fptr,
+                                 docs_l2sq, num_docs(), DOC_BLOCK_SIZE);
     }
 
     template<class FPTYPE>
@@ -1959,7 +1963,9 @@ SparseMatrix<T>::SparseMatrix(
             closest_docs = new std::vector<doc_id_t>[num_centers];
 
         FPTYPE *docs_l2sq = new FPTYPE[num_docs()];
-        compute_docs_l2sq(docs_l2sq);
+        // compute_docs_l2sq(docs_l2sq);
+        Kmeans::compute_col_l2sq(this->offsets_CSC, this->vals_CSC_fptr,
+                                 docs_l2sq, num_docs(), DOC_BLOCK_SIZE);
 
         std::vector<size_t> prev_cl_sizes(num_centers, 0);
         auto prev_closest_docs = new std::vector<doc_id_t>[num_centers];

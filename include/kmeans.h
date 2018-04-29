@@ -232,7 +232,7 @@ namespace Kmeans {
   }
 
   // compute L2^2 of each col in CSC matrix
-  void compute_col_l2sq(MKL_INT *offsets_CSC, flash::flash_ptr<FPTYPE> vals_CSC_fptr,
+  void compute_col_l2sq(const MKL_INT *offsets_CSC, flash::flash_ptr<FPTYPE> vals_CSC_fptr,
                         FPTYPE *col_l2sq, MKL_INT n_cols, MKL_INT col_blk_size);
 
   void projected_closest_centers_full(
