@@ -83,14 +83,53 @@ namespace ISLE
             cols_CSR = new MKL_INT[nnzs];
             offsets_CSR = new MKL_INT[max_dim + 1];
 
-            const MKL_INT job[6] = { 1,0,0,0,0,1 }; // First 1: CSC->CSR, last 1: fill acsr, ja,ia
-            const MKL_INT m = max_dim;
-            MKL_INT info = 0;
+            #ifdef LINUX
+            assert(sizeof(FPTYPE)*(size_t)nnzs <= malloc_usable_size(vals_CSR));
+            assert(sizeof(FPTYPE)*(size_t)nnzs <= malloc_usable_size(vals_CSC));
+            assert(sizeof(MKL_INT)*(size_t)nnzs <= malloc_usable_size(cols_CSR));
+            assert(sizeof(MKL_INT)*(size_t)nnzs <= malloc_usable_size(rows_CSC));
+            #endif
+            
+            // MKL csr to csc conversion routine is buggy when nnzs move beyond 2^31 or 2^32
+            if ((offset_t)nnzs < (offset_t)(1 << 31)) {
+                const MKL_INT job[6] = { 1,0,0,0,0,1 }; // First 1: CSC->CSR, last 1: fill acsr, ja,ia
+                const MKL_INT m = max_dim;
+                MKL_INT info = 0;
 
-            FPcsrcsc(job, &m,
-                vals_CSR, cols_CSR, offsets_CSR,
-                vals_CSC, (MKL_INT*)rows_CSC, (MKL_INT*)offsets_CSC,
-                &info); // info is useless
+                FPcsrcsc(job, &m,
+                    vals_CSR, cols_CSR, offsets_CSR,
+                    vals_CSC, (MKL_INT*)rows_CSC, (MKL_INT*)offsets_CSC,
+                    &info); // info is useless
+            } 
+            else {
+                std::vector<std::tuple<MKL_INT, MKL_INT, FPTYPE> > entries;
+                entries.reserve(nnzs);
+                for (MKL_INT col = 0; col < ncols; ++col)
+                    for (offset_t pos = offsets_CSC[col]; pos < offsets_CSC[col + 1]; ++pos)
+                        entries.emplace_back(col, rows_CSC[pos], vals_CSC[pos]);
+                parallel_sort(entries.begin(), entries.end(),
+                    [](const auto&l, const auto &r)
+                {return std::get<1>(l) < std::get<1>(r)
+                    || (std::get<1>(l) == std::get<1>(r)) && (std::get<0>(l) < std::get<0>(r)); });
+
+                MKL_INT cur_row = 0;
+                offsets_CSR[0] = 0;
+                MKL_INT pos = 0;
+                for (auto iter = entries.begin(); iter < entries.end(); ++iter) {
+                    if (std::get<1>(*iter) > cur_row) {
+                        for (MKL_INT r = cur_row; r < std::get<1>(*iter); ++r)
+                            offsets_CSR[r+1] = pos;
+                        cur_row = std::get<1>(*iter);
+                    }
+                    vals_CSR[pos] = std::get<2>(*iter);
+                    cols_CSR[pos] = std::get<0>(*iter);
+                    ++pos;
+                }
+                if (cur_row < max_dim) {
+                    for (MKL_INT r = cur_row; r < max_dim; ++r)
+                        offsets_CSR[r+1] = pos;
+                }
+            }
 
             if (check) {
                 for (auto i = nrows; i <= max_dim; ++i)
