@@ -373,7 +373,7 @@ namespace ISLE
         for (auto pos = start_pos; pos < end_pos; ++pos) {
             auto word_id = infer_data->row_CSC(pos);
             if (std::accumulate(model_by_word + word_id * num_topics,
-                model_by_word + (word_id + 1)* num_topics, 0.0) > 1.0e-10)
+                model_by_word + (word_id + 1)* num_topics, (FPTYPE)0.0) > 1.0e-10)
             {
                 a[nnzs_in_doc] = infer_data->normalized_val_CSC(pos);
                 memcpy(M_slice + nnzs_in_doc * num_topics,
@@ -421,7 +421,7 @@ namespace ISLE
                     w[topic] /= normalizer;
             }
 
-            auto sumw = std::accumulate(w, w + num_topics, 0.0);
+            auto sumw = std::accumulate(w, w + num_topics, 0.0f);
             if (std::isnormal(sumw))
                 if (std::abs(1 - sumw) > 0.01)
                     std::cout << "sum of W: " << sumw << std::endl;

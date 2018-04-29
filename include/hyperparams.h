@@ -36,7 +36,7 @@ namespace ISLE
 // while matrix-matrix product time decreases as O(k)
 // Choose an optimal block size that works as a compromise
 #define BLOCK_KS_MAX_ITERS   100
-#define BLOCK_KS_BLOCK_SIZE  10
+#define BLOCK_KS_BLOCK_SIZE  25
 #define BLOCK_KS_TOLERANCE   1e-4
 
 #define DOC_BLOCK_SIZE (1 << 18)

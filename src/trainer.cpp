@@ -499,7 +499,7 @@ namespace ISLE
             }
 
             // compute new nnzs
-            new_nnzs = std::accumulate(new_nnzs_in_chunk, new_nnzs_in_chunk + num_word_chunks, 0);
+            new_nnzs = std::accumulate(new_nnzs_in_chunk, new_nnzs_in_chunk + num_word_chunks, (offset_t)0);
             GLOG_DEBUG("new_nnzs=", new_nnzs);
             delete[] word_begins;
             delete[] word_ends;
@@ -765,7 +765,7 @@ namespace ISLE
             AVG_CLUSTER_FOR_CATCHLESS_TOPIC);
         auto nl_top_words = new std::vector<std::pair<word_id_t, FPTYPE> >[num_topics];
         A_sp->topic_coherence(num_topics, DEFAULT_COHERENCE_NUM_WORDS, AvgModel, nl_top_words, nl_coherences);
-        avg_nl_coherence = std::accumulate(nl_coherences.begin(), nl_coherences.end(), 0.0) / num_topics;
+        avg_nl_coherence = std::accumulate(nl_coherences.begin(), nl_coherences.end(), (FPTYPE)0.0) / num_topics;
         out_log->print_string(
             "\nAvg coherence without catchwords: "
             + std::to_string(avg_nl_coherence) + "\n");
@@ -837,7 +837,7 @@ namespace ISLE
 
         std::vector<FPTYPE> coherences; coherences.resize(num_topics, 0);
         A_sp->topic_coherence(num_topics, DEFAULT_COHERENCE_NUM_WORDS, *Model, topwords, coherences);
-	FPTYPE avg_coherence =std::accumulate(coherences.begin(), coherences.end(), 0.0)  / coherences.size();
+        FPTYPE avg_coherence = std::accumulate(coherences.begin(), coherences.end(), (FPTYPE)0.0) / coherences.size();
         timer.next_time_secs("Calculating coherence");
 
         for (doc_id_t t = 0; t < num_topics; ++t) {
