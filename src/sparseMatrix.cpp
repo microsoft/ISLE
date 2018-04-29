@@ -663,8 +663,8 @@ namespace ISLE
                 doc < num_docs() && doc < (block + 1) * doc_block_size; ++doc) {
                 for (doc_id_t topic = 0; topic < num_topics; ++topic) {
                     if (DocTopicSumArray[topic + num_topics * (doc - block*doc_block_size)])
-                        doc_topic_sum->push_back(std::make_tuple(doc, topic,
-                            DocTopicSumArray[topic + num_topics * (doc - block*doc_block_size)]));
+                        doc_topic_sum->emplace_back(doc, topic,
+                            DocTopicSumArray[topic + num_topics * (doc - block*doc_block_size)]);
                 }
                 doc_start_index.push_back(doc_topic_sum->size());
             }

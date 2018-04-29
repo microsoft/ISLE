@@ -432,6 +432,7 @@ namespace ISLE
                 word_begin = word_end;
             }
             assert(num_word_chunks <= divide_round_up(offsets_CSR[vocab_size], chunk_size));
+            assert(word_ends[num_word_chunks - 1] == vocab_size);
 
             offset_t *new_nnzs_in_chunk = new offset_t[num_word_chunks];
             pfor(int64_t chunk = 0; chunk < num_word_chunks; ++chunk) {
@@ -443,7 +444,7 @@ namespace ISLE
                 for (word_id_t word = word_begins[chunk]; word < word_ends[chunk]; ++word)
                     freqs[word].clear();
             }
-            new_nnzs = std::accumulate(new_nnzs_in_chunk, new_nnzs_in_chunk + num_word_chunks, 0);
+            new_nnzs = std::accumulate(new_nnzs_in_chunk, new_nnzs_in_chunk + num_word_chunks, (offset_t)0);
             delete[] word_begins;
             delete[] word_ends;
             delete[] new_nnzs_in_chunk;
