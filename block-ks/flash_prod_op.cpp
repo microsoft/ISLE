@@ -70,7 +70,8 @@ ReusableCsrmmTask::~ReusableCsrmmTask() {
 void ReusableCsrmmTask::execute() {
   // GLOG_DEBUG("using a_ptr=", this->in_mem_ptrs[this->a],
   //            ", ja_ptr=", this->in_mem_ptrs[this->ja]);
-  mkl_set_num_threads_local(FLASH_CSRMM_MKL_NTHREADS);
+  MKL_INT old_nthreads = mkl_set_num_threads_local(FLASH_CSRMM_MKL_NTHREADS);
+	// GLOG_INFO("old_nthreads=", old_nthreads);
   ARMA_FPTYPE *a_ptr =
       (ARMA_FPTYPE *) offset_buf(this->in_mem_ptrs[this->a], this->a_offset);
   MKL_INT *ja_ptr =
@@ -89,6 +90,8 @@ void ReusableCsrmmTask::execute() {
   // execute csrmm
   mkl_csrmm(&trans_a, &m, &n, &k, &this->alpha, &matdescra[0], a_ptr, ja_ptr,
             this->ia, this->ia + 1, this->b, &n, &this->beta, this->c, &n);
+	// restore MKL num threads for this thread
+  mkl_set_num_threads_local(old_nthreads);
 }
 
 void ReusableCsrmmTask::reset(ARMA_FPTYPE *new_b, ARMA_FPTYPE *new_c) {
