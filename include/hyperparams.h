@@ -39,7 +39,7 @@ namespace ISLE
 #define BLOCK_KS_BLOCK_SIZE  10
 #define BLOCK_KS_TOLERANCE   1e-4
 
-#define DOC_BLOCK_SIZE (1 << 18)
+#define DOC_BLOCK_SIZE (1 << 19)
 
 #define USE_EXPLICIT_PROJECTED_MATRIX false
 

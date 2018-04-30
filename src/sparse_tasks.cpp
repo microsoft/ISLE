@@ -116,7 +116,7 @@ public:
       /* distsq_docs_to_centers -- END  */
 
       // compute new center assignment
-      pfor_static_131072(int64_t d = 0; d < this->doc_blk_size; ++d)
+      pfor_dynamic_1024(int64_t d = 0; d < this->doc_blk_size; ++d)
       {
         center_index[d] = (doc_id_t)FPimin(num_centers, dist_matrix + (size_t)d * (size_t)num_centers, 1);
       }

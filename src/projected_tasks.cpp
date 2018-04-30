@@ -41,7 +41,7 @@ namespace {
     void execute(){
       FPTYPE* blk_vals_CSC = (FPTYPE*) this->in_mem_ptrs[this->blk_vals_CSC_fptr];
 
-      pfor(MKL_INT i=0;i<this->blk_size;i++){
+      pfor_dynamic_1024(MKL_INT i=0;i<this->blk_size;i++){
         MKL_INT nnzs_i = this->blk_offsets_CSC[i+1] - this->blk_offsets_CSC[i];
         FPTYPE* vec_start = blk_vals_CSC + (this->blk_offsets_CSC[i] - this->blk_offsets_CSC[0]);
         this->blk_l2sq[i] = FPnrm2(nnzs_i, vec_start, 1);
@@ -175,7 +175,7 @@ namespace {
         /* distsq_projected_docs_to_projected_centers -- END  */
 
         // compute new center assignment
-        pfor(int64_t d = 0; d < this->doc_blk_size; ++d)
+        pfor_dynamic_1024(int64_t d = 0; d < this->doc_blk_size; ++d)
         {
           center_index[d] = (doc_id_t)FPimin(num_centers, projected_dist_matrix + (size_t)d * (size_t)num_centers, 1);
         }

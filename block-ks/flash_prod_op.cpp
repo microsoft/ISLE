@@ -154,6 +154,7 @@ FlashProdOp::~FlashProdOp() {
   opts.enable_overlap_check = true;
   opts.single_use_discard = false;
   // sched.set_options(opts);
+  mkl_set_num_threads_local(0);
 }
 
 void FlashProdOp::destroy_tasks() {
