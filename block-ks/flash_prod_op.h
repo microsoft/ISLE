@@ -84,6 +84,9 @@ class FlashProdOp {
   // destorys tasks and frees resources
   void destroy_tasks();
 
+  // interact with blas-scheduler
+  FBLAS_UINT prev_n_compute_thr;
+
  public:
   uint64_t n_mms = 0;
   FlashProdOp(flash_ptr<ARMA_FPTYPE> a_csr, flash_ptr<MKL_INT> a_col, 

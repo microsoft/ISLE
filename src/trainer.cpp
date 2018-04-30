@@ -569,6 +569,8 @@ namespace ISLE
         out_log->print_string("Best k-means init residual: " + std::to_string(best_residual) + "\n");
         timer->next_time_secs("K-means seeds initialization");
 
+        // flush cache
+        flash::sched.flush_cache();
 
         //
         // Lloyds on B_k with k-means++ seeds
@@ -590,6 +592,9 @@ namespace ISLE
         }
         B_fl->cleanup_after_eigensolver();
 
+        // flush cache
+        flash::sched.flush_cache();
+
         //
         // Lloyds on B with k-means++ seeds
         //
@@ -610,6 +615,9 @@ namespace ISLE
         for (doc_id_t topic = 0; topic != num_topics; ++topic)
             for (auto d = closest_docs[topic].begin(); d < closest_docs[topic].end(); ++d)
                 *d = original_cols[*d];
+
+        // flush cache
+        flash::sched.flush_cache();
 
         //
         // Identify Catchwords
@@ -700,6 +708,8 @@ namespace ISLE
         A_sp->find_catchwords(num_topics, catchword_thresholds, catchwords);
         timer->next_time_secs("Finding catchwords for clusters");
 
+        // flush cache
+        flash::sched.flush_cache();
 
         //
         // Construct the topic model

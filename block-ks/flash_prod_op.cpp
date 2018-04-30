@@ -126,11 +126,14 @@ FlashProdOp::FlashProdOp(flash_ptr<ARMA_FPTYPE> a_csr, flash_ptr<MKL_INT> a_col,
   this->blk_size = blk_size;
   this->temp_ptr = new ARMA_FPTYPE[this->inner_dim * this->blk_size];
 
+  this->prev_n_compute_thr = sched.get_num_compute_threads();
+  sched.set_num_compute_threads(BLOCK_KS_COMPUTE_THR);
+
   SchedulerOptions opts;
   opts.enable_prioritizer = false;
   opts.enable_overlap_check = false;
   opts.single_use_discard = true;
-  sched.set_options(opts);
+  // sched.set_options(opts);
 
   // setup tasks
   setup_tasks();
@@ -139,11 +142,15 @@ FlashProdOp::FlashProdOp(flash_ptr<ARMA_FPTYPE> a_csr, flash_ptr<MKL_INT> a_col,
 FlashProdOp::~FlashProdOp() {
   destroy_tasks();
   delete[] this->temp_ptr;
+
+  // restore num compute threads
+  sched.set_num_compute_threads(this->prev_n_compute_thr);
+
   SchedulerOptions opts;
   opts.enable_prioritizer = true;
   opts.enable_overlap_check = true;
   opts.single_use_discard = false;
-  sched.set_options(opts);
+  // sched.set_options(opts);
 }
 
 void FlashProdOp::destroy_tasks() {

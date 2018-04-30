@@ -22,7 +22,8 @@ include_directories(include ${INTEL_ROOT}/include ${MKL_ROOT}/include)
 link_directories(${INTEL_ROOT}/lib/intel64 ${MKL_ROOT}/lib/intel64)
 
 # Flash definitions
-add_definitions(-DFLASH_CSRMM_MKL_NTHREADS=16
+add_definitions(-DFLASH_CSRMM_MKL_NTHREADS=1
+                -DBLOCK_KS_COMPUTE_THR=\(std::thread::hardware_concurrency\(\)/2\)
                 -DSECTOR_LEN=512
                 -DMAX_NNZS=10000000
                 -DMAX_CSRMM_BLK_SIZE=131072
