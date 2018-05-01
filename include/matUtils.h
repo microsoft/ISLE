@@ -42,6 +42,7 @@ namespace ISLE
         size_t		num_row_blocks;
         size_t		*row_block_offsets;
         FPTYPE		row_block_exp;
+        MKL_INT     **shifted_offsets;
 
         Timer		*op_timer;
         double		op_user_time_sum;
@@ -59,7 +60,8 @@ namespace ISLE
             nrows(nrows_), ncols(ncols_), nnzs(nnzs_),
             max_dim(ncols_ > nrows_ ? ncols_ : nrows_),
             split_CSR_by_rows(split_CSR_by_rows_),
-            split_CSR_by_cols(split_CSR_by_cols_)
+            split_CSR_by_cols(split_CSR_by_cols_),
+            row_block_offsets(NULL), shifted_offsets(NULL)
         {
             assert(sizeof(word_id_t) == sizeof(MKL_INT));
             assert(sizeof(offset_t) == sizeof(MKL_INT));
@@ -223,7 +225,7 @@ namespace ISLE
             }
 
             if (split_CSR_by_rows) {
-                size_t row_block_size = 32;
+                /*size_t row_block_size = 32;
                 row_block_exp = 1.25;
                 num_row_blocks = (std::log2(1 + (nrows / row_block_size)) / std::log2(row_block_exp));
                 row_block_offsets = new size_t[num_row_blocks + 20];
@@ -237,6 +239,29 @@ namespace ISLE
                         break;
                     }
                     i++;
+                }*/
+                assert(nnzs == offsets_CSR[nrows]);
+                offset_t chunk_size = 1 << 24;
+                row_block_offsets = new size_t[1 + divide_round_up(nnzs, chunk_size)];
+                row_block_offsets[0] = 0;
+                num_row_blocks = 0;
+                size_t row_begin = 0;
+                size_t row_end = 0;
+                while (row_begin < nrows) {
+                    while (offsets_CSR[row_end] - offsets_CSR[row_begin] < chunk_size
+                        && row_end < nrows)
+                        ++row_end;
+                    row_block_offsets[++num_row_blocks] = row_end;
+                    row_begin = row_end;
+                }
+                assert(num_row_blocks <= divide_round_up(nnzs, chunk_size));
+
+                shifted_offsets = new MKL_INT*[num_row_blocks];
+                for (size_t block = 0; block < num_row_blocks; ++block) {
+                    shifted_offsets[block] = new MKL_INT[row_block_offsets[block + 1] - row_block_offsets[block] + 1];
+                    for (auto row = row_block_offsets[block]; row <= row_block_offsets[block + 1]; ++row)
+                        shifted_offsets[block][row - row_block_offsets[block]] =
+                        this->offsets_CSR[row] - this->offsets_CSR[row_block_offsets[block]];
                 }
                 assert(row_block_offsets[num_row_blocks - 1] < nrows);
                 assert(row_block_offsets[num_row_blocks] == nrows);
@@ -269,6 +294,11 @@ namespace ISLE
             if (split_CSR_by_rows) {
                 assert(row_block_offsets != NULL);
                 delete[] row_block_offsets;
+
+                assert(shifted_offsets != NULL);
+                for (size_t block = 0; block < num_row_blocks; ++block)
+                    delete[] shifted_offsets[block];
+                delete[] shifted_offsets;
             }
 
             std::cout << "Time spent in matvecs: "
@@ -313,9 +343,23 @@ namespace ISLE
                 this->vals_CSC, rm_in.memptr(), m_temp.memptr(), 
                 this->ncols, this->nrows, m_in.n_cols, 1.0f, 0.0f);
 
-            perform_csrmm(this->offsets_CSR, this->cols_CSR, 
-                this->vals_CSR, m_temp.memptr(), m_out.memptr(),
-                this->nrows, this->ncols, m_in.n_cols, 1.0f, 0.0f);
+            if (!split_CSR_by_rows) {
+                perform_csrmm(this->offsets_CSR, this->cols_CSR,
+                    this->vals_CSR, m_temp.memptr(), m_out.memptr(),
+                    this->nrows, this->ncols, m_in.n_cols, 1.0f, 0.0f);
+            }
+            else {
+                mkl_set_num_threads_local(1);
+                pfor(int64_t block = 0; block < num_row_blocks; ++block) {
+                    perform_csrmm(shifted_offsets[block],
+                        this->cols_CSR + offsets_CSR[row_block_offsets[block]],
+                        this->vals_CSR + offsets_CSR[row_block_offsets[block]],
+                        m_temp.memptr(), m_out.memptr() + (row_block_offsets[block] * m_in.n_cols),
+                        row_block_offsets[block + 1] - row_block_offsets[block],
+                        this->ncols, m_in.n_cols, 1.0f, 0.0f);
+                }
+                mkl_set_num_threads_local(0);
+            }
 
             return arma::trans(m_out);
         }
