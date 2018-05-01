@@ -136,7 +136,8 @@ FlashProdOp::FlashProdOp(flash_ptr<ARMA_FPTYPE> a_csr, flash_ptr<MKL_INT> a_col,
   opts.enable_prioritizer = false;
   opts.enable_overlap_check = false;
   opts.single_use_discard = true;
-  // sched.set_options(opts);
+	sched.flush_cache();
+  sched.set_options(opts);
 
   // setup tasks
   setup_tasks();
@@ -153,8 +154,9 @@ FlashProdOp::~FlashProdOp() {
   opts.enable_prioritizer = true;
   opts.enable_overlap_check = true;
   opts.single_use_discard = false;
-  // sched.set_options(opts);
+  sched.set_options(opts);
   mkl_set_num_threads_local(0);
+	sched.flush_cache();
 }
 
 void FlashProdOp::destroy_tasks() {

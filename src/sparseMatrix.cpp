@@ -1351,7 +1351,9 @@ SparseMatrix<T>::SparseMatrix(
         flash_ptr<MKL_INT> a_tr_off = flash::flash_malloc<MKL_INT>((n_cols + 1) * sizeof(MKL_INT), "a_tr_off");
         flash_ptr<MKL_INT> a_tr_col = flash::flash_malloc<MKL_INT>(nnzs * sizeof(MKL_INT), "a_tr_col");
         flash_ptr<FPTYPE> a_tr_csr = flash::flash_malloc<FPTYPE>(nnzs * sizeof(FPTYPE), "a_tr_csr");
+	flash::sched.set_num_compute_threads(BLOCK_KS_COMPUTE_THR);
         flash::csrcsc(n_rows, n_cols, a_off, a_col, a_csr, a_tr_off, a_tr_col, a_tr_csr);
+	flash::sched.set_num_compute_threads(1);
         MKL_INT* a_tr_off_ptr = new MKL_INT[n_cols + 1];
         flash::read_sync(a_tr_off_ptr, a_tr_off, n_cols + 1);
         GLOG_ASSERT(a_tr_off_ptr[n_cols] == a_off_ptr[n_rows],

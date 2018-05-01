@@ -26,7 +26,7 @@ add_definitions(-DFLASH_CSRMM_MKL_NTHREADS=1
                 -DBLOCK_KS_COMPUTE_THR=\(std::thread::hardware_concurrency\(\)/2\)
                 -DSECTOR_LEN=512
                 -DMAX_NNZS=10000000
-                -DMAX_CSRMM_BLK_SIZE=65536
+                -DMAX_CSRMM_BLK_SIZE=131072
                 -DIS_ALIGNED=IS_512_ALIGNED)
 
 add_library(fblas STATIC IMPORTED)
