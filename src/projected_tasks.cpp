@@ -125,6 +125,7 @@ namespace {
       GLOG_ASSERT(this->num_centers != 0, "num_centers is 0");
 
       // Init
+			mkl_set_num_threads_local(0);
       word_id_t *shifted_rows_CSC = (word_id_t *)this->in_mem_ptrs[this->shifted_rows_CSC_fptr];
       FPTYPE *shifted_vals_CSC = (FPTYPE *)this->in_mem_ptrs[this->shifted_vals_CSC_fptr];
 
@@ -175,7 +176,8 @@ namespace {
         /* distsq_projected_docs_to_projected_centers -- END  */
 
         // compute new center assignment
-        pfor_dynamic_1024(int64_t d = 0; d < this->doc_blk_size; ++d)
+				#pragma omp parallel for schedule(static, 32768) num_threads(32)
+        for(int64_t d = 0; d < this->doc_blk_size; ++d)
         {
           center_index[d] = (doc_id_t)FPimin(num_centers, projected_dist_matrix + (size_t)d * (size_t)num_centers, 1);
         }
@@ -266,6 +268,7 @@ namespace {
       GLOG_ASSERT(this->num_centers != 0, "num_centers is 0");
 
       // Init
+			mkl_set_num_threads_local(0);
       word_id_t *shifted_rows_CSC = (word_id_t *)this->in_mem_ptrs[this->shifted_rows_CSC_fptr];
       FPTYPE *shifted_vals_CSC = (FPTYPE *)this->in_mem_ptrs[this->shifted_vals_CSC_fptr];
       FPTYPE *projected_docs = new FPTYPE[doc_blk_size * num_centers];
@@ -303,7 +306,8 @@ namespace {
       }
       /* `multiply_with` -- END  */
 
-      pfor_dynamic_1(uint64_t c = 0; c < num_centers; ++c) {
+			#pragma omp parallel for schedule(dynamic, 1) num_threads(32)
+      for(uint64_t c = 0; c < num_centers; ++c) {
         FPTYPE *center = projected_centers + c * num_centers;
         for (auto diter = closest_docs[c].begin(); diter != closest_docs[c].end(); ++diter)
           FPaxpy(num_centers, 1.0, projected_docs + (*diter) * num_centers, 1, center, 1);

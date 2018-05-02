@@ -69,7 +69,8 @@ public:
     // 32K words / chunk
     uint64_t chunk_size = (1 << 14); 
     uint64_t num_chunks = ROUND_UP(blk_size, chunk_size) / chunk_size;
-    pfor(uint64_t i=0;i<num_chunks;i++){
+#pragma omp parallel for schedule(dynamic, 1) num_threads(32)
+    for(uint64_t i=0;i<num_chunks;i++){
       uint64_t chunk_start = start_row + (chunk_size * i);
       uint64_t chunk_end = std::min(blk_size, chunk_start + chunk_size);
       uint64_t chunk_offset = local_csr_offs[chunk_start] - *local_csr_offs;

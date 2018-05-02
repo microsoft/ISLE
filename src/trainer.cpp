@@ -593,7 +593,7 @@ namespace ISLE
         B_fl->cleanup_after_eigensolver();
 
         // flush cache
-        flash::sched.flush_cache();
+        // flash::sched.flush_cache();
 
         //
         // Lloyds on B with k-means++ seeds
@@ -617,7 +617,7 @@ namespace ISLE
                 *d = original_cols[*d];
 
         // flush cache
-        flash::sched.flush_cache();
+        // flash::sched.flush_cache();
 
         //
         // Identify Catchwords
@@ -644,7 +644,7 @@ namespace ISLE
                     cluster_ids[*iter] = topic;
 
 
-            offset_t chunk_size = (offset_t) 1 << 26;
+            offset_t chunk_size = (offset_t) 1 << 28;
             word_id_t *word_begins = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
             word_id_t *word_ends = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
             word_id_t word_begin = 0;

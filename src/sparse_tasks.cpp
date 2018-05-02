@@ -80,6 +80,7 @@ public:
     GLOG_ASSERT(this->num_centers != 0, "num_centers is 0");
 
     // Init
+		mkl_set_num_threads_local(0);
     word_id_t *shifted_rows_CSC = (word_id_t *)this->in_mem_ptrs[this->shifted_rows_CSC_fptr];
     FPTYPE *shifted_vals_CSC = (FPTYPE *)this->in_mem_ptrs[this->shifted_vals_CSC_fptr];
 
@@ -116,7 +117,8 @@ public:
       /* distsq_docs_to_centers -- END  */
 
       // compute new center assignment
-      pfor_dynamic_1024(int64_t d = 0; d < this->doc_blk_size; ++d)
+			#pragma omp parallel for schedule(static, 8192) num_threads(32)
+      for(int64_t d = 0; d < this->doc_blk_size; ++d)
       {
         center_index[d] = (doc_id_t)FPimin(num_centers, dist_matrix + (size_t)d * (size_t)num_centers, 1);
       }
@@ -205,6 +207,7 @@ public:
     GLOG_ASSERT(this->num_centers != 0, "num_centers is 0");
 
     // Init
+		mkl_set_num_threads_local(0);
     std::vector<std::vector<doc_id_t>> closest_docs(num_centers);
     word_id_t *shifted_rows_CSC = (word_id_t *)this->in_mem_ptrs[this->shifted_rows_CSC_fptr];
     FPTYPE *shifted_vals_CSC = (FPTYPE *)this->in_mem_ptrs[this->shifted_vals_CSC_fptr];
@@ -218,7 +221,8 @@ public:
       for (uint64_t c = 0; c < num_centers; ++c)
         cluster_sizes[c] += closest_docs[c].size();
 
-      pfor_dynamic_1(uint64_t c = 0; c < num_centers; ++c)
+#pragma omp parallel for schedule(dynamic, 1) num_threads(32)
+      for(uint64_t c = 0; c < num_centers; ++c)
       {
         auto center = centers + (c * vocab_size);
         for (auto diter = closest_docs[c].begin(); diter != closest_docs[c].end(); ++diter)
@@ -256,7 +260,6 @@ void closest_centers_full(
     const word_id_t vocab_size,
     const FPTYPE *const docs_l2sq,
     doc_id_t* const center_index) {
-
   // transpose centers
   FPTYPE* centers_tr = new FPTYPE[num_centers * vocab_size];
   FPomatcopy('C', 'T', vocab_size, num_centers, 1.0f, centers,
