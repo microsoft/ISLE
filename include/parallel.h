@@ -8,7 +8,7 @@
 //
 //#define NO_PAR
 
-#define NUM_OMP_THR 8
+#define NUM_OMP_THR 28
 
 #if defined(NO_PAR)
 #define pfor			    for
