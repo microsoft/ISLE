@@ -569,8 +569,8 @@ namespace ISLE
         out_log->print_string("Best k-means init residual: " + std::to_string(best_residual) + "\n");
         timer->next_time_secs("K-means seeds initialization");
 
-        // flush cache
-        flash::sched.flush_cache();
+        // flush cache (DISABLED as kmeanspp uses the same doc blocks)
+        // flash::sched.flush_cache();
 
         //
         // Lloyds on B_k with k-means++ seeds
@@ -616,8 +616,8 @@ namespace ISLE
             for (auto d = closest_docs[topic].begin(); d < closest_docs[topic].end(); ++d)
                 *d = original_cols[*d];
 
-        // flush cache
-        // flash::sched.flush_cache();
+        // flush cache - rth highest uses CSR
+        flash::sched.flush_cache();
 
         //
         // Identify Catchwords
