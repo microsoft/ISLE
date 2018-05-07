@@ -276,7 +276,7 @@ void BlockKs<ProdOp>::compute()
 
     // Compute residuals & determine nconv
     residual_blk = H.tail_rows(blk_size);
-    norms = arma::sum(arma::square(residual_blk), 0);
+    norms = arma::sqrt(arma::sum(arma::square(residual_blk), 0));
     ARMA_FPVEC evs = arma::diagvec(H);
     evs = evs.head(norms.n_cols);
     norms = norms / evs.t();
@@ -303,7 +303,7 @@ void BlockKs<ProdOp>::compute()
   if (n_restarts == this->maxit) {
     // Compute residuals & determine nconv
     residual_blk = H.tail_rows(blk_size);
-    norms = arma::sum(arma::square(residual_blk), 0);
+    norms = arma::sqrt(arma::sum(arma::square(residual_blk), 0));
     PRINT(norms);
     idxs = find(norms >= tol, 1, "first");
 
