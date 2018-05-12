@@ -1101,9 +1101,7 @@ namespace ISLE
         int edge_topic_threshold;
         for (auto iter = selected_pairs.begin(); iter != selected_pairs.end(); ++iter) {
             if (++running_count > max_edge_topics) {
-                edge_topic_threshold = std::get<2>(*iter);
-                // while (std::get<2>(*iter) == edge_topic_threshold && iter != selected_pairs.end())
-                //    iter++;
+                edge_topic_threshold = std::get<2>(*iter); 
                 selected_pairs.erase(iter, selected_pairs.end());
                 break;
             }
@@ -1117,10 +1115,10 @@ namespace ISLE
 
         for (auto t = 0; t < selected_pairs.size(); ++t) {
             FPaxpy(vocab_size, EDGE_TOPIC_PRIMARY_RATIO,
-                Model->data() + std::get<0>(selected_pairs[t]), 1,
+                Model->data() + std::get<0>(selected_pairs[t]) * vocab_size, 1,
                 EdgeModel->data() + t * vocab_size, 1);
             FPaxpy(vocab_size, 1 - EDGE_TOPIC_PRIMARY_RATIO,
-                Model->data() + std::get<1>(selected_pairs[t]), 1,
+                Model->data() + std::get<1>(selected_pairs[t]) * vocab_size, 1,
                 EdgeModel->data() + t * vocab_size, 1);
         }
 

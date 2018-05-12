@@ -32,7 +32,7 @@ int main(int argv, char **argc) {
 
     try {
         ISLE::ISLETrainer trainer(vocab_size, num_docs, max_entries, num_topics,
-            sample, sample_rate, ISLE::ISLETrainer::data_ingest::PREPROCESSED_DATA_LOAD,
+            sample, sample_rate, ISLE::ISLETrainer::data_ingest::FILE_DATA_LOAD,
             tdf_file, vocab_file, output_dir, compute_edge_topics, max_edge_topics);
         trainer.train();
         trainer.write_output_to_files();
