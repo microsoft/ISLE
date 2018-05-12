@@ -1147,9 +1147,9 @@ namespace ISLE
 #elif FILE_IO_MODE == WIN_MMAP_FILE_IO || FILE_IO_MODE == LINUX_MMAP_FILE_IO
         MMappedOutput out(filename);
         for (auto iter = topic_pairs.begin(); iter != topic_pairs.end(); ++iter) {
-            out.concat_int(std::get<0>(*iter) + 1, '\t');
-            out.concat_int(std::get<1>(*iter) + 1, '\t');
-            out.concat_int(std::get<2>(*iter) + 1, '\n');
+            out.concat_int(std::get<0>(*iter), '\t');
+            out.concat_int(std::get<1>(*iter), '\t');
+            out.concat_int(std::get<2>(*iter), '\n');
         }
         out.flush_and_close();
 #else
