@@ -1180,7 +1180,7 @@ namespace ISLE
                 [](const auto& l, const auto& r) {return l.second >= r.second; });*/
 
             std::vector<std::pair<word_id_t, FPTYPE> > top_words;
-            EdgeModel->find_n_top_words(t, num_top_words, top_words);
+            EdgeModel->find_n_top_words(t, 2* num_top_words, top_words);
             out << "Top words in edge_topic: \n";
             for (int word = 0; word < num_top_words; ++word)
                 out << vocab_words[top_words[word].first]
