@@ -1196,7 +1196,7 @@ namespace ISLE
             out << "\n";
 
 
-            EdgeModel->find_n_top_words(std::get<1>(*iter), num_top_words, top_words);
+            Model->find_n_top_words(std::get<1>(*iter), num_top_words, top_words);
             out << "Top words in topic: " << std::get<1>(*iter) << "\n";
             for (int word = 0; word < num_top_words; ++word)
                 out << vocab_words[top_words[word].first]
