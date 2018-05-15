@@ -581,7 +581,7 @@ namespace ISLE
                     cluster_ids[*iter] = topic;
 
 
-            offset_t chunk_size = 1 << 24;
+            offset_t chunk_size = 1 << 18;
             word_id_t *word_begins = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
             word_id_t *word_ends = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
             word_id_t word_begin = 0;
