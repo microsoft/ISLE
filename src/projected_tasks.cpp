@@ -176,7 +176,7 @@ namespace {
         /* distsq_projected_docs_to_projected_centers -- END  */
 
         // compute new center assignment
-				#pragma omp parallel for schedule(static, 32768) num_threads(32)
+				#pragma omp parallel for schedule(static, 32768) num_threads(MAX_THREADS)
         for(int64_t d = 0; d < this->doc_blk_size; ++d)
         {
           center_index[d] = (doc_id_t)FPimin(num_centers, projected_dist_matrix + (size_t)d * (size_t)num_centers, 1);
@@ -306,7 +306,7 @@ namespace {
       }
       /* `multiply_with` -- END  */
 
-			#pragma omp parallel for schedule(dynamic, 1) num_threads(32)
+			#pragma omp parallel for schedule(dynamic, 1) num_threads(MAX_THREADS)
       for(uint64_t c = 0; c < num_centers; ++c) {
         FPTYPE *center = projected_centers + c * num_centers;
         for (auto diter = closest_docs[c].begin(); diter != closest_docs[c].end(); ++diter)

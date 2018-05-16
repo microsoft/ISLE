@@ -130,7 +130,7 @@ FlashProdOp::FlashProdOp(flash_ptr<ARMA_FPTYPE> a_csr, flash_ptr<MKL_INT> a_col,
   this->temp_ptr = new ARMA_FPTYPE[this->inner_dim * this->blk_size];
 
   this->prev_n_compute_thr = sched.get_num_compute_threads();
-  sched.set_num_compute_threads(BLOCK_KS_COMPUTE_THR);
+  sched.set_num_compute_threads(MAX_THREADS);
 
   SchedulerOptions opts;
   opts.enable_prioritizer = false;

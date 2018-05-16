@@ -37,7 +37,7 @@ namespace TopicModel {
     flash::read_sync(rows_CSC, rows_CSC_fptr, nnzs);
     flash::read_sync(vals_CSC, vals_CSC_fptr, nnzs);
 
-#pragma omp parallel for schedule(dynamic, 1) num_threads(32)
+#pragma omp parallel for schedule(dynamic, 1) num_threads(MAX_THREADS)
     for(uint64_t doc = 0; doc < doc_blk_size; ++doc)
     {
       offset_t c_pos = 0;

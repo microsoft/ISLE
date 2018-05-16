@@ -445,7 +445,7 @@ namespace ISLE
             new_nnzs = A_sp->compute_thresholds(0, vocab_size, freqs, thresholds, num_topics);
         }
         else if (how_data_loaded == data_ingest::PREPROCESSED_DATA_LOAD) {
-            offset_t chunk_size = 1 << 24;
+            offset_t chunk_size = 1 << 27;
             word_id_t *word_begins = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
             word_id_t *word_ends = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
             word_id_t word_begin = 0; 

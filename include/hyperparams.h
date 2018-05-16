@@ -6,7 +6,7 @@
 namespace ISLE
 {
 #define w0_c	(1.0) 
-#define eps1_c	(1.0 / 60.0)
+#define eps1_c	(1.0 / 6.0)
 #define eps2_c	(1.0 / 3.0)
 #define rho_c	(1.1)
 #define eps3_c	(5.0)

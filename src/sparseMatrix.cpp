@@ -426,7 +426,7 @@ SparseMatrix<T>::SparseMatrix(
         const offset_t *const offsets_CSR,
         std::vector<A_TYPE>* freqs)
     {
-	#pragma omp parallel for schedule(dynamic, 1) num_threads(32)
+	#pragma omp parallel for schedule(dynamic, 1) num_threads(MAX_THREADS)
         for(int64_t word = word_begin; word < word_end; ++word) {
             freqs[word].insert(freqs[word].begin(), 
                 normalized_vals_CSR + offsets_CSR[word - word_begin] - offsets_CSR[0],
@@ -843,7 +843,7 @@ SparseMatrix<T>::SparseMatrix(
         if (num_topic_blocks * topic_block_size < num_topics)
             ++num_topic_blocks;
 
-	#pragma omp parallel for schedule(dynamic, 1) num_threads(32)
+	#pragma omp parallel for schedule(dynamic, 1) num_threads(MAX_THREADS)
         for(int64_t topic_block = 0; topic_block < num_topic_blocks; ++topic_block)
         {
             auto topic_begin = topic_block * topic_block_size;
@@ -967,7 +967,7 @@ SparseMatrix<T>::SparseMatrix(
 
         timer.next_time_secs("c TM: add", 30);
 
-			#pragma omp parallel for schedule(dynamic, 1) num_threads(32)	
+			#pragma omp parallel for schedule(dynamic, 1) num_threads(MAX_THREADS)	
         for(int t = 0; t < num_topics; ++t) {
             auto topic_vector_sum = FPasum(Model.vocab_size(), Model.data() + (size_t)Model.vocab_size() * (size_t)t, 1);
             FPscal(Model.vocab_size(), 1.0 / topic_vector_sum, Model.data() + (size_t)Model.vocab_size() * (size_t)t, 1);
@@ -1002,7 +1002,7 @@ SparseMatrix<T>::SparseMatrix(
         coherences.resize(num_topics, 0.0);
         for (auto topic = 0; topic < num_topics; ++topic) {
             if (top_words[topic].size() > 1)
-			#pragma omp parallel for schedule(dynamic, 8192) num_threads(32)	
+			#pragma omp parallel for schedule(dynamic, 8192) num_threads(MAX_THREADS)	
                 for(long long word = 0; word < M; ++word)
                 for (word_id_t word2 = 0; word2 < word; ++word2) {
                     assert(doc_freqs[topic][word2] > 0);
@@ -1066,7 +1066,7 @@ SparseMatrix<T>::SparseMatrix(
                 }
             }
 
-			#pragma omp parallel for schedule(dynamic, 1) num_threads(32)	
+			#pragma omp parallel for schedule(dynamic, 1) num_threads(MAX_THREADS)	
             for(int64_t chunk = 0; chunk < num_chunks; ++chunk)
                 for (int64_t doc = chunk*chunk_size;
                     doc < num_docs() && doc < (chunk + 1)*chunk_size; ++doc)
@@ -1136,7 +1136,7 @@ SparseMatrix<T>::SparseMatrix(
                 }
             }
 
-			#pragma omp parallel for schedule(dynamic, 1) num_threads(32)	
+			#pragma omp parallel for schedule(dynamic, 1) num_threads(MAX_THREADS)	
             for(int64_t chunk = 0; chunk < num_chunks; ++chunk)
                 for (int64_t doc = chunk*chunk_size;
                     doc < num_docs() && doc < (chunk + 1)*chunk_size; ++doc)

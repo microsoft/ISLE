@@ -117,7 +117,7 @@ public:
       /* distsq_docs_to_centers -- END  */
 
       // compute new center assignment
-			#pragma omp parallel for schedule(static, 8192) num_threads(32)
+			#pragma omp parallel for schedule(static, 8192) num_threads(MAX_THREADS)
       for(int64_t d = 0; d < this->doc_blk_size; ++d)
       {
         center_index[d] = (doc_id_t)FPimin(num_centers, dist_matrix + (size_t)d * (size_t)num_centers, 1);
@@ -221,7 +221,7 @@ public:
       for (uint64_t c = 0; c < num_centers; ++c)
         cluster_sizes[c] += closest_docs[c].size();
 
-#pragma omp parallel for schedule(dynamic, 1) num_threads(32)
+#pragma omp parallel for schedule(dynamic, 1) num_threads(MAX_THREADS)
       for(uint64_t c = 0; c < num_centers; ++c)
       {
         auto center = centers + (c * vocab_size);
