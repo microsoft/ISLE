@@ -638,10 +638,10 @@ namespace ISLE
 
         size_t num_docs_alloc = (size_t)num_docs() < doc_block_size
             ? (size_t)num_docs() : doc_block_size;
-        FPTYPE* DocTopicSumArray = new FPTYPE[(size_t)num_topics * num_docs_alloc];
+        FPTYPE* DocTopicSumArray = new FPTYPE[(size_t)num_topics * (size_t)num_docs_alloc];
 
         for (size_t block = 0; block < doc_blocks; ++block) {
-            memset((void*)DocTopicSumArray, 0, (size_t)num_topics * num_docs_alloc * sizeof(FPTYPE));
+            memset((void*)DocTopicSumArray, 0, (size_t)num_topics * (size_t)num_docs_alloc * sizeof(FPTYPE));
 
             size_t doc_begin = block * doc_block_size;
             size_t doc_end = (block + 1) * doc_block_size;
@@ -664,7 +664,7 @@ namespace ISLE
                 for (doc_id_t topic = 0; topic < num_topics; ++topic) {
                     if (DocTopicSumArray[topic + num_topics * (doc - block*doc_block_size)])
                         doc_topic_sum->emplace_back(doc, topic,
-                            DocTopicSumArray[topic + num_topics * (doc - block*doc_block_size)]);
+                            DocTopicSumArray[(size_t)topic + (size_t)num_topics * (size_t)(doc - block*doc_block_size)]);
                 }
                 doc_start_index.push_back(doc_topic_sum->size());
             }
