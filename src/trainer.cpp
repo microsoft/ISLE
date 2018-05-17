@@ -656,7 +656,7 @@ namespace ISLE
         timer->next_time_secs("Output model");
 
         if (flag_construct_edge_topics) {
-            output_edge_model(true);
+            //output_edge_model(true);
             timer->next_time_secs("Output edge model");
         }
 
@@ -1113,7 +1113,7 @@ namespace ISLE
         EdgeModel = new DenseMatrix<FPTYPE>(vocab_size, selected_pairs.size());
         assert(Model != NULL);
 
-        for (auto t = 0; t < selected_pairs.size(); ++t) {
+        pfor (int64_t t = 0; t < selected_pairs.size(); ++t) {
             FPaxpy(vocab_size, EDGE_TOPIC_PRIMARY_RATIO,
                 Model->data() + std::get<0>(selected_pairs[t]) * vocab_size, 1,
                 EdgeModel->data() + t * vocab_size, 1);
