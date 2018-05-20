@@ -1297,7 +1297,9 @@ SparseMatrix<T>::SparseMatrix(
         U_rows = vocab_size();
         U_cols = num_topics;
         U_colmajor = new FPTYPE[(size_t)num_topics * (size_t)vocab_size()];
+#if USE_EXPLICIT_PROJECTED_MATRIX
         SigmaVT = new FPTYPE[(size_t)num_topics * (size_t)num_docs()];
+#endif
     }
 
     template<class FPTYPE>
