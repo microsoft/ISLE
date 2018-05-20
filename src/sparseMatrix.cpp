@@ -1174,6 +1174,8 @@ namespace ISLE
         assert(U_Spectra.IsRowMajor == false);
         assert(U_Spectra.rows() == vocab_size() && U_Spectra.cols() == num_topics);
         memcpy(U_colmajor, U_Spectra.data(), U_rows * U_cols * sizeof(FPTYPE));
+        if (!U_rowmajor)
+            compute_U_rowmajor();
         compute_sigmaVT(num_topics);
     }
 
@@ -1198,7 +1200,11 @@ namespace ISLE
         for (int i = 0; i < num_topics; ++i)
             evalues.push_back(sevs[i]);
         memcpy(U_colmajor, sevecs.memptr(), U_rows * U_cols * sizeof(FPTYPE));
+        if (!U_rowmajor)
+            compute_U_rowmajor();
+#if USE_EXPLICIT_PROJECTED_MATRIX
         compute_sigmaVT(num_topics);
+#endif
     }
     
     template<class FPTYPE>
@@ -1224,8 +1230,6 @@ namespace ISLE
     template<class FPTYPE>
     void FPSparseMatrix<FPTYPE>::compute_sigmaVT(const doc_id_t num_topics)
     {
-        if (!U_rowmajor)
-            compute_U_rowmajor();
 
         const char transa = 'N';
         const MKL_INT m = num_docs();
