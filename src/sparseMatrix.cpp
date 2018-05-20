@@ -1251,9 +1251,11 @@ namespace ISLE
         delete[] U_colmajor;
         U_colmajor = NULL;
 
+#if USE_EXPLICIT_PROJECTED_MATRIX
         assert(SigmaVT != NULL);
         delete[] SigmaVT;
         SigmaVT = NULL;
+#endif
     }
 
 
