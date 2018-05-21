@@ -1498,12 +1498,15 @@ namespace ISLE
         std::fill_n(ones_vec, std::max(doc_end - doc_begin, num_centers), (FPTYPE)1.0);
 
         FPTYPE *centers_tr = new FPTYPE[(size_t)num_centers*(size_t)vocab_size()];
+				FPomatcopy('C', 'T', vocab_size(), num_centers, 1.0f, centers,
+             			 vocab_size(), centers_tr, num_centers);
+/*
         // Improve this
         for (word_id_t r = 0; r < vocab_size(); ++r)
             for (auto c = 0; c < num_centers; ++c)
                 centers_tr[(size_t)c + (size_t)r * (size_t)num_centers]
                 = centers[(size_t)r + (size_t)c * (size_t)vocab_size()];
-
+*/
         const char transa = 'N';
         const MKL_INT m = doc_end - doc_begin;
         const MKL_INT n = num_centers;
