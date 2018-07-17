@@ -86,7 +86,7 @@ int main(int argv, char**argc)
 
     doc_id_t doc_block_size = 100000;
     int64_t num_blocks = divide_round_up(num_docs, doc_block_size);
-    auto llhs = new FPTYPE[num_docs];
+    auto llhs = new std::pair<FPTYPE, FPTYPE> [num_docs];
     auto nconverged = new doc_id_t[num_blocks];
 
     pfor(int64_t block = 0; block < num_blocks; ++block) {
@@ -105,11 +105,11 @@ int main(int argv, char**argc)
                 << ", " << doc << "]" << std::endl;
 
             llhs[doc] = infer.infer_doc_in_file(doc, wts, iters, Lfguess);
-            if (llhs[doc] != 0.0)
+            if (llhs[doc].first != 0.0)
                 nconverged[block]++;
             else std::cout << "Doc: " << doc << "failed to converge" << std::endl;
             for (doc_id_t topic = 0; topic < num_topics; ++topic)
-                out.concat_float(llhs[doc] == 0.0 ? 1.0 / (FPTYPE)num_topics : wts[topic], '\t', 1, 8);
+                out.concat_float(llhs[doc].first == 0.0 ? 1.0 / (FPTYPE)num_topics : wts[topic], '\t', 1, 8);
             out.add_endline();
         }
         out.flush_and_close();
@@ -120,8 +120,22 @@ int main(int argv, char**argc)
     std::cout << "Number of docs for which inference converged: " << nconvergedall
         << " (of " << num_docs << ")" << std::endl;
 
-    std::cout << "Avg LLH for converged docs: "
-        << std::accumulate(llhs, llhs + ((num_blocks*doc_block_size < num_docs) ? num_blocks*doc_block_size : num_docs), 0.0) / nconvergedall << std::endl;
+    std::pair<FPTYPE,FPTYPE> sum_llhs;
+    sum_llhs.first = 0.0;
+    sum_llhs.second = 0.0;
+
+     
+    doc_id_t llhs_size = num_blocks*doc_block_size < num_docs ? num_blocks*doc_block_size : num_docs;
+    for (doc_id_t doc = 0; doc < llhs_size; doc++){
+        sum_llhs.first += llhs[doc].first;
+        sum_llhs.second += llhs[doc].second;
+    }
+
+    std::cout << "Avg LLH per document for converged docs: "
+      << ((FPTYPE)num_docs/nconvergedall) * sum_llhs.first / nconvergedall << std::endl;
+
+    std::cout << "Avg LLH per word: "
+      << sum_llhs.second / max_entries << std::endl;
 
     delete[] nconverged;
     delete[] llhs;

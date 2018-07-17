@@ -64,7 +64,7 @@ namespace ISLE
             const doc_id_t num_docs_);
         ~ISLEInfer();
 
-        FPTYPE infer_doc_in_file(
+        std::pair<FPTYPE, FPTYPE> infer_doc_in_file(
             doc_id_t doc,
             FPTYPE* w,
             const int iters,
@@ -74,7 +74,7 @@ namespace ISLE
             const FPTYPE *const a,
             const FPTYPE *const M,
             FPTYPE* w,
-            const int nnzs,
+            const int nnzs_in_doc,
             const int iters,
             FPTYPE Lf); // Need to estimate Lipschitz cosntant for this instance
 
@@ -83,13 +83,15 @@ namespace ISLE
             const FPTYPE *const a,
             const FPTYPE *const M,
             FPTYPE* w,
-            const int nnzs);
+            const int nnzs_in_doc);
 
-        FPTYPE calculate_llh(
+        std::pair<FPTYPE, FPTYPE> calculate_llh(
             const FPTYPE *const a,
             const FPTYPE *const M,
             FPTYPE* w,
-            const int nnzs);
+            const int nnzs_in_doc,
+            const int words_in_doc 
+       );
     };
 }
 

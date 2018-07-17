@@ -47,6 +47,7 @@ namespace ISLE
         inline offset_t  get_nnzs()		const { return _nnzs; }
         inline doc_id_t  num_docs()		const { return _num_docs; }
         inline word_id_t vocab_size()	const { return _vocab_size; }
+        inline T         get_avg_doc_sz()       const { return avg_doc_sz; } 
 
         inline offset_t	 offset_CSC(doc_id_t doc)		const { return offsets_CSC[doc]; }
         inline word_id_t row_CSC(offset_t pos)			const { return rows_CSC[pos]; }
