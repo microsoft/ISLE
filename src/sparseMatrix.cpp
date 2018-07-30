@@ -129,7 +129,7 @@ namespace ISLE
         #ifndef NOPAR
         #pragma omp parallel for schedule(dynamic, 131072) reduction(+:empty_docs)
         #endif
-        for(int64_t doc = 0; doc < num_docs(); ++doc) {
+        for(int64_t doc = 0; doc < (int64_t)num_docs(); ++doc) {
             auto doc_sum = std::accumulate(vals_CSC + offsets_CSC[doc], vals_CSC + offsets_CSC[doc + 1],
                 (T)0.0, std::plus<T>());
             if (doc_sum == (T)0)
@@ -682,11 +682,11 @@ namespace ISLE
                     if (std::get<2>(*iter) > max) {
                         max2 = max; max2_topic = max_topic;
                         max = std::get<2>(*iter);
-                        max_topic = std::get<1>(*iter);
+                        max_topic = (int)std::get<1>(*iter);
                     }
                     else if (std::get<2>(*iter) > max2) {
                         max2 = std::get<2>(*iter);
-                        max2_topic = std::get<1>(*iter);
+                        max2_topic = (int)std::get<1>(*iter);
                     }
                 }
                 if (max_topic >= 0 && max2_topic >= 0) {
@@ -848,8 +848,8 @@ namespace ISLE
         coherences.resize(num_topics, 0.0);
         for (auto topic = 0; topic < num_topics; ++topic) {
             if (top_words[topic].size() > 1)
-                pfor_dynamic_8192(long long word = 0; word < M; ++word)
-                for (word_id_t word2 = 0; word2 < word; ++word2) {
+                pfor_dynamic_8192(long long word = 0; word < (long long)M; ++word)
+                for (word_id_t word2 = 0; word2 < (word_id_t)word; ++word2) {
                     assert(doc_freqs[topic][word2] > 0);
                     coherences[topic]
                         += (FPTYPE)std::log(joint_doc_freqs[topic][word][word2] + coherence_eps)
@@ -1025,7 +1025,7 @@ namespace ISLE
 
         assert(docs_log_fact.size() == 0);
         docs_log_fact.resize(num_docs());
-        pfor_dynamic_131072(int64_t doc = 0; doc < num_docs(); ++doc) {
+        pfor_dynamic_131072(int64_t doc = 0; doc < (int64_t)num_docs(); ++doc) {
             FPTYPE doclogfact = 0;
             for (offset_t pos = offset_CSC(doc); pos < offset_CSC(doc + 1); ++pos)
                 doclogfact -= log_fact[(int)val_CSC(pos)];
@@ -1398,7 +1398,7 @@ namespace ISLE
         std::cout << "sampling docs: pivot: " << pivot << std::endl;
 
         auto select_docs = new bool[num_docs()];
-        pfor_dynamic_131072(int64_t doc = 0; doc < num_docs(); ++doc) {
+        pfor_dynamic_131072(int64_t doc = 0; doc < (int64_t)num_docs(); ++doc) {
             select_docs[doc] = (doc_weights[doc] >= pivot);
         }
 
@@ -1554,7 +1554,7 @@ namespace ISLE
             num_centers, centers, centers_l2sq,
             doc_begin, doc_end, docs_l2sq, dist_matrix);
 
-        pfor_static_131072(int64_t d = 0; d < doc_end - doc_begin; ++d)
+        pfor_static_131072(int64_t d = 0; d < (int64_t)(doc_end - doc_begin); ++d)
             center_index[d] = (doc_id_t)FPimin(num_centers,
                 dist_matrix + (size_t)d * (size_t)num_centers, 1);
     }
@@ -1565,7 +1565,7 @@ namespace ISLE
         FPTYPE * centers_l2sq,
         const doc_id_t num_centers)
     {
-        pfor_static_256(int64_t c = 0; c < num_centers; ++c)
+        pfor_static_256(int64_t c = 0; c < (int64_t)num_centers; ++c)
             centers_l2sq[c] = FPdot(vocab_size(),
                 centers + (size_t)c * (size_t)vocab_size(), 1,
                 centers + (size_t)c * (size_t)vocab_size(), 1);
@@ -1669,7 +1669,7 @@ namespace ISLE
     {
         assert(docs_l2sq != NULL);
         FPscal(num_docs(), 0.0, docs_l2sq, 1);
-        pfor_static_131072(int64_t d = 0; d < num_docs(); ++d)
+        pfor_static_131072(int64_t d = 0; d < (int64_t)num_docs(); ++d)
             for (auto witer = offsets_CSC[d]; witer < offsets_CSC[d + 1]; ++witer)
                 docs_l2sq[d] += vals_CSC[witer] * vals_CSC[witer];
     }
@@ -1853,7 +1853,7 @@ namespace ISLE
             num_centers, projected_centers_tr, projected_centers_l2sq,
             doc_begin, doc_end, projected_docs_l2sq, projected_dist_matrix);
 
-        pfor_static_131072(int64_t d = 0; d < doc_end - doc_begin; ++d)
+        pfor_static_131072(int64_t d = 0; d < (int64_t)(doc_end - doc_begin); ++d)
             center_index[d] = (doc_id_t)FPimin(num_centers,
                 projected_dist_matrix + (size_t)d * (size_t)num_centers, 1);
     }
@@ -1865,7 +1865,7 @@ namespace ISLE
         const doc_id_t num_centers)
     {
         assert(U_cols == num_centers);
-        pfor_static_256(int64_t c = 0; c < num_centers; ++c)
+        pfor_static_256(int64_t c = 0; c < (int64_t)num_centers; ++c)
             projected_centers_l2sq[c] = FPdot(num_centers,
                 projected_centers + (size_t)c * (size_t)num_centers, 1,
                 projected_centers + (size_t)c * (size_t)num_centers, 1);
@@ -1927,7 +1927,7 @@ namespace ISLE
         
         // projected_centers_tr = num_centers x num_topics [row-major, each column a center]
         FPTYPE *projected_centers_tr = new FPTYPE[(size_t)num_centers * (size_t)U_cols];
-        for (word_id_t r = 0; r < U_cols; ++r)
+        for (MKL_INT r = 0; r < U_cols; ++r)
             for (auto c = 0; c < num_centers; ++c)
                 projected_centers_tr[(size_t)c + (size_t)r * (size_t)num_centers]
                 = projected_centers[(size_t)r + (size_t)c * (size_t)U_cols];
@@ -2087,7 +2087,7 @@ namespace ISLE
 
         FPTYPE *projected_centers_tr = new FPTYPE[(size_t)num_centers * (size_t)U_cols];
         // Improve this
-        for (word_id_t r = 0; r < U_cols; ++r)
+        for (MKL_INT r = 0; r < U_cols; ++r)
             for (auto c = 0; c < num_centers; ++c)
                 projected_centers_tr[(size_t)c + (size_t)r * (size_t)num_centers]
                 = projected_centers[(size_t)r + (size_t)c * (size_t)U_cols];
@@ -2097,7 +2097,7 @@ namespace ISLE
             doc_begin, doc_end, projected_docs_l2sq,
             projected_dist);
 
-        pfor_static_131072(int d = doc_begin; d < doc_end; ++d) {
+        pfor_static_131072(MKL_INT d = (MKL_INT)doc_begin; d < (MKL_INT)doc_end; ++d) {
             if (num_centers == 1) {
                 // Round about for small negative distances
                 size_t pos = (size_t)d - (size_t)doc_begin;
@@ -2150,7 +2150,7 @@ namespace ISLE
         while (centers.size() < k) {
             std::cout << "centers.size():  " << centers.size() 
                 << "   new_centers_added: " << new_centers_added << std::endl;
-            pfor(int64_t block = 0; block < divide_round_up(num_docs(), (doc_id_t)DOC_BLOCK_SIZE); ++block)
+            pfor(int64_t block = 0; block < (int64_t)divide_round_up(num_docs(), (doc_id_t)DOC_BLOCK_SIZE); ++block)
                 update_min_distsq_to_projected_centers(U_cols, new_centers_added,
                     centers_coords + (size_t)(centers.size() - new_centers_added) * (size_t)U_cols,
                     block*DOC_BLOCK_SIZE, std::min(((doc_id_t)block + 1)*(doc_id_t)DOC_BLOCK_SIZE, num_docs()),
@@ -2166,7 +2166,7 @@ namespace ISLE
                 assert(std::find(iter + 1, centers.end(), *iter) == centers.end());
             }
 
-            int s = centers.size();
+            int s = (int)centers.size();
             new_centers_added = 0;
             for (int c = 0; (c < 1 + std::sqrt(s - 5 > 0 ? s - 5 : 0)) && (centers.size() < k); ++c) {
                 auto dice_throw = dist_cumul[num_docs()] * rand_fraction();

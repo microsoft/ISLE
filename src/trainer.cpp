@@ -561,9 +561,9 @@ namespace ISLE
         //
         MKL_UINT r;
         if (flag_sample_docs)
-            r = std::floor(eps2_c*w0_c*(FPTYPE)num_docs*sample_rate / (FPTYPE)(2.0*num_topics));
+            r = (MKL_UINT)std::floor(eps2_c*w0_c*(FPTYPE)num_docs*sample_rate / (FPTYPE)(2.0*num_topics));
         else
-            r = std::floor(eps2_c*w0_c*(FPTYPE)num_docs / (FPTYPE)(2.0*num_topics));
+            r = (MKL_UINT)std::floor(eps2_c*w0_c*(FPTYPE)num_docs / (FPTYPE)(2.0*num_topics));
 
         if (how_data_loaded == data_ingest::FILE_DATA_LOAD 
             || how_data_loaded == data_ingest::ITERATIVE_DATA_LOAD) {

@@ -106,9 +106,9 @@ namespace ISLE
                     &info); // info is useless
             } 
             else {
-                std::vector<std::tuple<MKL_INT, MKL_INT, FPTYPE> > entries;
+                std::vector<std::tuple<MKL_UINT, MKL_UINT, FPTYPE> > entries;
                 entries.reserve(nnzs);
-                for (MKL_INT col = 0; col < ncols; ++col)
+                for (MKL_UINT col = 0; col < ncols; ++col)
                     for (offset_t pos = offsets_CSC[col]; pos < offsets_CSC[col + 1]; ++pos)
                         entries.emplace_back(col, rows_CSC[pos], vals_CSC[pos]);
                 parallel_sort(entries.begin(), entries.end(),
@@ -116,12 +116,12 @@ namespace ISLE
                 {return std::get<1>(l) < std::get<1>(r)
                     || (std::get<1>(l) == std::get<1>(r)) && (std::get<0>(l) < std::get<0>(r)); });
 
-                MKL_INT cur_row = 0;
+                MKL_UINT cur_row = 0;
                 offsets_CSR[0] = 0;
-                MKL_INT pos = 0;
+                MKL_UINT pos = 0;
                 for (auto iter = entries.begin(); iter < entries.end(); ++iter) {
                     if (std::get<1>(*iter) > cur_row) {
-                        for (MKL_INT r = cur_row; r < std::get<1>(*iter); ++r)
+                        for (MKL_UINT r = cur_row; r < std::get<1>(*iter); ++r)
                             offsets_CSR[r+1] = pos;
                         cur_row = std::get<1>(*iter);
                     }
@@ -130,7 +130,7 @@ namespace ISLE
                     ++pos;
                 }
                 if (cur_row < max_dim) {
-                    for (MKL_INT r = cur_row; r < max_dim; ++r)
+                    for (MKL_UINT r = cur_row; r < max_dim; ++r)
                         offsets_CSR[r+1] = pos;
                 }
             }
@@ -182,8 +182,8 @@ namespace ISLE
 
                 for (auto row = 0; row < nrows; ++row) {
                     size_t prev_block = 0;
-                    size_t prev_pos = offsets_CSR[row];
-                    size_t pos = offsets_CSR[row];
+                    auto prev_pos = offsets_CSR[row];
+                    auto pos = offsets_CSR[row];
                     for (pos = offsets_CSR[row]; pos < offsets_CSR[row + 1]; ++pos) {
                         auto block = cols_CSR[pos] / nrows;
                         if (prev_block < block) {
@@ -350,7 +350,7 @@ namespace ISLE
             }
             else {
                 mkl_set_num_threads_local(1);
-                pfor(int64_t block = 0; block < num_row_blocks; ++block) {
+                pfor(int64_t block = 0; block < (int64_t)num_row_blocks; ++block) {
                     perform_csrmm(shifted_offsets[block],
                         this->cols_CSR + offsets_CSR[row_block_offsets[block]],
                         this->vals_CSR + offsets_CSR[row_block_offsets[block]],
@@ -387,12 +387,12 @@ namespace ISLE
             else if (split_CSR_by_rows) {
                 FPscal(nrows, 0.0, y_out, 1);
                 {
-                    int block_size = 32;
-                    size_t num_blocks = nrows % block_size == 0
+                    MKL_UINT block_size = 32;
+                    MKL_UINT num_blocks = nrows % block_size == 0
                         ? nrows / block_size : nrows / block_size + 1;
                     pfor_dynamic_1(int i = 0; i <= num_row_blocks; ++i) {
-                        int begin = row_block_offsets[i];
-                        int end = row_block_offsets[i + 1];
+                        auto begin = row_block_offsets[i];
+                        auto end = row_block_offsets[i + 1];
                         if (end > nrows) end = nrows;
                         for (auto row = begin; row < end; ++row)
                             for (auto pos = offsets_CSR[row]; pos < offsets_CSR[row + 1]; ++pos)
