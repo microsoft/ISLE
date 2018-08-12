@@ -366,7 +366,7 @@ namespace ISLE
 
             if (std::is_same<T, FPTYPE>::value) {
                 for (auto iter = freqs[word].begin(); iter != freqs[word].end(); ++iter) {
-                    assert(*iter <= avg_doc_sz);
+                    assert(*iter <= avg_doc_sz + 1e-2);
                     *iter = std::round(*iter);
                 }
                 auto trunc = std::lower_bound(freqs[word].begin(), freqs[word].end(), 0.0, std::greater<>());

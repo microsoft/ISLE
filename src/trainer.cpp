@@ -786,6 +786,8 @@ namespace ISLE
         //}
         out_log->print_cluster_details(num_topics, distsq, catchwords, closest_docs, coherences, nl_coherences);
         timer.next_time_secs("Output summary");
+        output_top_words();
+
     }
 
     //
