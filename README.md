@@ -1,7 +1,7 @@
 # Build
 
 Both Linux and Windows 10 builds use Intel(R) MKL(R) library. We used 2017 version; other versions might work as well.
-Suppose you have installed MKL at <MKL_ROOT>. In Linux, this is typically `/opt/intel/mkl`.
+Suppose you have installed MKL at `<MKL_ROOT>`. In Linux, this is typically `/opt/intel/mkl`.
 In Windows 10, this is typically `C:\Program Files (x86)\IntelSWTools\compilers_and_libraries_2017\windows\mkl`
 
 ## Linux / gcc
@@ -18,7 +18,7 @@ This should generate two executables `ISLETrain` and `ISLEInfer` in the `<ISLE_R
 
 Open `<ISLE_ROOT>\win\ISLE.sln` in VS2015, and build the `ISLETrain` and `ISLEInfer` projects.
 The Debug build uses dynamic linking for C runtime, OpenMP, and MKL libraries.
-The Relesae build links all these dependencies statically into a self-contained exe.
+The Release build links all these dependencies statically into a self-contained exe.
 
 If there is a problem with this, you could configure project file properties as follows:
 * Under VC++ Directories >
