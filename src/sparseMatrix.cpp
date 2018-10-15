@@ -358,8 +358,10 @@ namespace ISLE
         word_id_t freq_less_words = 0;
 
         // Check:  rounding down vs round to nearest
-        const doc_id_t count_gr = (doc_id_t)(w0_c * (FPTYPE)num_docs() / (2.0 * (FPTYPE)num_topics));
-        const doc_id_t count_eq = (doc_id_t)std::ceil(3.0 * eps1_c * w0_c * (FPTYPE)num_docs() / (FPTYPE)num_topics);
+        doc_id_t count_gr = (doc_id_t)(w0_c * (FPTYPE)num_docs() / (2.0 * (FPTYPE)num_topics));
+        doc_id_t count_eq = (doc_id_t)std::ceil(3.0 * eps1_c * w0_c * (FPTYPE)num_docs() / (FPTYPE)num_topics);
+        if (count_gr == 0) count_gr = 1;
+        if (count_eq == 0) count_eq = 1;
 
         for (word_id_t word = word_begin; word < word_end; ++word) {
             assert(std::is_sorted(freqs[word].begin(), freqs[word].end(), std::greater<>()));
