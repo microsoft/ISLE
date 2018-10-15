@@ -3,6 +3,8 @@
 
 #pragma once
 
+#include <malloc.h>
+
 #include "types.h"
 #include "ks_types.h"
 #include "timer.h"
@@ -40,6 +42,7 @@ namespace ISLE
         size_t		num_row_blocks;
         size_t		*row_block_offsets;
         FPTYPE		row_block_exp;
+        MKL_INT     **shifted_offsets;
 
         Timer		*op_timer;
         double		op_user_time_sum;
@@ -57,7 +60,8 @@ namespace ISLE
             nrows(nrows_), ncols(ncols_), nnzs(nnzs_),
             max_dim(ncols_ > nrows_ ? ncols_ : nrows_),
             split_CSR_by_rows(split_CSR_by_rows_),
-            split_CSR_by_cols(split_CSR_by_cols_)
+            split_CSR_by_cols(split_CSR_by_cols_),
+            row_block_offsets(NULL), shifted_offsets(NULL)
         {
             assert(sizeof(word_id_t) == sizeof(MKL_INT));
             assert(sizeof(offset_t) == sizeof(MKL_INT));
@@ -83,14 +87,53 @@ namespace ISLE
             cols_CSR = new MKL_INT[nnzs];
             offsets_CSR = new MKL_INT[max_dim + 1];
 
-            const MKL_INT job[6] = { 1,0,0,0,0,1 }; // First 1: CSC->CSR, last 1: fill acsr, ja,ia
-            const MKL_INT m = max_dim;
-            MKL_INT info = 0;
+            #ifdef LINUX
+            assert(sizeof(FPTYPE)*(size_t)nnzs <= malloc_usable_size(vals_CSR));
+            assert(sizeof(FPTYPE)*(size_t)nnzs <= malloc_usable_size(vals_CSC));
+            assert(sizeof(MKL_INT)*(size_t)nnzs <= malloc_usable_size(cols_CSR));
+            assert(sizeof(MKL_INT)*(size_t)nnzs <= malloc_usable_size(rows_CSC));
+            #endif
+            
+            // MKL csr to csc conversion routine is buggy when nnzs move beyond 2^31 or 2^32
+            if ((offset_t)nnzs < (offset_t)(1 << 31)) {
+                const MKL_INT job[6] = { 1,0,0,0,0,1 }; // First 1: CSC->CSR, last 1: fill acsr, ja,ia
+                const MKL_INT m = max_dim;
+                MKL_INT info = 0;
 
-            FPcsrcsc(job, &m,
-                vals_CSR, cols_CSR, offsets_CSR,
-                vals_CSC, (MKL_INT*)rows_CSC, (MKL_INT*)offsets_CSC,
-                &info); // info is useless
+                FPcsrcsc(job, &m,
+                    vals_CSR, cols_CSR, offsets_CSR,
+                    vals_CSC, (MKL_INT*)rows_CSC, (MKL_INT*)offsets_CSC,
+                    &info); // info is useless
+            } 
+            else {
+                std::vector<std::tuple<MKL_UINT, MKL_UINT, FPTYPE> > entries;
+                entries.reserve(nnzs);
+                for (MKL_UINT col = 0; col < ncols; ++col)
+                    for (offset_t pos = offsets_CSC[col]; pos < offsets_CSC[col + 1]; ++pos)
+                        entries.emplace_back(col, rows_CSC[pos], vals_CSC[pos]);
+                parallel_sort(entries.begin(), entries.end(),
+                    [](const auto&l, const auto &r)
+                {return std::get<1>(l) < std::get<1>(r)
+                    || (std::get<1>(l) == std::get<1>(r)) && (std::get<0>(l) < std::get<0>(r)); });
+
+                MKL_UINT cur_row = 0;
+                offsets_CSR[0] = 0;
+                MKL_UINT pos = 0;
+                for (auto iter = entries.begin(); iter < entries.end(); ++iter) {
+                    if (std::get<1>(*iter) > cur_row) {
+                        for (MKL_UINT r = cur_row; r < std::get<1>(*iter); ++r)
+                            offsets_CSR[r+1] = pos;
+                        cur_row = std::get<1>(*iter);
+                    }
+                    vals_CSR[pos] = std::get<2>(*iter);
+                    cols_CSR[pos] = std::get<0>(*iter);
+                    ++pos;
+                }
+                if (cur_row < max_dim) {
+                    for (MKL_UINT r = cur_row; r < max_dim; ++r)
+                        offsets_CSR[r+1] = pos;
+                }
+            }
 
             if (check) {
                 for (auto i = nrows; i <= max_dim; ++i)
@@ -139,8 +182,8 @@ namespace ISLE
 
                 for (auto row = 0; row < nrows; ++row) {
                     size_t prev_block = 0;
-                    size_t prev_pos = offsets_CSR[row];
-                    size_t pos = offsets_CSR[row];
+                    auto prev_pos = offsets_CSR[row];
+                    auto pos = offsets_CSR[row];
                     for (pos = offsets_CSR[row]; pos < offsets_CSR[row + 1]; ++pos) {
                         auto block = cols_CSR[pos] / nrows;
                         if (prev_block < block) {
@@ -182,7 +225,7 @@ namespace ISLE
             }
 
             if (split_CSR_by_rows) {
-                size_t row_block_size = 32;
+                /*size_t row_block_size = 32;
                 row_block_exp = 1.25;
                 num_row_blocks = (std::log2(1 + (nrows / row_block_size)) / std::log2(row_block_exp));
                 row_block_offsets = new size_t[num_row_blocks + 20];
@@ -196,6 +239,29 @@ namespace ISLE
                         break;
                     }
                     i++;
+                }*/
+                assert(nnzs == offsets_CSR[nrows]);
+                offset_t chunk_size = 1 << 24;
+                row_block_offsets = new size_t[1 + divide_round_up(nnzs, chunk_size)];
+                row_block_offsets[0] = 0;
+                num_row_blocks = 0;
+                size_t row_begin = 0;
+                size_t row_end = 0;
+                while (row_begin < nrows) {
+                    while (offsets_CSR[row_end] - offsets_CSR[row_begin] < chunk_size
+                        && row_end < nrows)
+                        ++row_end;
+                    row_block_offsets[++num_row_blocks] = row_end;
+                    row_begin = row_end;
+                }
+                assert(num_row_blocks <= divide_round_up(nnzs, chunk_size));
+
+                shifted_offsets = new MKL_INT*[num_row_blocks];
+                for (size_t block = 0; block < num_row_blocks; ++block) {
+                    shifted_offsets[block] = new MKL_INT[row_block_offsets[block + 1] - row_block_offsets[block] + 1];
+                    for (auto row = row_block_offsets[block]; row <= row_block_offsets[block + 1]; ++row)
+                        shifted_offsets[block][row - row_block_offsets[block]] =
+                        this->offsets_CSR[row] - this->offsets_CSR[row_block_offsets[block]];
                 }
                 assert(row_block_offsets[num_row_blocks - 1] < nrows);
                 assert(row_block_offsets[num_row_blocks] == nrows);
@@ -228,6 +294,11 @@ namespace ISLE
             if (split_CSR_by_rows) {
                 assert(row_block_offsets != NULL);
                 delete[] row_block_offsets;
+
+                assert(shifted_offsets != NULL);
+                for (size_t block = 0; block < num_row_blocks; ++block)
+                    delete[] shifted_offsets[block];
+                delete[] shifted_offsets;
             }
 
             std::cout << "Time spent in matvecs: "
@@ -272,9 +343,23 @@ namespace ISLE
                 this->vals_CSC, rm_in.memptr(), m_temp.memptr(), 
                 this->ncols, this->nrows, m_in.n_cols, 1.0f, 0.0f);
 
-            perform_csrmm(this->offsets_CSR, this->cols_CSR, 
-                this->vals_CSR, m_temp.memptr(), m_out.memptr(),
-                this->nrows, this->ncols, m_in.n_cols, 1.0f, 0.0f);
+            if (!split_CSR_by_rows) {
+                perform_csrmm(this->offsets_CSR, this->cols_CSR,
+                    this->vals_CSR, m_temp.memptr(), m_out.memptr(),
+                    this->nrows, this->ncols, m_in.n_cols, 1.0f, 0.0f);
+            }
+            else {
+                mkl_set_num_threads_local(1);
+                pfor(int64_t block = 0; block < (int64_t)num_row_blocks; ++block) {
+                    perform_csrmm(shifted_offsets[block],
+                        this->cols_CSR + offsets_CSR[row_block_offsets[block]],
+                        this->vals_CSR + offsets_CSR[row_block_offsets[block]],
+                        m_temp.memptr(), m_out.memptr() + (row_block_offsets[block] * m_in.n_cols),
+                        row_block_offsets[block + 1] - row_block_offsets[block],
+                        this->ncols, m_in.n_cols, 1.0f, 0.0f);
+                }
+                mkl_set_num_threads_local(0);
+            }
 
             return arma::trans(m_out);
         }
@@ -302,12 +387,12 @@ namespace ISLE
             else if (split_CSR_by_rows) {
                 FPscal(nrows, 0.0, y_out, 1);
                 {
-                    int block_size = 32;
-                    size_t num_blocks = nrows % block_size == 0
+                    MKL_UINT block_size = 32;
+                    MKL_UINT num_blocks = nrows % block_size == 0
                         ? nrows / block_size : nrows / block_size + 1;
                     pfor_dynamic_1(int i = 0; i <= num_row_blocks; ++i) {
-                        int begin = row_block_offsets[i];
-                        int end = row_block_offsets[i + 1];
+                        auto begin = row_block_offsets[i];
+                        auto end = row_block_offsets[i + 1];
                         if (end > nrows) end = nrows;
                         for (auto row = begin; row < end; ++row)
                             for (auto pos = offsets_CSR[row]; pos < offsets_CSR[row + 1]; ++pos)

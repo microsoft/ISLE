@@ -76,7 +76,7 @@ void BlockKs<ProdOp>::expand()
     // Expand & orthogonalize
     PRINT_SIZE(H);
     Vk = V.cols(H.n_cols, H.n_rows - 1);
-    PRINT(arma::norm(Vk));
+    PRINT_NORM(Vk);
     F = this->op->multiply(Vk);
     timer.next_time_secs("Ax(Vk)");
     ARMA_FPMAT V_temp(V.memptr(), V.n_rows, H.n_rows, false, true);
@@ -98,7 +98,7 @@ void BlockKs<ProdOp>::expand()
     // Copy all 'rk' vectors to V
     for (uint64_t j = 0; j < rk; j++)
       V.unsafe_col(H.n_cols + j) = Q.col(j);
-    PRINT(arma::norm(V.cols(H.n_cols, H.n_rows - 1)));
+    PRINT_NORM(V.cols(H.n_cols, H.n_rows - 1));
     // Resize R to be upper triangular, concentrated in top left corner
     R = arma::join_cols(R, arma::zeros<ARMA_FPMAT>(blk_size - rk, R.n_cols));
     H.submat(H.n_rows - blk_size, H.n_cols - blk_size, H.n_rows - 1,
@@ -125,14 +125,14 @@ void BlockKs<ProdOp>::expand()
           nvecs += rk2;
         }
       }
-      PRINT(arma::norm(V.t() * V - arma::eye<ARMA_FPMAT>(V.n_cols, V.n_cols)));
+      PRINT_NORM(V.t() * V - arma::eye<ARMA_FPMAT>(V.n_cols, V.n_cols));
       if (nTries == 100 && nvecs < H.n_rows)
         std::runtime_error(
             "Unable to find new starting basis for Arnoldi expansion.");
     }
     timer.next_time_secs("Orthonormalize");
   }
-  PRINT(arma::norm(V.t() * V - arma::eye<ARMA_FPMAT>(V.n_cols, V.n_cols)));
+  PRINT_NORM(V.t() * V - arma::eye<ARMA_FPMAT>(V.n_cols, V.n_cols));
 }
 
 template<class ProdOp>
@@ -149,10 +149,9 @@ void BlockKs<ProdOp>::truncate()
   // Compute EVD of `H` & rearrange
   subH = H.submat(nconv, nconv, H.n_cols - 1, H.n_cols - 1);
   bool success = arma::eig_sym(eH, vH, subH);
-  // PRINT(arma::norm(arma::imag(vvH)));
-  // PRINT(arma::norm(arma::imag(eeH)));
-  PRINT(arma::norm((vH.t() * subH * vH) - arma::diagmat(eH)));
-  PRINT(arma::norm((vH.t() * vH) - arma::eye<ARMA_FPMAT>(vH.n_cols, vH.n_cols)));
+  
+  PRINT_NORM((vH.t() * subH * vH) - arma::diagmat(eH));
+  PRINT_NORM((vH.t() * vH) - arma::eye<ARMA_FPMAT>(vH.n_cols, vH.n_cols));
 
   if (!success)
     throw std::runtime_error("evd(H) failed");
@@ -184,7 +183,7 @@ void BlockKs<ProdOp>::truncate()
   H = H.head_cols(nev);
   H = H.head_rows(nev + blk_size);
 
-  PRINT(arma::norm(V.t() * V - arma::eye<ARMA_FPMAT>(V.n_cols, V.n_cols)));
+  PRINT_NORM(V.t() * V - arma::eye<ARMA_FPMAT>(V.n_cols, V.n_cols));
 }
 
 template<class ProdOp>
@@ -277,7 +276,7 @@ void BlockKs<ProdOp>::compute()
 
     // Compute residuals & determine nconv
     residual_blk = H.tail_rows(blk_size);
-    norms = arma::sum(arma::square(residual_blk), 0);
+    norms = arma::sqrt(arma::sum(arma::square(residual_blk), 0));
     ARMA_FPVEC evs = arma::diagvec(H);
     evs = evs.head(norms.n_cols);
     norms = norms / evs.t();
@@ -304,7 +303,7 @@ void BlockKs<ProdOp>::compute()
   if (n_restarts == this->maxit) {
     // Compute residuals & determine nconv
     residual_blk = H.tail_rows(blk_size);
-    norms = arma::sum(arma::square(residual_blk), 0);
+    norms = arma::sqrt(arma::sum(arma::square(residual_blk), 0));
     PRINT(norms);
     idxs = find(norms >= tol, 1, "first");
 

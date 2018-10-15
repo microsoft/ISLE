@@ -14,6 +14,8 @@ typedef float ARMA_FPTYPE;
 #ifdef DEBUG
 #define PRINT(X) \
   { std::cerr << #X << "::\n" << X << std::endl; }
+#define PRINT_NORM(X) \
+  { std::cerr << "NORM(" << #X << "): " << std::sqrt(arma::dot(X,X)) << std::endl; }
 #define PRINT_SIZE(X)                                                \
   {                                                                  \
     std::cerr << #X << ":: (" << X.n_rows << ", " << X.n_cols << ")" \
@@ -21,6 +23,8 @@ typedef float ARMA_FPTYPE;
   }
 #else
 #define PRINT(X) \
+  {}
+#define PRINT_NORM(X) \
   {}
 #define PRINT_SIZE(X) \
   {}
@@ -59,7 +63,8 @@ namespace utils {
     uint64_t    cur_rank = 0;
     for (uint64_t i = 0; i < A.n_cols; i++) {
       arma::vec v = a.col(i);
-      ARMA_FPTYPE    v_norm = arma::norm(v);
+      ARMA_FPTYPE v_norm = std::sqrt(arma::dot(v, v));
+      //ARMA_FPTYPE    v_norm = arma::norm(v);
       // Test if column is almost zero
       if (v_norm < 1e-6) {
         disc_idxs(i - cur_rank) = i;
@@ -107,17 +112,17 @@ for(uint64_t j=i;j<A.n_cols;j++){
     // PRINT(B);
     // PRINT(A);
     // PRINT(Q);
-    PRINT(arma::norm(Q.t() * Q - arma::eye<ARMA_FPMAT>(Q.n_cols, Q.n_cols)));
-    assert(arma::norm(Q.t() * Q - arma::eye<ARMA_FPMAT>(Q.n_cols, Q.n_cols)) <
-           1e-4);
+    // PRINT(arma::norm(Q.t() * Q - arma::eye<ARMA_FPMAT>(Q.n_cols, Q.n_cols)));
+    // assert(arma::norm(Q.t() * Q - arma::eye<ARMA_FPMAT>(Q.n_cols, Q.n_cols)) <
+    //      1e-4);
     // PRINT(R);
     // PRINT(P);
     PRINT(idxs.t());
-    PRINT(arma::norm(B - Q * R));
+    // PRINT(arma::norm(B - Q * R));
     // PRINT(arma::rank(B));
     // PRINT(arma::rank(R));
     PRINT(cur_rank);
-    assert(arma::norm(B - Q * R) < 1e-4);
+    // assert(arma::norm(B - Q * R) < 1e-4);
 #endif
   }
 

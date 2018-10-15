@@ -47,6 +47,7 @@ namespace ISLE
         inline offset_t  get_nnzs()		const { return _nnzs; }
         inline doc_id_t  num_docs()		const { return _num_docs; }
         inline word_id_t vocab_size()	const { return _vocab_size; }
+        inline T         get_avg_doc_sz()       const { return avg_doc_sz; } 
 
         inline offset_t	 offset_CSC(doc_id_t doc)		const { return offsets_CSC[doc]; }
         inline word_id_t row_CSC(offset_t pos)			const { return rows_CSC[pos]; }
@@ -68,6 +69,9 @@ namespace ISLE
 
         void allocate(const offset_t nnzs_);
 
+        void shrink(const offset_t new_nnzs_);
+
+
         inline T elem(
             const word_id_t& word,
             const doc_id_t& doc) const
@@ -81,6 +85,13 @@ namespace ISLE
 
         void populate_CSC(const std::vector<DocWordEntry<count_t> >& entries);
 
+        void populate_preprocessed_CSC(
+            offset_t nnzs,
+            FPTYPE avg_doc_sz,
+            FPTYPE* normalized_vals_CSC,
+            word_id_t* rows_CSC_,
+            offset_t *offsets_CSC);
+        
         template<class FPTYPE>
         FPTYPE doc_norm(
             doc_id_t doc,
@@ -103,10 +114,20 @@ namespace ISLE
 
         void list_word_freqs_by_sorting(std::vector<A_TYPE>* freqs);
 
+        void list_word_freqs_from_CSR(
+            const word_id_t word_begin,
+            const word_id_t word_end,
+            const FPTYPE *const normalized_vals_CSR,
+            const offset_t *const offsets_CSR,
+            std::vector<A_TYPE>* freqs);
+
         // Input: @num_topics, @freqs: one vector for each word listing its non-zero freqs in docs
         // Output: @zetas: Reference to cutoffs frequencies for each word
         // Return: Total number of entries that are above threshold
         offset_t compute_thresholds(
+            word_id_t word_begin,
+            word_id_t word_end,
+            std::vector<A_TYPE> *const freqs,
             std::vector<T>& zetas,
             const doc_id_t num_topics);
 
@@ -117,6 +138,18 @@ namespace ISLE
             const MKL_UINT r,
             const std::vector<doc_id_t>& doc_partition,
             T *thresholds);
+
+        void rth_highest_element_using_CSR(
+            const word_id_t word_begin,
+            const word_id_t word_end,
+            const doc_id_t num_topics,
+            const MKL_UINT r,
+            const std::vector<doc_id_t>* closest_docs,
+            const FPTYPE *const normalized_vals_CSR,
+            const doc_id_t *cols_CSR,
+            const offset_t *const offsets_CSR,
+            const int *const cluster_ids,
+            T *threshold_matrix);
 
         // Input: @num_topics, @thresholds: Threshold for (words,topic)
         // Output: @catchwords: list of catchwords for each topic
@@ -162,22 +195,23 @@ namespace ISLE
 
         void compute_log_combinatorial(std::vector<FPTYPE>& docs_log_fact);
 
-        friend class FloatingPointSparseMatrix<FPTYPE>;
+        friend class FPSparseMatrix<FPTYPE>;
     };
 
     template<class FPTYPE>
-    class FloatingPointSparseMatrix : public SparseMatrix<FPTYPE>
+    class FPSparseMatrix : public SparseMatrix<FPTYPE>
     {
         Eigen::MatrixX BBT;				// For Spectra EigenSolve
         //Eigen::MatrixX U_Spectra;		// first few eig vectors of this*this^T
         FPTYPE *U_colmajor;             // First num_topics eigenvectors of this*this^T
+        FPTYPE *U_rowmajor;             // U_colmajor in row-major form
         MKL_INT U_rows;
         MKL_INT U_cols;
         FPTYPE *SigmaVT;			    // Sigma * VT obtained from eigensolvers 
         MKL_INT num_singular_vals;		// Number of Singular values
 
     public:
-        friend class FloatingPointDenseMatrix<FPTYPE>;
+        friend class FPDenseMatrix<FPTYPE>;
 
         using SparseMatrix<FPTYPE>::allocate;
         using SparseMatrix<FPTYPE>::num_docs;
@@ -194,11 +228,11 @@ namespace ISLE
         using SparseMatrix<FPTYPE>::_nnzs;
         using SparseMatrix<FPTYPE>::_num_docs;
 
-        FloatingPointSparseMatrix(const word_id_t d, const doc_id_t s);
+        FPSparseMatrix(const word_id_t d, const doc_id_t s);
 
-        ~FloatingPointSparseMatrix();
+        ~FPSparseMatrix();
 
-        FloatingPointSparseMatrix(
+        FPSparseMatrix(
             const SparseMatrix<FPTYPE>& from,
             const bool copy_normalized = false);
 
@@ -230,7 +264,7 @@ namespace ISLE
             const doc_id_t num_topics,
             std::vector<FPTYPE>& evalues);
 
-       
+        void compute_U_rowmajor();
         void compute_sigmaVT(const doc_id_t num_topics);
 
         // Input: @from: Copy from here
@@ -240,6 +274,18 @@ namespace ISLE
         // Output: @original_cols: For remaining cols, id to original cols, if drop_empty==true
         template <class fromT>
         void threshold_and_copy(
+            const SparseMatrix<fromT>& from,
+            const std::vector<fromT>& zetas,
+            const offset_t nnzs,
+            std::vector<doc_id_t>& original_cols);
+
+        template <class fromT>
+        void threshold_and_copy_doc_block(
+            const doc_id_t doc_begin,
+            const doc_id_t doc_end,
+            offset_t& this_pos,
+            doc_id_t& nz_docs,
+            const bool* select_docs,             // pass NULL to pick all docs
             const SparseMatrix<fromT>& from,
             const std::vector<fromT>& zetas,
             const offset_t nnzs,
@@ -309,6 +355,8 @@ namespace ISLE
             FPTYPE * centers_l2sq,
             const doc_id_t num_centers);
 
+        void compute_docs_l2sq(FPTYPE *const docs_l2sq);
+
         FPTYPE lloyds_iter(
             const doc_id_t num_centers,
             FPTYPE *centers,
@@ -316,13 +364,95 @@ namespace ISLE
             std::vector<doc_id_t> *closest_docs = NULL,
             bool compute_residual = false);
 
-        void compute_docs_l2sq(FPTYPE *const docs_l2sq);
-
         FPTYPE run_lloyds(
             const doc_id_t			num_centers,
             FPTYPE					*centers,
             std::vector<doc_id_t>	*closest_docs, // Pass NULL if you dont want closest_docs
             const int				max_reps);
+
+        //
+        // U^T x docs in range [doc_begin, doc_end) 
+        // Output is projected docs in column-major order
+        //
+        void UT_times_docs(
+            const doc_id_t doc_begin,
+            const doc_id_t doc_end,
+            FPTYPE* const projected_docs);
+
+        //
+        // Let A denote the block of data [doc_begin, doc_end)
+        // This function computes out := A^T * in
+        // out is row-major with size (doc_end - doc_end) * cols
+        // in is row-major with size vocab_size() * cols
+        //
+        void multiply_with(
+            const doc_id_t doc_begin,
+            const doc_id_t doc_end,
+            const FPTYPE *const in,
+            FPTYPE *const out,
+            const MKL_INT cols);
+
+        void distsq_projected_docs_to_projected_centers(
+            const word_id_t dim,
+            doc_id_t num_centers,
+            const FPTYPE *const projected_centers_tr,
+            const FPTYPE *const projected_centers_l2sq,
+            const doc_id_t doc_begin,
+            const doc_id_t doc_end,
+            const FPTYPE *const projected_docs_l2sq,
+            FPTYPE *projected_dist_matrix);
+
+        // same input semantics as `closest_centers`
+        void projected_closest_centers(
+            const doc_id_t num_centers,
+            const FPTYPE *const projected_centers_tr,
+            const FPTYPE *const projected_centers_l2sq,
+            const doc_id_t doc_begin,
+            const doc_id_t doc_end,
+            const FPTYPE *const projected_docs_l2sq, 
+            doc_id_t *center_index,                  
+            FPTYPE *const projected_dist_matrix); 
+
+        void compute_projected_centers_l2sq(
+            FPTYPE * projected_centers,
+            FPTYPE * projected_centers_l2sq,
+            const doc_id_t num_centers);
+
+        void compute_projected_docs_l2sq(
+            FPTYPE *const projected_docs_l2sq);
+
+        FPTYPE lloyds_iter_on_projected_space(
+            const doc_id_t num_centers,
+            FPTYPE *projected_centers,
+            const FPTYPE *const projected_docs_l2sq,
+            std::vector<doc_id_t> *closest_docs = NULL,
+            bool compute_residual = false);
+
+        FPTYPE run_lloyds_on_projected_space(
+            const doc_id_t			num_centers,
+            FPTYPE					*projected_centers, // centers are already projected to U^T
+            std::vector<doc_id_t>	*closest_docs, // Pass NULL if you dont want closest_docs
+            const int				max_reps);
+
+        void update_min_distsq_to_projected_centers(
+            const word_id_t dim,
+            const doc_id_t num_centers,
+            const FPTYPE *const projected_centers,
+            const doc_id_t doc_begin,
+            const doc_id_t doc_end,
+            const FPTYPE *const projected_docs_l2sq,
+            FPTYPE *min_dist,
+            FPTYPE *projected_dist);
+
+        FPTYPE kmeanspp_on_projected_space(
+            const doc_id_t k,
+            std::vector<doc_id_t>&centers);
+
+        FPTYPE kmeans_init_on_projected_space(
+            const int num_centers,
+            const int max_reps,
+            std::vector<doc_id_t>&	best_seed,   // Wont be initialized if method==KMEANSBB
+            FPTYPE *const			best_centers_coords); // Wont be initialized if null
 
         // Input: @num_centers, @centers: coords of centers to start the iteration, @print_residual
         // Output: @closest_docs: if NULL, nothing is returned; is !NULL, return partition of docs between centers

@@ -62,7 +62,7 @@ void ISLE::create_dir(const std::string& dir_name)
         mkdir(log_dir_lpcwstr, S_IRWXU);
     else
         std::cerr << "Subdir exists already" << std::endl;
-    delete log_dir_lpcwstr;
+    delete[] log_dir_lpcwstr;
 #else
     assert(false);
 #endif

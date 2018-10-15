@@ -20,7 +20,7 @@
 namespace ISLE
 {
     class WordCountSparseMatrix;
-    template<class FPTYPE> class FloatingPointSparseMatrix;
+    template<class FPTYPE> class FPSparseMatrix;
 
     template<class T>
     class DenseMatrix
@@ -100,7 +100,7 @@ namespace ISLE
             const;
     };
 
-    template<class FPTYPE> class FloatingPointDenseMatrix;
+    template<class FPTYPE> class FPDenseMatrix;
 
     class WordCountDenseMatrix : public DenseMatrix<count_t>
     {
@@ -113,7 +113,7 @@ namespace ISLE
     };
 
     template<class FPTYPE>
-    class FloatingPointDenseMatrix : public DenseMatrix<FPTYPE>
+    class FPDenseMatrix : public DenseMatrix<FPTYPE>
     {
         FPTYPE	*svd_temp;
         FPTYPE	*U;
@@ -135,11 +135,11 @@ namespace ISLE
         using DenseMatrix<FPTYPE>::copy_col_to;
 
     public:
-        FloatingPointDenseMatrix(word_id_t d, doc_id_t s);
+        FPDenseMatrix(word_id_t d, doc_id_t s);
 
-        ~FloatingPointDenseMatrix();
+        ~FPDenseMatrix();
 
-        void populate_from_sparse(const FloatingPointSparseMatrix<FPTYPE>& from);
+        void populate_from_sparse(const FPSparseMatrix<FPTYPE>& from);
 
         FPTYPE frobenius() const;
 
@@ -154,12 +154,12 @@ namespace ISLE
         void compute_Spectra(const doc_id_t num_topics);
 
         void copy_sigmaVT_from(
-            FloatingPointDenseMatrix<FPTYPE>& from,
+            FPDenseMatrix<FPTYPE>& from,
             const doc_id_t k,
             bool hardCopy = false); // true for memcpy, false for alias
 
         void copy_sigmaVT_from(
-            FloatingPointSparseMatrix<FPTYPE>& from,
+            FPSparseMatrix<FPTYPE>& from,
             const doc_id_t k,
             bool hardCopy = false);
 
@@ -180,7 +180,7 @@ namespace ISLE
 
         void populate_with_topk_singulars(
             const doc_id_t k,
-            FloatingPointDenseMatrix<FPTYPE> &from);
+            FPDenseMatrix<FPTYPE> &from);
 
         FPTYPE distsq_point_to_center(
             const doc_id_t d,

@@ -36,6 +36,7 @@ namespace ISLE
     {
         word_id_t			vocab_size;
         doc_id_t			num_docs;
+        FPTYPE              avg_doc_sz;
         const offset_t		max_entries;
         const doc_id_t		num_topics;
         const std::string	input_file;
@@ -62,23 +63,35 @@ namespace ISLE
 
         std::vector<DocWordEntry<count_t> > entries;
 
-        SparseMatrix<A_TYPE>* A_sp;
-        FloatingPointSparseMatrix<FPTYPE> *B_fl_CSC;
+        SparseMatrix<A_TYPE>    *A_sp;
+        FPSparseMatrix<FPTYPE>  *B_fl_CSC;
+
+        // Also store CSR format when loading preprocessed data 
+        FPTYPE              *normalized_vals_CSR;
+        doc_id_t            *cols_CSR;
+        offset_t            *offsets_CSR;
 
         std::vector<std::string> vocab_words;
 
-        std::vector<word_id_t>* catchwords;
-        std::vector<std::pair<word_id_t, FPTYPE> >* topwords;
+        std::vector<word_id_t>  *catchwords;
+        std::vector<std::pair<word_id_t, FPTYPE> > *topwords;
 
-        DenseMatrix<FPTYPE>* Model;
-        DenseMatrix<FPTYPE>* EdgeModel;
+        DenseMatrix<FPTYPE> *Model;
+        DenseMatrix<FPTYPE> *EdgeModel;
 
         std::vector<doc_id_t> *closest_docs;
         A_TYPE* catchword_thresholds;
         FPTYPE* centers;
 
+        std::vector<std::tuple<int, int, doc_id_t> > top_topic_pairs;
+        std::vector<std::pair<word_id_t, int> > catchword_topics;
+        std::vector<std::tuple<doc_id_t, doc_id_t, FPTYPE> > doc_topic_sum;
+
     public:
-        enum data_ingest { FILE_DATA_LOAD, ITERATIVE_DATA_LOAD };
+        enum data_ingest {
+            FILE_DATA_LOAD,
+            PREPROCESSED_DATA_LOAD,
+            ITERATIVE_DATA_LOAD };
 
         ISLETrainer(
             const word_id_t		vocab_size_,        // If vocab_size_==0, #words initialized from dataset, keep below 2^31
@@ -107,6 +120,12 @@ namespace ISLE
         // Load a sparse data matrix from file
         //
         void load_data_from_file();
+
+        //
+        // Load a vocabulary list from file
+        // Load a preprocessed and noarmalized sparse data matrix from binary file
+        //
+        void load_preprocessed_data_from_file();
 
         //
         // Feed a document, i.e., list of words and their counts
@@ -143,6 +162,11 @@ namespace ISLE
         //
         void train();
 
+        // 
+        // Write the trained model, catchwords and other information to file 
+        //
+        void write_output_to_files();
+
         //
         // Calculate coherence based on cluster averages, without using catchwords
         //	
@@ -158,12 +182,7 @@ namespace ISLE
         //
         // Output Catchwords and Dominant Words for each topic
         //
-        void output_cluster_summary(
-            const std::vector<FPTYPE>& coherences,
-            const FPTYPE& avg_coherence,
-            const std::vector<FPTYPE>& nl_coherences,
-            const FPTYPE& avg_nl_coherence,
-            const FloatingPointSparseMatrix<FPTYPE> *const A_sp);
+        void output_cluster_summary();
 
         //
         // Output Model to file

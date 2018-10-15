@@ -6,7 +6,7 @@
 namespace ISLE
 {
 #define w0_c	(1.0) 
-#define eps1_c	(1.0 / 60.0)
+#define eps1_c	(1.0 / 6.0)
 #define eps2_c	(1.0 / 3.0)
 #define rho_c	(1.1)
 #define eps3_c	(5.0)
@@ -35,9 +35,13 @@ namespace ISLE
 // If BLOCK_KS_BLOCK_SIZE = k, QR time increases as O(k^2), 
 // while matrix-matrix product time decreases as O(k)
 // Choose an optimal block size that works as a compromise
-#define BLOCK_KS_MAX_ITERS   20
+#define BLOCK_KS_MAX_ITERS   100
 #define BLOCK_KS_BLOCK_SIZE  10
-#define BLOCK_KS_TOLERANCE   1e-5
+#define BLOCK_KS_TOLERANCE   1e-4
+
+#define DOC_BLOCK_SIZE (1 << 18)
+
+#define USE_EXPLICIT_PROJECTED_MATRIX false
 
     enum KMEANS_INIT_OPTIONS {
         KMEANSPP,
@@ -72,7 +76,7 @@ namespace ISLE
 
 #define EDGE_TOPIC_MIN_DOCS 1
 
-#define EDGE_TOPIC_PRIMARY_RATIO 0.9
+#define EDGE_TOPIC_PRIMARY_RATIO 0.7
 
 #define INFER_ITERS_DEFAULT 15
 #define INFER_LF_DEAFULT 10.0
