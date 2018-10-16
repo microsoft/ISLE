@@ -135,6 +135,7 @@ namespace ISLE
             << std::setw(15) << std::left << "#Words" << vocab_size << "\n"
             << std::setw(15) << std::left << "#Docs" << num_docs << "\n"
             << std::setw(15) << std::left << "#Topics" << num_topics << "\n"
+            << std::setw(15) << std::left << "TF-IDF" << tf_idf << "\n"
             << std::setw(15) << std::left << "Sampling?" << flag_sample_docs << "\n"
             << std::setw(15) << std::left << "Sample rate" << sample_rate << "\n"
             << std::setw(15) << std::left << "Edge topics?" << flag_construct_edge_topics << "\n"
@@ -269,12 +270,10 @@ namespace ISLE
             for (auto iter : entries)
                 idf[iter.word] += 1.0;
             for (word_id_t w = 0; w < vocab_size; ++w)
-                idf[w] = std::log(idf[w]);
+                idf[w] = std::log(((float)num_docs)/idf[w]);
             for (auto iter : entries)
                 iter.count *= (count_t) std::ceil(idf[iter.word] * (float)iter.count); 
         }
-
-
 
         A_sp = new SparseMatrix<A_TYPE>(vocab_size, num_docs);
         B_fl_CSC = new FPSparseMatrix<FPTYPE>(vocab_size, num_docs);
@@ -646,7 +645,7 @@ namespace ISLE
         A_sp->construct_topic_model(
             *Model, num_topics, closest_docs, catchwords,
             AVG_CLUSTER_FOR_CATCHLESS_TOPIC,
-            flag_construct_edge_topics || flag_print_top_two_topics ? &top_topic_pairs : NULL,
+            flag_construct_edge_topics && flag_print_top_two_topics ? &top_topic_pairs : NULL,
             &catchword_topics,
             &doc_topic_sum);
         timer->next_time_secs("Constructing topic vectors");
@@ -667,7 +666,7 @@ namespace ISLE
         //
         // Print top 2 topics for each document to file
         //
-        if (flag_print_top_two_topics)
+        if (flag_construct_edge_topics && flag_print_top_two_topics)
             print_top_two_topics(top_topic_pairs);
         timer->next_time_secs("Printing top 2 topics/doc");
 
@@ -675,7 +674,7 @@ namespace ISLE
         timer->next_time_secs("Output model");
 
         if (flag_construct_edge_topics) {
-            //output_edge_model(true);
+            output_edge_model(true);
             timer->next_time_secs("Output edge model");
         }
 

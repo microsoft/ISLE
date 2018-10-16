@@ -413,7 +413,7 @@ namespace ISLE
         {
             if (buf_ptr - buf_base > write_buf_size - 100)
                 double_buffer();
-            assert(num < (int64_t)(1 << 31)); // Else, can not print using itoa_mv
+            assert(num < 0x7fffffff); // Else, can not print using itoa_mv
             buf_ptr = itoa_mv((int)num, buf_ptr, terminal);
         }
 
