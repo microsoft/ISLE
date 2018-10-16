@@ -42,6 +42,7 @@ namespace ISLE
         const std::string	input_file;
         const std::string	vocab_file;
         const std::string	output_path_base;
+        const bool          tf_idf;
         const bool	        flag_sample_docs;
         const FPTYPE	    sample_rate;
         const bool	        flag_compute_log_combinatorial;
@@ -98,6 +99,7 @@ namespace ISLE
             const doc_id_t		num_docs_,          // If num_docs_==0,   #docs initialized from dataset, keep below 2^31
             const offset_t		max_entries_,       // Maximum number of non-zero doc-word counts. If 0, read unlimited #entries
             const doc_id_t		num_topics_,        // Number of topics you want to extract
+            const bool          tf_idf_,            // Apply tf-idf normalization
             const bool			sample_docs_,       // Pick a subset of documents for SVD after thresholding
             const FPTYPE		sample_rate_,       // If sampling, specify sample rate in (0, 1]
             const data_ingest	how_data_loaded_,   // Has data been loaded from file or fed point by point

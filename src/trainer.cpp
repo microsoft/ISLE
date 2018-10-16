@@ -10,6 +10,7 @@ namespace ISLE
         const doc_id_t		num_docs_,
         const offset_t		max_entries_,
         const doc_id_t		num_topics_,
+        const bool          tf_idf_,
         const bool			flag_sample_docs_,
         const FPTYPE		sample_rate_,
         const data_ingest	how_data_loaded_,
@@ -29,6 +30,7 @@ namespace ISLE
         avg_doc_sz(0),
         max_entries(max_entries_),
         num_topics(num_topics_),
+        tf_idf(tf_idf_),
         how_data_loaded(how_data_loaded_),
         input_file(input_file_),
         vocab_file(vocab_file_),
@@ -256,6 +258,23 @@ namespace ISLE
                 std::cout << std::setw(20) << std::left << "#Words(updated)" << vocab_size << "\n";
             }
         }
+
+        if (tf_idf) {
+            if (how_data_loaded == data_ingest::PREPROCESSED_DATA_LOAD) {
+                std::cerr << "TF-IDF is to be used only for text inputs." << std::endl;
+                exit(-1);
+            }
+           
+            std::vector<float> idf(vocab_size, 0.0);
+            for (auto iter : entries)
+                idf[iter.word] += 1.0;
+            for (word_id_t w = 0; w < vocab_size; ++w)
+                idf[w] = std::log(idf[w]);
+            for (auto iter : entries)
+                iter.count *= (count_t) std::ceil(idf[iter.word] * (float)iter.count); 
+        }
+
+
 
         A_sp = new SparseMatrix<A_TYPE>(vocab_size, num_docs);
         B_fl_CSC = new FPSparseMatrix<FPTYPE>(vocab_size, num_docs);
