@@ -663,28 +663,28 @@ namespace ISLE
 
     void ISLETrainer::write_output_to_files()
     {
-        //
-        // Print top 2 topics for each document to file
-        //
-        if (flag_construct_edge_topics && flag_print_top_two_topics)
-            print_top_two_topics(top_topic_pairs);
-        timer->next_time_secs("Printing top 2 topics/doc");
-
         output_model(true);
         timer->next_time_secs("Output model");
-
-        if (flag_construct_edge_topics) {
-            output_edge_model(true);
-            timer->next_time_secs("Output edge model");
-        }
 
         output_top_words();
         timer->next_time_secs("Output topwords");
 
-        if (flag_print_doctopic) {
+       /* if (flag_print_doctopic) {
             output_doc_topic(catchword_topics, doc_topic_sum);
             timer->next_time_secs("Output doc-topic-catchword");
-        }
+        }*/
+
+		if (flag_construct_edge_topics) {
+			output_edge_model(true);
+			timer->next_time_secs("Output edge model");
+		}
+
+		//
+		// Print top 2 topics for each document to file
+		//
+		//if (flag_construct_edge_topics && flag_print_top_two_topics)
+		//	print_top_two_topics(top_topic_pairs);
+		//timer->next_time_secs("Printing top 2 topics/doc");
     }
 
     //
