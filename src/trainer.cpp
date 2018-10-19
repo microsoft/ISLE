@@ -768,14 +768,14 @@ namespace ISLE
         Timer timer;
         FPTYPE avg_nl_coherence;
         std::vector<FPTYPE> nl_coherences(num_topics, 0.0);
-        if (flag_compute_avg_coherence)
+        /*if (flag_compute_avg_coherence)
             output_avg_topic_coherence(avg_nl_coherence, nl_coherences);
-        timer.next_time_secs("Calculating average coherence");
+        timer.next_time_secs("Calculating average coherence");*/
 
 
-        std::vector<FPTYPE> coherences; coherences.resize(num_topics, 0);
-        A_sp->topic_coherence(num_topics, DEFAULT_COHERENCE_NUM_WORDS, *Model, topwords, coherences);
-	FPTYPE avg_coherence =std::accumulate(coherences.begin(), coherences.end(), 0.0)  / coherences.size();
+        std::vector<FPTYPE> coherences(num_topics, 0.0);
+        //A_sp->topic_coherence(num_topics, DEFAULT_COHERENCE_NUM_WORDS, *Model, topwords, coherences);
+	    FPTYPE avg_coherence =std::accumulate(coherences.begin(), coherences.end(), 0.0)  / coherences.size();
         timer.next_time_secs("Calculating coherence");
 
         for (doc_id_t t = 0; t < num_topics; ++t) {
@@ -786,7 +786,7 @@ namespace ISLE
             std::ostringstream top_word_stream;
             Model->print_top_words(vocab_words, topwords[t], top_word_stream);
             out_log->print_stringstream(top_word_stream, false);
-            out_log->print_string("\nCoherence: " + std::to_string(coherences[t]) + "\n", false);
+            //out_log->print_string("\nCoherence: " + std::to_string(coherences[t]) + "\n", false);
         }
         out_log->print_string("\n---------------------------\n", false);
         if (flag_compute_avg_coherence)
