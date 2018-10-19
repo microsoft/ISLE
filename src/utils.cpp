@@ -29,7 +29,8 @@ std::string ISLE::log_dir_name(
     const doc_id_t num_topics,
     const std::string& output_path_base,
     const bool& sample_docs,
-    const FPTYPE& sample_rate)
+    const FPTYPE& sample_rate,
+	const bool tf_idf)
 {
     auto log_subdir = "log_t_"
         + std::to_string(num_topics)
@@ -39,7 +40,8 @@ std::string ISLE::log_dir_name(
         + "_kMppReps_" + std::to_string(KMEANS_INIT_REPS)
         + "_kMLowDReps_" + std::to_string(MAX_KMEANS_LOWD_REPS)
         + "_kMReps_" + std::to_string(MAX_KMEANS_REPS)
-        + "_sample_" + std::to_string(sample_docs);
+        + "_sample_" + std::to_string(sample_docs)
+		+ "_tfidf_" + std::to_string((int)tf_idf);
     if (sample_docs)
         log_subdir += "_Rate_" + std::to_string(sample_rate);
     return concat_file_path(output_path_base, log_subdir);

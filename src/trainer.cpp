@@ -64,7 +64,7 @@ namespace ISLE
         //
         // Initialize  is_log_file_open directories, vocablist, and timer
         //
-        log_dir = log_dir_name(num_topics, output_path_base, flag_sample_docs, sample_rate);
+        log_dir = log_dir_name(num_topics, output_path_base, flag_sample_docs, sample_rate, tf_idf);
         create_dir(log_dir);
 
         out_log = new LogUtils(log_dir);

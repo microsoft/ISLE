@@ -538,7 +538,8 @@ namespace ISLE
         const doc_id_t num_topics,
         const std::string& output_path_base,
         const bool& sample_docs,
-        const FPTYPE& sample_rate);
+        const FPTYPE& sample_rate,
+		const bool tf_idf);
 
     void create_dir(const std::string& dir_name);
 
