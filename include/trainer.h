@@ -167,7 +167,12 @@ namespace ISLE
         // 
         // Write the trained model, catchwords and other information to file 
         //
-        void write_output_to_files();
+        void write_model_to_file();
+
+		// 
+		// Write the edge model, and other information to file 
+		//
+		void write_edgemodel_to_file();
 
         //
         // Calculate coherence based on cluster averages, without using catchwords
@@ -227,6 +232,11 @@ namespace ISLE
         //
         void print_top_two_topics(
             std::vector<std::tuple<int, int, doc_id_t> >& top_topic_pairs);
+
+		//
+		// Construct edge topics
+		//
+		void train_edge_topics();
 
         //
         // Compute edge topics based on the list of top-2 topics for each file
