@@ -838,14 +838,12 @@ namespace ISLE
         const FPTYPE coherence_eps)
     {
         assert(model.vocab_size() == vocab_size());
-        for (auto topic = 0; topic < num_topics; ++topic)
-            model.find_n_top_words(topic, M, top_words[topic]);
 
         // joint_counts[i][j] will hold joint freq for jth and ith dom words for j<i
         std::vector<std::vector<std::vector<size_t> > > joint_doc_freqs;
-        compute_joint_doc_frequency(num_topics, top_words, joint_doc_freqs);
+        compute_joint_doc_frequency(num_topics, M, top_words, joint_doc_freqs);
         std::vector<std::vector<size_t> > doc_freqs;
-        compute_doc_frequency(num_topics, top_words, doc_freqs);
+        compute_doc_frequency(num_topics, M, top_words, doc_freqs);
 
         coherences.resize(num_topics, 0.0);
         for (auto topic = 0; topic < num_topics; ++topic) {
@@ -864,6 +862,7 @@ namespace ISLE
     template<class T>
     void SparseMatrix<T>::compute_joint_doc_frequency(
         const int num_topics,
+		const int num_top_words,
         const std::vector<std::pair<word_id_t, FPTYPE> >* top_words,
         std::vector<std::vector<std::vector<size_t> > >& joint_counts)
         const
@@ -876,7 +875,7 @@ namespace ISLE
         for (auto topic = 0; topic < num_topics; ++topic) {
             joint_counts[topic].resize(top_words[topic].size());
 
-            for (word_id_t word = 0; word < top_words[topic].size(); ++word) {
+            for (word_id_t word = 0; word < num_top_words; ++word) {
                 assert(joint_counts[topic][word].size() == 0);
                 joint_counts[topic][word].resize(word, 0);
             }
@@ -886,7 +885,7 @@ namespace ISLE
         { // Serial version
             for (doc_id_t doc = 0; doc < num_docs(); ++doc)
                 for (auto topic = 0; topic < num_topics; ++topic)
-                    for (word_id_t w1 = 0; w1 < top_words[topic].size(); ++w1)
+                    for (word_id_t w1 = 0; w1 < num_top_words; ++w1)
                         for (word_id_t w2 = 0; w2 < w1; ++w2)
                             if (normalized(top_words[topic][w1].first, doc) > 0
                                 && normalized(top_words[topic][w2].first, doc) > 0)
@@ -906,7 +905,7 @@ namespace ISLE
                 for (auto topic = 0; topic < num_topics; ++topic) {
                     joint_counts_chunks[chunk][topic].resize(top_words[topic].size());
 
-                    for (word_id_t word = 0; word < top_words[topic].size(); ++word) {
+                    for (word_id_t word = 0; word < num_top_words; ++word) {
                         assert(joint_counts_chunks[chunk][topic][word].size() == 0);
                         joint_counts_chunks[chunk][topic][word].resize(word, 0);
                     }
@@ -917,7 +916,7 @@ namespace ISLE
                 for (int64_t doc = chunk*chunk_size;
                     doc < num_docs() && doc < (chunk + 1)*chunk_size; ++doc)
                     for (auto topic = 0; topic < num_topics; ++topic)
-                        for (word_id_t w1 = 0; w1 < top_words[topic].size(); ++w1)
+                        for (word_id_t w1 = 0; w1 < num_top_words; ++w1)
                             for (word_id_t w2 = 0; w2 < w1; ++w2)
                                 if (normalized(top_words[topic][w1].first, doc) > 0
                                     && normalized(top_words[topic][w2].first, doc) > 0)
@@ -925,14 +924,14 @@ namespace ISLE
 
             for (size_t chunk = 0; chunk < num_chunks; ++chunk)
                 for (auto topic = 0; topic < num_topics; ++topic)
-                    for (word_id_t w1 = 0; w1 < top_words[topic].size(); ++w1)
+                    for (word_id_t w1 = 0; w1 < num_top_words; ++w1)
                         for (word_id_t w2 = 0; w2 < w1; ++w2)
                             joint_counts[topic][w1][w2]
                             += joint_counts_chunks[chunk][topic][w1][w2];
         }
 
         for (auto topic = 0; topic < num_topics; ++topic)
-            for (word_id_t word = 0; word < top_words[topic].size(); ++word)
+            for (word_id_t word = 0; word < num_top_words; ++word)
                 assert(joint_counts[topic][word].size() == word);
 
         /*for (auto pos = offsets_CSC[doc]; pos != offsets_CSC[doc + 1]; ++pos)
@@ -944,6 +943,7 @@ namespace ISLE
     template<class T>
     void SparseMatrix<T>::compute_doc_frequency(
         const int num_topics,
+		const int num_top_words, 
         const std::vector<std::pair<word_id_t, FPTYPE> >* top_words,
         std::vector<std::vector<size_t> >& doc_frequencies)
         const
@@ -953,7 +953,7 @@ namespace ISLE
         Timer timer;
         doc_frequencies.resize(num_topics);
         for (auto topic = 0; topic < num_topics; ++topic) {
-            assert(top_words[topic].size() > 0);
+            assert(top_words[topic].size() >= num_top_words);
             doc_frequencies[topic].resize(top_words[topic].size(), 0);
         }
 
@@ -961,7 +961,7 @@ namespace ISLE
         { // Use Serial version
             for (int64_t doc = 0; doc < num_docs(); ++doc)
                 for (auto topic = 0; topic < num_topics; ++topic)
-                    for (word_id_t word = 0; word < top_words[topic].size(); ++word)
+                    for (word_id_t word = 0; word < num_top_words; ++word)
                         if (normalized(top_words[topic][word].first, doc) > (T)0.0)
                             doc_frequencies[topic][word]++;
         }
@@ -986,19 +986,19 @@ namespace ISLE
                 for (int64_t doc = chunk*chunk_size;
                     doc < num_docs() && doc < (chunk + 1)*chunk_size; ++doc)
                     for (auto topic = 0; topic < num_topics; ++topic)
-                        for (word_id_t word = 0; word < top_words[topic].size(); ++word)
+                        for (word_id_t word = 0; word < num_top_words; ++word)
                             if (normalized(top_words[topic][word].first, doc) > (T)0.0)
                                 doc_frequencies_chunks[chunk][topic][word]++;
 
             for (size_t chunk = 0; chunk < num_chunks; ++chunk)
                 for (auto topic = 0; topic < num_topics; ++topic)
-                    for (word_id_t word = 0; word < top_words[topic].size(); ++word)
+                    for (word_id_t word = 0; word < num_top_words; ++word)
                         doc_frequencies[topic][word] +=
                         doc_frequencies_chunks[chunk][topic][word];
         }
 
         for (auto topic = 0; topic < num_topics; ++topic) {
-            assert(doc_frequencies[topic].size() == top_words[topic].size());
+            assert(doc_frequencies[topic].size() == num_top_words);
             for (auto iter = doc_frequencies[topic].begin();
                 iter < doc_frequencies[topic].end(); ++iter)
                 assert(*iter > 0);

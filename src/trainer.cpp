@@ -686,17 +686,6 @@ namespace ISLE
 
     void ISLETrainer::write_edgemodel_to_file()
     {
-        output_model(true);
-        timer->next_time_secs("Output model");
-
-        output_top_words();
-        timer->next_time_secs("Output topwords");
-
-       /* if (flag_print_doctopic) {
-            output_doc_topic(catchword_topics, doc_topic_sum);
-            timer->next_time_secs("Output doc-topic-catchword");
-        }*/
-
 		if (flag_construct_edge_topics) {
 			output_edge_model(true);
 			timer->next_time_secs("Output edge model");
@@ -787,6 +776,11 @@ namespace ISLE
     void ISLETrainer::output_cluster_summary()
     {
         assert(is_training_complete);
+
+		for (auto topic = 0; topic < num_topics; ++topic)
+			Model->find_n_top_words(topic,
+				DEFAULT_COHERENCE_NUM_WORDS > 10? DEFAULT_COHERENCE_NUM_WORDS:10,
+				topwords[topic]);
 
         Timer timer;
         FPTYPE avg_nl_coherence;

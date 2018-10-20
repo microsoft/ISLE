@@ -182,6 +182,7 @@ namespace ISLE
         // Output: @joint_counts: joint_counts[i][j] contains joint freq for j<i
         void compute_joint_doc_frequency(
             const int num_topics,
+			const int num_top_words,
             const std::vector<std::pair<word_id_t, FPTYPE> >* top_words,
             std::vector<std::vector<std::vector<size_t> > >& joint_counts)
             const;
@@ -189,7 +190,8 @@ namespace ISLE
         // Convert to algebra. Equivalent to "this*column(1)"
         void compute_doc_frequency(
             const int num_topics,
-            const std::vector<std::pair<word_id_t, FPTYPE> >* top_words,
+			const int num_top_words,
+			const std::vector<std::pair<word_id_t, FPTYPE> >* top_words,
             std::vector<std::vector<size_t> >& doc_frequencies)
             const;
 

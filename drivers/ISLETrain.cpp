@@ -36,8 +36,9 @@ int main(int argv, char **argc) {
             tf_idf, sample, sample_rate, ISLE::ISLETrainer::data_ingest::FILE_DATA_LOAD,
             tdf_file, vocab_file, output_dir, compute_edge_topics, max_edge_topics);
         trainer.train();
-        trainer.write_model_to_file();
         trainer.output_cluster_summary();
+		trainer.write_model_to_file();
+
 
 		if (compute_edge_topics) {
 			trainer.train_edge_topics();
