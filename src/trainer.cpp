@@ -266,12 +266,12 @@ namespace ISLE
                 exit(-1);
             }
            
-            std::vector<float> idf(vocab_size, 0.0);
+            std::vector<float> idf(vocab_size+1, 0.0);
             for (auto iter : entries)
                 idf[iter.word] += 1.0;
-            for (word_id_t w = 0; w < vocab_size; ++w)
-                idf[w] = std::log(((float)num_docs)/idf[w]);
-            for (auto iter : entries)
+			for (word_id_t w = 1; w <= vocab_size; ++w)
+				idf[w] = std::log(((float)num_docs) / idf[w]);
+			for (auto iter : entries)
                 iter.count = (count_t) std::ceil(idf[iter.word] * (float)iter.count); 
         }
 
