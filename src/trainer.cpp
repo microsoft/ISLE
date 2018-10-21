@@ -272,7 +272,7 @@ namespace ISLE
             for (word_id_t w = 0; w < vocab_size; ++w)
                 idf[w] = std::log(((float)num_docs)/idf[w]);
             for (auto iter : entries)
-                iter.count *= (count_t) std::ceil(idf[iter.word] * (float)iter.count); 
+                iter.count = (count_t) std::ceil(idf[iter.word] * (float)iter.count); 
         }
 
         A_sp = new SparseMatrix<A_TYPE>(vocab_size, num_docs);
