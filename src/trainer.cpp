@@ -832,7 +832,7 @@ namespace ISLE
     {
         assert(is_training_complete);
 
-        Model->write_to_file(concat_file_path(log_dir, std::string("M_hat_catch")));
+        //Model->write_to_file(concat_file_path(log_dir, std::string("M_hat_catch")));
         if (output_sparse)
             Model->write_to_file_as_sparse(concat_file_path(log_dir, std::string("M_hat_catch_sparse")));
     }
@@ -844,7 +844,7 @@ namespace ISLE
     {
         assert(is_training_complete);
 
-        EdgeModel->write_to_file(concat_file_path(log_dir, std::string("EdgeModel")));
+        //EdgeModel->write_to_file(concat_file_path(log_dir, std::string("EdgeModel")));
         if (output_sparse)
             EdgeModel->write_to_file_as_sparse(concat_file_path(log_dir, std::string("EdgeModel_sparse")));
     }
