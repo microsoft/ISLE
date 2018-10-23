@@ -1158,6 +1158,7 @@ namespace ISLE
                 Model->data() + std::get<1>(selected_pairs[t]) * vocab_size, 1,
                 EdgeModel->data() + t * vocab_size, 1);
         }
+        std::cout << "Completed edge topic construction" << std::endl;
 
         if (flag_print_edge_topic_composition) {
             print_edge_topic_composition(selected_pairs);
