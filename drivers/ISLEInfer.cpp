@@ -113,7 +113,7 @@ int main(int argv, char**argc)
         llhs[doc] = infer.infer_doc_in_file(doc, wts, iters, Lfguess);
         if (llhs[doc].first != 0.0)
             nconverged++;
-        else std::cout << "Doc: " << doc << " failed to converge" << std::endl;
+        else std::cout << "Doc " << doc << " failed to converge" << std::endl;
         for (doc_id_t topic = 0; topic < num_topics; ++topic)
             out.concat_float(llhs[doc].first == 0.0 ? 1.0 / (FPTYPE)num_topics : wts[topic], '\t', 1, 8);
         out.add_endline();
