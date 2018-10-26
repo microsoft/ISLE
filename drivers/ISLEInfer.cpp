@@ -132,6 +132,7 @@ int main(int argv, char**argc)
         }
     }
     out.flush_and_close();
+    top_out.add_endline();
     top_out.flush_and_close();
     delete[] wts;
 
