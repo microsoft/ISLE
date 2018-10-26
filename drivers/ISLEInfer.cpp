@@ -119,7 +119,7 @@ int main(int argv, char**argc)
         out.add_endline();
 
         top_topics.clear();
-        if (llhs[doc].first > 0.0)
+        if (llhs[doc].first != 0.0)
             for (doc_id_t topic = 0; topic < num_topics; ++topic)
                 if (wts[topic] > 1.0 / (FPTYPE)num_topics)
                     top_topics.emplace_back(topic, wts[topic]);
