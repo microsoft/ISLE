@@ -71,7 +71,14 @@ int main(int argv, char**argc)
             std::string("inferred_weights_iters_") + std::to_string(iters)
             + std::string("_Lf_") + std::to_string(Lfguess))
             + std::string("_block_") + std::to_string(block));
+        MMappedOutput top_out(concat_file_path(output_dir,
+            std::string("top_topics_iters_") + std::to_string(iters)
+            + std::string("_Lf_") + std::to_string(Lfguess))) 
+            + std::string("_block_") + std::to_string(block));
+
         FPTYPE* wts = new FPTYPE[num_topics];
+        std::vector<std::pair<doc_id_t, FPTYPE> > top_topics;
+
         for (doc_id_t doc = block*doc_block_size; doc < (block + 1)*doc_block_size && doc < num_docs; ++doc) {
             if (doc % 10000 == 9999)
                 std::cout << "docs inferred: ["
@@ -85,8 +92,22 @@ int main(int argv, char**argc)
             for (doc_id_t topic = 0; topic < num_topics; ++topic)
                 out.concat_float(llhs[doc].first == 0.0 ? 1.0 / (FPTYPE)num_topics : wts[topic], '\t', 1, 8);
             out.add_endline();
+
+            top_topics.clear();
+            if (llhs[doc].first != 0.0)
+                for (doc_id_t topic = 0; topic < num_topics; ++topic)
+                    if (wts[topic] > 1.0 / (FPTYPE)num_topics)
+                        top_topics.emplace_back(topic, wts[topic]);
+            std::sort(top_topics.begin(), top_topics.end(),
+                [](const auto& l, const auto& r) {return l.second > r.second; });
+            for (int i = 0; i < 5 && i < top_topics.size(); ++i) {
+                top_out.concat_int(doc, '\t');
+                top_out.concat_int(top_topics[i].first, '\t');
+                top_out.concat_float(top_topics[i].second, '\n');
+            }
         }
         out.flush_and_close();
+        top_out.flush_and_close();
 
         delete[] wts;
     }
@@ -132,7 +153,6 @@ int main(int argv, char**argc)
         }
     }
     out.flush_and_close();
-    top_out.add_endline();
     top_out.flush_and_close();
     delete[] wts;
 
