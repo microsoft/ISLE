@@ -4,18 +4,19 @@
 #include "infer.h"
 
 using namespace ISLE;
-
 // Run ./ISLEInfer
 // Output: list of <doc_id> <topic id> <wt>  (small wt entries will be dropped)
 int main(int argv, char**argc)
 {
-    if (argv != 11) {
+    if (argv != 12) {
         std::cout << "Incorrect usage of ISLEInfer. Use: \n"
             << "inferFromFile <sparse_model_file> <infer_file> <output_dir> "
             << "<num_topics> <vocab_size> <num_docs_in_infer_file> "
             << "<nnzs_in_infer_file> <nnzs_in_sparse_model_file> "
             << "<iters>[0 for default]  "
-            << "Lifschitz_constant_guess>[0 for default]" << std::endl;
+            << "Lifschitz_constant_guess>[0 for default] " 
+            << "Preprocessed_Data_load[0 for file data load, 1 for preprocessed data load]" <<
+            std::endl;
         exit(-1);
     }
     const std::string sparse_model_file = std::string(argc[1]);
@@ -27,11 +28,16 @@ int main(int argv, char**argc)
     const doc_id_t num_docs = atol(argc[6]);
     const offset_t max_entries = atol(argc[7]);
     const offset_t M_hat_catch_sparse_entries = atol(argc[8]);
+    FPTYPE *normalized_vals_CSC;
+    word_id_t *rows_CSC; 
+    offset_t *offsets_CSC;
+
 
     int iters = atol(argc[9]);
     if (iters == 0) iters = INFER_ITERS_DEFAULT;
     FPTYPE Lfguess = atof(argc[10]);
     if (Lfguess == 0.0) Lfguess = INFER_LF_DEAFULT;
+    const int preprocess = std::stoi(argc[11]);
 
     std::cout << "Loading sparse model file: " << sparse_model_file << std::endl;
     FPTYPE *model_by_word = new FPTYPE[vocab_size * num_topics];
@@ -41,22 +47,93 @@ int main(int argv, char**argc)
 
     std::cout << "Loading data from inference file: " << infer_file << std::endl;
     std::vector<DocWordEntry<count_t> > entries;
-    DocWordEntriesReader reader(entries);
-    reader.read_from_file(infer_file, max_entries);
     auto infer_data = new SparseMatrix<FPTYPE>(vocab_size, num_docs);
-    std::sort(			// Sort by doc first, and word second.
-        entries.begin(), entries.end(),
-        [](const auto& l, const auto& r)
-    {return (l.doc < r.doc) || (l.doc == r.doc && l.word < r.word); });
-    entries.erase(			// Remove duplicates
+    
+    if (preprocess == 0){
+        DocWordEntriesReader reader(entries);
+        reader.read_from_file(infer_file, max_entries);
+        std::sort(			// Sort by doc first, and word second.
+            entries.begin(), entries.end(),
+            [](const auto& l, const auto& r)
+            {return (l.doc < r.doc) || (l.doc == r.doc && l.word < r.word); });
+        entries.erase(			// Remove duplicates
         std::unique(entries.begin(), entries.end(),
             [](const auto& l, const auto& r) {return l.doc == r.doc && l.word == r.word; }),
         entries.end());
-    infer_data->populate_CSC(entries);
-    infer_data->normalize_docs(true, true);
+        infer_data->populate_CSC(entries);
+        infer_data->normalize_docs(true, true);
+    }
+    else{
+        std::string input_file = infer_file;
+        std::ifstream info_stream(std::string(input_file) + "_tr.info");
+      
+        word_id_t   file_vocab_size;
+        doc_id_t    file_num_docs;
+        offset_t    file_nnzs;
+        FPTYPE      avg_doc_sz;
 
-    auto llhs = new std::pair<FPTYPE, FPTYPE>[num_docs];
+        info_stream >> file_num_docs;
+        info_stream >> file_vocab_size;
+        info_stream >> file_nnzs;
+        info_stream >> avg_doc_sz;
+        info_stream.close();
 
+        if (vocab_size != file_vocab_size) {
+            std::cerr << "Vocab size information mismatch" << std::endl;
+            exit(-1);
+        }
+        if (num_docs != file_num_docs) {
+            std::cerr << "Num docs information mismatch" << std::endl;
+            exit(-1);
+        }
+        if (max_entries != file_nnzs) {
+            std::cerr << "Num entries information mismatch" << std::endl;
+            exit(-1);
+        }
+
+        std::ifstream vals_CSC_stream(std::string(input_file) + "_tr.csr", std::ios::binary | std::ios::in);
+        vals_CSC_stream.seekg(0, std::ios::end);
+        offset_t vals_CSC_len = vals_CSC_stream.tellg();
+        assert(vals_CSC_len == sizeof(FPTYPE) * max_entries);
+        vals_CSC_stream.seekg(0, std::ios::beg);
+        normalized_vals_CSC = new FPTYPE[max_entries];
+        vals_CSC_stream.read((char*)normalized_vals_CSC, vals_CSC_len);
+        vals_CSC_stream.close();
+
+        std::ifstream rows_CSC_stream(std::string(input_file) + "_tr.col", std::ios::binary | std::ios::in);
+        rows_CSC_stream.seekg(0, std::ios::end);
+        offset_t rows_CSC_len = rows_CSC_stream.tellg();
+        assert(rows_CSC_len == sizeof(word_id_t) * max_entries);
+        rows_CSC_stream.seekg(0, std::ios::beg);
+        rows_CSC = new word_id_t[max_entries];
+        rows_CSC_stream.read((char*)rows_CSC, rows_CSC_len);
+        rows_CSC_stream.close();
+
+        std::ifstream offsets_CSC_stream(std::string(input_file) + "_tr.off", std::ios::binary | std::ios::in);
+        offsets_CSC_stream.seekg(0, std::ios::end);
+        offset_t offsets_CSC_len = offsets_CSC_stream.tellg();
+        assert(offsets_CSC_len == sizeof(offset_t) * (num_docs + 1));
+        offsets_CSC_stream.seekg(0, std::ios::beg);
+        offsets_CSC = new offset_t[num_docs + 1];
+        offsets_CSC_stream.read((char*)offsets_CSC, offsets_CSC_len);
+        offsets_CSC_stream.close();
+
+ 
+        infer_data->populate_preprocessed_CSC(
+                max_entries, avg_doc_sz,
+                normalized_vals_CSC, rows_CSC, offsets_CSC);        
+    }
+
+  
+    auto max_nnzs = 0;
+    for (auto doc = 0; doc < num_docs; doc += 1){
+       if (infer_data->offset_CSC(doc + 1) - infer_data->offset_CSC(doc) > max_nnzs)
+           max_nnzs = infer_data->offset_CSC(doc + 1) - infer_data->offset_CSC(doc); 
+    }
+    max_nnzs = max_nnzs + 1;
+
+    auto llhs = new std::pair<FPTYPE, FPTYPE>[num_docs];    
+ 
     // Turn the following flag on for parallel inference that works block by block
 #ifdef PARALLEL_INFERENCE
     doc_id_t doc_block_size = 100000;
@@ -66,12 +143,19 @@ int main(int argv, char**argc)
     pfor(int64_t block = 0; block < num_blocks; ++block) {
         nconverged[block] = 0;
         std::cout << "Creating inference engine" << std::endl;
-        ISLEInfer infer(model_by_word, infer_data, num_topics, vocab_size, num_docs);
+        ISLEInfer infer(model_by_word, infer_data, num_topics, vocab_size, num_docs, max_nnzs);
         MMappedOutput out(concat_file_path(output_dir,
             std::string("inferred_weights_iters_") + std::to_string(iters)
             + std::string("_Lf_") + std::to_string(Lfguess))
             + std::string("_block_") + std::to_string(block));
+        MMappedOutput top_out(concat_file_path(output_dir,
+            std::string("top_topics_iters_") + std::to_string(iters)
+            + std::string("_Lf_") + std::to_string(Lfguess)) 
+            + std::string("_block_") + std::to_string(block));
+
         FPTYPE* wts = new FPTYPE[num_topics];
+        std::vector<std::pair<doc_id_t, FPTYPE> > top_topics;
+
         for (doc_id_t doc = block*doc_block_size; doc < (block + 1)*doc_block_size && doc < num_docs; ++doc) {
             if (doc % 10000 == 9999)
                 std::cout << "docs inferred: ["
@@ -85,8 +169,22 @@ int main(int argv, char**argc)
             for (doc_id_t topic = 0; topic < num_topics; ++topic)
                 out.concat_float(llhs[doc].first == 0.0 ? 1.0 / (FPTYPE)num_topics : wts[topic], '\t', 1, 8);
             out.add_endline();
+
+            top_topics.clear();
+            if (llhs[doc].first != 0.0)
+                for (doc_id_t topic = 0; topic < num_topics; ++topic)
+                    if (wts[topic] > 1.0 / (FPTYPE)num_topics)
+                        top_topics.emplace_back(topic, wts[topic]);
+            std::sort(top_topics.begin(), top_topics.end(),
+                [](const auto& l, const auto& r) {return l.second > r.second; });
+            for (int i = 0; i < 5 && i < top_topics.size(); ++i) {
+                top_out.concat_int(doc, '\t');
+                top_out.concat_int(top_topics[i].first, '\t');
+                top_out.concat_float(top_topics[i].second, '\n');
+            }
         }
         out.flush_and_close();
+        top_out.flush_and_close();
 
         delete[] wts;
     }
@@ -96,7 +194,7 @@ int main(int argv, char**argc)
     doc_id_t nconverged = 0;
 
     std::cout << "Creating inference engine" << std::endl;
-    ISLEInfer infer(model_by_word, infer_data, num_topics, vocab_size, num_docs);
+    ISLEInfer infer(model_by_word, infer_data, num_topics, vocab_size, num_docs, max_nnzs);
     MMappedOutput out(concat_file_path(output_dir,
         std::string("inferred_weights_iters_") + std::to_string(iters)
         + std::string("_Lf_") + std::to_string(Lfguess)));
@@ -132,7 +230,6 @@ int main(int argv, char**argc)
         }
     }
     out.flush_and_close();
-    top_out.add_endline();
     top_out.flush_and_close();
     delete[] wts;
 

@@ -41,6 +41,7 @@ namespace ISLE
         word_id_t vocab_size;
         doc_id_t num_topics;
         doc_id_t num_docs;
+        offset_t MAX_NNZS;
 
         const SparseMatrix<FPTYPE> *const infer_data;
 
@@ -49,7 +50,6 @@ namespace ISLE
         Timer* timer;
 
         // Temporary space for intermediate values
-#define MAX_NNZS 20000
         FPTYPE* a;
         FPTYPE* M_slice;
         FPTYPE* z;
@@ -61,7 +61,8 @@ namespace ISLE
             const SparseMatrix<FPTYPE> *const infer_data_,
             const doc_id_t num_topics_,
             const word_id_t vocab_size_,
-            const doc_id_t num_docs_);
+            const doc_id_t num_docs_,
+            const offset_t max_nnzs);     
         ~ISLEInfer();
 
         std::pair<FPTYPE, FPTYPE> infer_doc_in_file(

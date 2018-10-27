@@ -329,13 +329,15 @@ namespace ISLE
         const SparseMatrix<FPTYPE> *const infer_data_,
         const doc_id_t num_topics_,
         const word_id_t vocab_size_,
-        const doc_id_t num_docs_)
+        const doc_id_t num_docs_,
+        const offset_t max_nnzs)
         :
         model_by_word(model_by_word_),
         infer_data(infer_data_),
         num_topics(num_topics_),
         vocab_size(vocab_size_),
-        num_docs(num_docs_)
+        num_docs(num_docs_),
+        MAX_NNZS(max_nnzs)
     {
         timer = new Timer();
 
@@ -343,8 +345,7 @@ namespace ISLE
         M_slice = new FPTYPE[MAX_NNZS * num_topics];
         gradw = new FPTYPE[num_topics];
         z = new FPTYPE[MAX_NNZS];
-       
-
+      
         assert(a != NULL);
         assert(M_slice != NULL);
         assert(gradw != NULL);
@@ -391,7 +392,8 @@ namespace ISLE
         if (mwu(a, M_slice, w, nnzs_in_doc, iters, Lfguess) == true) // MWU converged
             llh = calculate_llh(a, M_slice, w, nnzs_in_doc, words_in_doc);
         return llh;
-    }
+    }        
+
 
     // Returns llh = \sum_d a[d] * is_log_file_open{(M*w)[d]}
     bool ISLEInfer::mwu(
