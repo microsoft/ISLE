@@ -1064,6 +1064,7 @@ namespace ISLE
         const SparseMatrix<FPTYPE>& from,
         const bool copy_normalized)
         : SparseMatrix<FPTYPE>(from.vocab_size(), from.num_docs()),
+        U_rowmajor(NULL),     
         SigmaVT(NULL)
     {
         allocate(from.get_nnzs());
