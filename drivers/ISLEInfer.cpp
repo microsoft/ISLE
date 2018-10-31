@@ -102,8 +102,8 @@ int main(int argv, char**argc)
             std::sort(top_topics.begin(), top_topics.end(),
                 [](const auto& l, const auto& r) {return l.second > r.second; });
             for (int i = 0; i < 5 && i < top_topics.size(); ++i) {
-                top_out.concat_int(doc+1, '\t');
-                top_out.concat_int(top_topics[i].first, '\t');
+                top_out.concat_int(doc + 1, '\t');
+                top_out.concat_int(1 + top_topics[i].first, '\t');
                 top_out.concat_float(top_topics[i].second, '\n');
             }
         }
@@ -149,7 +149,7 @@ int main(int argv, char**argc)
             [](const auto& l, const auto& r) {return l.second > r.second; });
         for (int i = 0; i < 5 && i < top_topics.size(); ++i) {
             top_out.concat_int(doc+1, '\t');
-            top_out.concat_int(top_topics[i].first, '\t');
+            top_out.concat_int(top_topics[i].first + 1, '\t');
             top_out.concat_float(top_topics[i].second, '\n');
         }
     }
