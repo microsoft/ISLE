@@ -407,6 +407,9 @@ namespace ISLE
         for (auto topic = 0; topic < num_topics; ++topic)
             w[topic] = (FPTYPE)1.0 / ((FPTYPE)num_topics);
 
+        if (nnzs_in_doc == 0)
+            return converged;
+
         for (int guessLf = 0; guessLf < 10; guessLf++) {
 
             for (auto topic = 0; topic < num_topics; ++topic)
