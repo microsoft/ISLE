@@ -68,8 +68,8 @@ int main(int argv, char**argc)
     auto nconverged = new doc_id_t[num_blocks];
 
     pfor(int64_t block = 0; block < num_blocks; ++block) {
-        auto block_begin = block*doc_block_size;
-        auto block_end = (block + 1)*doc_block_size < num_docs ? (block + 1)*doc_block_size : num_docs;
+        int64_t block_begin = block*doc_block_size;
+        int64_t block_end = (block + 1)*doc_block_size < num_docs ? (block + 1)*doc_block_size : num_docs;
         nconverged[block] = 0;
         std::cout << "Creating inference engine" << std::endl;
         ISLEInfer infer(model_by_word, infer_data, num_topics, vocab_size, num_docs);
@@ -85,9 +85,9 @@ int main(int argv, char**argc)
         for (doc_id_t doc = block_begin; doc < block_end; ++doc) {
             if (doc % 10000 == 9999)
                 std::cout << "docs inferred: ["
-                << doc_begin + (((int64_t)doc - (int64_t)10000) > (int64_t)(block*doc_block_size) 
-                    ? ((int64_t)doc - (int64_t)10000) : block*doc_block_size)
-                << ", " << doc << "]" << std::endl;
+                << doc_begin + (int64_t)(doc - 10000) > block_begin
+                    ? (int64_t)(doc - 10000) : block_begin)
+                << ", " << doc_begin + doc << "]" << std::endl;
 
             llhs[doc] = infer.infer_doc_in_file(doc, wts, iters, Lfguess);
             if (llhs[doc].first != 0.0)
