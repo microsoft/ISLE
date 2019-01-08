@@ -54,7 +54,7 @@ int main(int argv, char**argc)
         std::unique(entries.begin(), entries.end(),
             [](const auto& l, const auto& r) {return l.doc == r.doc && l.word == r.word; }),
         entries.end());
-    for (auto iter : entries) iter.doc = iter.doc - (doc_begin-1);
+    for (auto i = 0; i < entries.size(); ++i) entries[i].doc -= (doc_begin - 1);
     infer_data->populate_CSC(entries);
     infer_data->normalize_docs(true, true);
 
