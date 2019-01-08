@@ -68,19 +68,21 @@ int main(int argv, char**argc)
     auto nconverged = new doc_id_t[num_blocks];
 
     pfor(int64_t block = 0; block < num_blocks; ++block) {
+        auto block_begin = block*doc_block_size;
+        auto block_end = (block + 1)*doc_block_size < num_docs ? (block + 1)*doc_block_size : num_docs;
         nconverged[block] = 0;
         std::cout << "Creating inference engine" << std::endl;
         ISLEInfer infer(model_by_word, infer_data, num_topics, vocab_size, num_docs);
         MMappedOutput top_out(concat_file_path(output_dir,
             std::string("top_topics_iters_") + std::to_string(iters)
             + std::string("_Lf_") + std::to_string(Lfguess))
-            + std::string("_doc_") + std::to_string(doc_begin)
-            + std::string("_to_") + std::to_string(doc_end));
+            + std::string("_doc_") + std::to_string(block_begin)
+            + std::string("_to_") + std::to_string(block_end));
 
         FPTYPE* wts = new FPTYPE[num_topics];
         std::vector<std::pair<doc_id_t, FPTYPE> > top_topics;
 
-        for (doc_id_t doc = block*doc_block_size; doc < (block + 1)*doc_block_size && doc < num_docs; ++doc) {
+        for (doc_id_t doc = block_begin; doc < block_end; ++doc) {
             if (doc % 10000 == 9999)
                 std::cout << "docs inferred: ["
                 << doc_begin + (((int64_t)doc - (int64_t)10000) > (int64_t)(block*doc_block_size) 
