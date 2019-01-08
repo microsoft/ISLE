@@ -61,7 +61,7 @@ int main(int argv, char**argc)
     auto llhs = new std::pair<FPTYPE, FPTYPE>[num_docs];
 
     // Turn the following flag on for parallel inference that works block by block
-//#define PARALLEL_INFERENCE
+#define PARALLEL_INFERENCE
 #ifdef PARALLEL_INFERENCE
     doc_id_t doc_block_size = 1000000;
     int64_t num_blocks = divide_round_up(num_docs, doc_block_size);
