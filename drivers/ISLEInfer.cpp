@@ -76,8 +76,8 @@ int main(int argv, char**argc)
         MMappedOutput top_out(concat_file_path(output_dir,
             std::string("top_topics_iters_") + std::to_string(iters)
             + std::string("_Lf_") + std::to_string(Lfguess))
-            + std::string("_doc_") + std::to_string(block_begin)
-            + std::string("_to_") + std::to_string(block_end));
+            + std::string("_doc_") + std::to_string(doc_begin + block_begin)
+            + std::string("_to_") + std::to_string(doc_begin + block_end));
 
         FPTYPE* wts = new FPTYPE[num_topics];
         std::vector<std::pair<doc_id_t, FPTYPE> > top_topics;
