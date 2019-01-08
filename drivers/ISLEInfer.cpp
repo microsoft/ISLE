@@ -54,7 +54,7 @@ int main(int argv, char**argc)
         std::unique(entries.begin(), entries.end(),
             [](const auto& l, const auto& r) {return l.doc == r.doc && l.word == r.word; }),
         entries.end());
-    for (auto iter : entries) iter.doc -= doc_begin;
+    for (auto iter : entries) iter.doc = iter.doc - (doc_begin-1);
     infer_data->populate_CSC(entries);
     infer_data->normalize_docs(true, true);
 
@@ -103,7 +103,7 @@ int main(int argv, char**argc)
             std::sort(top_topics.begin(), top_topics.end(),
                 [](const auto& l, const auto& r) {return l.second > r.second; });
             for (int i = 0; i < 5 && i < top_topics.size(); ++i) {
-                top_out.concat_int(doc + 1 + doc_begin, '\t');
+                top_out.concat_int(doc + doc_begin, '\t');
                 top_out.concat_int(1 + top_topics[i].first, '\t');
                 top_out.concat_float(top_topics[i].second, '\n');
             }
@@ -149,7 +149,7 @@ int main(int argv, char**argc)
         std::sort(top_topics.begin(), top_topics.end(),
             [](const auto& l, const auto& r) {return l.second > r.second; });
         for (int i = 0; i < 5 && i < top_topics.size(); ++i) {
-            top_out.concat_int(doc+1+doc_begin, '\t');
+            top_out.concat_int(doc + doc_begin, '\t');
             top_out.concat_int(top_topics[i].first + 1, '\t');
             top_out.concat_float(top_topics[i].second, '\n');
         }
