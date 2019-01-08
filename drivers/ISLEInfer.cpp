@@ -31,7 +31,7 @@ int main(int argv, char**argc)
 
     int iters = atol(argc[10]);
     if (iters == 0) iters = INFER_ITERS_DEFAULT;
-    FPTYPE Lfguess = atof(argc[12]);
+    FPTYPE Lfguess = atof(argc[11]);
     if (Lfguess == 0.0) Lfguess = INFER_LF_DEAFULT;
 
     std::cout << "Loading sparse model file: " << sparse_model_file << std::endl;
