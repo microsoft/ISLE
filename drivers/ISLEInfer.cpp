@@ -85,7 +85,7 @@ int main(int argv, char**argc)
         for (doc_id_t doc = block_begin; doc < block_end; ++doc) {
             if (doc % 10000 == 9999)
                 std::cout << "docs inferred: ["
-                << doc_begin + (int64_t)(doc - 10000) > block_begin
+                << doc_begin + (((int64_t)(doc - 10000)) > block_begin
                     ? (int64_t)(doc - 10000) : block_begin)
                 << ", " << doc_begin + doc << "]" << std::endl;
 
