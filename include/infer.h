@@ -85,7 +85,7 @@ namespace ISLE
             FPTYPE* w,
             const int nnzs_in_doc);
 
-		inline long ISLEInfer::combinatorial(
+	inline long combinatorial(
 			const FPTYPE *const a,
 			const int nnzs_in_doc);
 
