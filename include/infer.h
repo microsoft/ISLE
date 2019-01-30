@@ -85,13 +85,16 @@ namespace ISLE
             FPTYPE* w,
             const int nnzs_in_doc);
 
+		inline long ISLEInfer::combinatorial(
+			const FPTYPE *const a,
+			const int nnzs_in_doc);
+
         std::pair<FPTYPE, FPTYPE> calculate_llh(
             const FPTYPE *const a,
             const FPTYPE *const M,
             FPTYPE* w,
             const int nnzs_in_doc,
-            const int words_in_doc 
-       );
+            const int words_in_doc);
     };
 }
 

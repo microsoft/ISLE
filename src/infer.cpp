@@ -466,6 +466,28 @@ namespace ISLE
             1.0, M, num_topics, z, 1, 0.0, gradw, 1);
     }
 
+	inline long factorial(int n) {
+		if (n == 0 || n == 1)
+			return 1;
+		else {
+			int ret = 1;
+			for (int i = 0; i < n; ++i) ret *= i;
+			return ret;
+		}
+
+	}
+
+	inline long ISLEInfer::combinatorial(
+		const FPTYPE *const a,
+		const int nnzs_in_doc
+	)
+	{
+		long ret = factorial(nnzs_in_doc);
+		for (int d = 0; d < nnzs_in_doc; ++d)
+			ret /= a[d];
+		return ret;
+	}
+
     std::pair<FPTYPE, FPTYPE> ISLEInfer::calculate_llh(
         const FPTYPE *const a,
         const FPTYPE *const M,
@@ -483,6 +505,7 @@ namespace ISLE
         llh.first = 0.0;
         for (int d = 0; d < nnzs_in_doc; ++d)
             llh.first += a[d] * std::log(z[d]);
+		llh.first -= std::log(combinatorial(a, nnzs_in_doc));
 
         llh.second = llh.first * words_in_doc;
         llh.first = llh.first * infer_data->get_avg_doc_sz();
