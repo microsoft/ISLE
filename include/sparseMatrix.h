@@ -26,11 +26,12 @@ namespace ISLE
     protected:
         word_id_t	_vocab_size;	// Size of the vocabulary
         doc_id_t	_num_docs;		// Number of documents
-        offset_t    _nnzs;			// Number of non-zero entries
-                                    //  3-row Compressed Sparse Column format, 0-index-based
-        T			*vals_CSC;		// vals_CSC array 
+        doc_id_t  _nz_docs;
+        offset_t  _nnzs;			  // Number of non-zero entries
+                                //  3-row Compressed Sparse Column format, 0-index-based
+        T			    *vals_CSC;		// vals_CSC array 
         word_id_t	*rows_CSC;		// Row array for non-zero word count
-        offset_t	*offsets_CSC;		// offsets_CSC array
+        offset_t	*offsets_CSC;	// offsets_CSC array
 
         T			*normalized_vals_CSC;	// normalized values
 

@@ -15,6 +15,7 @@ namespace ISLE
         :
         _vocab_size(d),
         _num_docs(s),
+        _nz_docs(s),
         _nnzs(nnzs),
         vals_CSC(NULL),
         rows_CSC(NULL),
@@ -124,7 +125,7 @@ namespace ISLE
         bool normalize_to_one)
     {
         normalized_vals_CSC = new T[get_nnzs()];
-        uint64_t empty_docs = 0; 
+        doc_id_t empty_docs = 0; 
 
         #ifndef NOPAR
         #pragma omp parallel for schedule(dynamic, 131072) reduction(+:empty_docs)
@@ -148,6 +149,7 @@ namespace ISLE
                 else
                     assert(false);
         }
+        auto _nz_docs = num_docs() - empty_docs;
         if (empty_docs > 0)
             std::cout << "\n ==== WARNING:  " << empty_docs
             << " docs are empty\n" << std::endl;
@@ -358,8 +360,8 @@ namespace ISLE
         word_id_t freq_less_words = 0;
 
         // Check:  rounding down vs round to nearest
-        doc_id_t count_gr = (doc_id_t)(w0_c * (FPTYPE)num_docs() / (2.0 * (FPTYPE)num_topics));
-        doc_id_t count_eq = (doc_id_t)std::ceil(3.0 * eps1_c * w0_c * (FPTYPE)num_docs() / (FPTYPE)num_topics);
+        doc_id_t count_gr = (doc_id_t)(w0_c * (FPTYPE)(_nz_docs) / (2.0 * (FPTYPE)num_topics));
+        doc_id_t count_eq = (doc_id_t)std::ceil(3.0 * eps1_c * w0_c * (FPTYPE)_nz_docs / (FPTYPE)num_topics);
         if (count_gr == 0) count_gr = 1;
         if (count_eq == 0) count_eq = 1;
 
