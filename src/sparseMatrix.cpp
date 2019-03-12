@@ -149,7 +149,7 @@ namespace ISLE
                 else
                     assert(false);
         }
-        auto _nz_docs = num_docs() - empty_docs;
+        this->_nz_docs = num_docs() - empty_docs;
         if (empty_docs > 0)
             std::cout << "\n ==== WARNING:  " << empty_docs
             << " docs are empty\n" << std::endl;
