@@ -86,7 +86,20 @@ namespace ISLE
         uint64_t total_word_count = 0;
         for (auto iter = entries.begin(); iter != entries.end(); ++iter)
             total_word_count += iter->count;
-        avg_doc_sz = (T)(total_word_count / num_docs());
+		doc_id_t empty_docs=0;
+		#ifndef NOPAR
+		#pragma omp parallel for schedule(dynamic, 131072) reduction(+:empty_docs)
+		#endif
+		for (int64_t doc = 0; doc < (int64_t)num_docs(); ++doc) {
+			if (offsets_CSC[doc] == offsets_CSC[doc + 1])
+				empty_docs++;
+		}
+		this->_nz_docs = num_docs() - empty_docs;
+		this->avg_doc_sz = (T)(total_word_count / _nz_docs);
+		std::cout << "#tokens: " << total_word_count << "  #nz docs: " << _nz_docs << std::endl;
+
+		if (empty_docs > 0)
+			std::cout << "\n ==== WARNING:  " << empty_docs << " docs are empty\n" << std::endl;
 
         std::cout << "Entries in sparse matrix: " << get_nnzs() << std::endl;
         std::cout << "Average document size: " << avg_doc_sz << std::endl;
@@ -125,16 +138,13 @@ namespace ISLE
         bool normalize_to_one)
     {
         normalized_vals_CSC = new T[get_nnzs()];
-        doc_id_t empty_docs = 0; 
 
-        #ifndef NOPAR
-        #pragma omp parallel for schedule(dynamic, 131072) reduction(+:empty_docs)
-        #endif
-        for(int64_t doc = 0; doc < (int64_t)num_docs(); ++doc) {
-            auto doc_sum = std::accumulate(vals_CSC + offsets_CSC[doc], vals_CSC + offsets_CSC[doc + 1],
-                (T)0.0, std::plus<T>());
-            if (doc_sum == (T)0)
-                empty_docs++; 
+		#ifndef NOPAR
+		#pragma omp parallel for schedule(dynamic, 131072)
+		#endif
+		for (int64_t doc = 0; doc < (int64_t)num_docs(); ++doc) {
+			auto doc_sum = std::accumulate(vals_CSC + offsets_CSC[doc], vals_CSC + offsets_CSC[doc + 1],
+				(T)0.0, std::plus<T>());
             for (offset_t pos = offsets_CSC[doc]; pos < offsets_CSC[doc + 1]; ++pos)
                 if (std::is_same<T, count_t>::value) {
                     assert(normalize_to_one == false);
@@ -149,10 +159,7 @@ namespace ISLE
                 else
                     assert(false);
         }
-        this->_nz_docs = num_docs() - empty_docs;
-        if (empty_docs > 0)
-            std::cout << "\n ==== WARNING:  " << empty_docs
-            << " docs are empty\n" << std::endl;
+
         if (delete_unnormalized) {
             delete[] vals_CSC;
             vals_CSC = NULL;
