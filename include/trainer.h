@@ -10,7 +10,7 @@
 
 #include <mkl.h>
 
-#include "blas-on-flash/include/pointers/pointer.h"
+#include "BLAS-on-flash/include/pointers/pointer.h"
 
 #include "Eigen/Core"
 #include "Eigen/SparseCore"

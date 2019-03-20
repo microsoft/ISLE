@@ -4,10 +4,10 @@
 #include "trainer.h"
 #include "flash_tasks/threshold.h"
 #include "flash_tasks/rth_highest.h"
-#include "blas-on-flash/include/pointers/pointer.h"
-#include "blas-on-flash/include/utils.h"
-#include "blas-on-flash/include/lib_funcs.h"
-#include "blas-on-flash/include/scheduler/scheduler.h"
+#include "BLAS-on-flash/include/pointers/pointer.h"
+#include "BLAS-on-flash/include/utils.h"
+#include "BLAS-on-flash/include/lib_funcs.h"
+#include "BLAS-on-flash/include/scheduler/scheduler.h"
 
 namespace flash{
     extern Scheduler sched;

@@ -1,8 +1,8 @@
 #pragma once
 #include "types.h"
 #include "parallel.h"
-#include "blas-on-flash/include/pointers/pointer.h"
-#include "blas-on-flash/include/lib_funcs.h"
+#include "BLAS-on-flash/include/pointers/pointer.h"
+#include "BLAS-on-flash/include/lib_funcs.h"
 #include <cassert>
 
 namespace Kmeans {

@@ -8,7 +8,7 @@
 #include <set>
 #include <limits>
 
-#include "blas-on-flash/include/pointers/pointer.h"
+#include "BLAS-on-flash/include/pointers/pointer.h"
 
 #include "types.h"
 // types.h is included before influences the behavior of Eigen and, therefore, Spectra
