@@ -45,6 +45,7 @@ add_compile_options(${OPTIM_CXXFLAGS})
 # Generate drivers
 add_executable(ISLETrain drivers/ISLETrain.cpp)
 add_executable(ISLEInfer drivers/ISLEInfer.cpp)
+add_executable(tsvd_to_csr drivers/tsvd_to_csr.cpp)
 
 # Generate library
 add_library(ISLE STATIC src/trainer.cpp src/utils.cpp src/denseMatrix.cpp src/sparseMatrix.cpp
