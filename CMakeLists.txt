@@ -31,7 +31,7 @@ add_definitions(-DFLASH_CSRMM_MKL_NTHREADS=1
 
 add_library(fblas STATIC IMPORTED)
 set_target_properties(fblas PROPERTIES
-  IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/blas-on-flash/bin/libfblas.a"
+  IMPORTED_LOCATION "${CMAKE_SOURCE_DIR}/BLAS-on-flash/bin/libfblas.a"
   INTERFACE_INCLUDE_DIRECTORIES "${CMAKE_SOURCE_DIR}")
 link_libraries(fblas aio)
 

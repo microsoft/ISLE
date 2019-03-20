@@ -1,0 +1,3 @@
+[submodule "BLAS-on-flash"]
+	path = BLAS-on-flash
+	url = https://github.com/Microsoft/BLAS-on-flash.git
