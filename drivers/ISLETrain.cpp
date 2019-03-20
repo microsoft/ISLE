@@ -41,7 +41,7 @@ int main(int argv, char **argc) {
             tf_idf, sample, sample_rate, ISLE::ISLETrainer::data_ingest::FILE_DATA_LOAD,
             tdf_file, vocab_file, output_dir, compute_edge_topics, max_edge_topics);
         trainer.train();
-        trainer.write_output_to_files();
+        trainer.write_model_to_file();
         // TODO :: convert this to flash variant
         // trainer.output_cluster_summary();
 		    //if (compute_edge_topics) {
