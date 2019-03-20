@@ -27,6 +27,7 @@ SparseMatrix<T>::SparseMatrix(
     const offset_t nnzs)
     : _vocab_size(d),
       _num_docs(s),
+      _nz_docs(s),
       _nnzs(nnzs),
       vals_CSC(NULL),
       rows_CSC(NULL),
@@ -177,7 +178,20 @@ SparseMatrix<T>::SparseMatrix(
         uint64_t total_word_count = 0;
         for (auto iter = entries.begin(); iter != entries.end(); ++iter)
             total_word_count += iter->count;
-        avg_doc_sz = (T)(total_word_count / num_docs());
+		doc_id_t empty_docs=0;
+		#ifndef NOPAR
+		#pragma omp parallel for schedule(dynamic, 131072) reduction(+:empty_docs)
+		#endif
+		for (int64_t doc = 0; doc < (int64_t)num_docs(); ++doc) {
+			if (offsets_CSC[doc] == offsets_CSC[doc + 1])
+				empty_docs++;
+		}
+		this->_nz_docs = num_docs() - empty_docs;
+		this->avg_doc_sz = (T)(total_word_count / _nz_docs);
+		std::cout << "#tokens: " << total_word_count << "  #nz docs: " << _nz_docs << std::endl;
+
+		if (empty_docs > 0)
+			std::cout << "\n ==== WARNING:  " << empty_docs << " docs are empty\n" << std::endl;
 
         std::cout << "Entries in sparse matrix: " << get_nnzs() << std::endl;
         std::cout << "Average document size: " << avg_doc_sz << std::endl;
@@ -218,16 +232,13 @@ SparseMatrix<T>::SparseMatrix(
         bool normalize_to_one)
     {
         normalized_vals_CSC = new T[get_nnzs()];
-        uint64_t empty_docs = 0; 
 
-        #ifndef NOPAR
-        #pragma omp parallel for schedule(dynamic, 131072) reduction(+:empty_docs)
-        #endif
-        for(int64_t doc = 0; doc < num_docs(); ++doc) {
-            auto doc_sum = std::accumulate(vals_CSC + offsets_CSC[doc], vals_CSC + offsets_CSC[doc + 1],
-                (T)0.0, std::plus<T>());
-            if (doc_sum == (T)0)
-                empty_docs++; 
+		#ifndef NOPAR
+		#pragma omp parallel for schedule(dynamic, 131072)
+		#endif
+		for (int64_t doc = 0; doc < (int64_t)num_docs(); ++doc) {
+			auto doc_sum = std::accumulate(vals_CSC + offsets_CSC[doc], vals_CSC + offsets_CSC[doc + 1],
+				(T)0.0, std::plus<T>());
             for (offset_t pos = offsets_CSC[doc]; pos < offsets_CSC[doc + 1]; ++pos)
                 if (std::is_same<T, count_t>::value) {
                     assert(normalize_to_one == false);
@@ -242,9 +253,7 @@ SparseMatrix<T>::SparseMatrix(
                 else
                     assert(false);
         }
-        if (empty_docs > 0)
-            std::cout << "\n ==== WARNING:  " << empty_docs
-            << " docs are empty\n" << std::endl;
+
         if (delete_unnormalized) {
             delete[] vals_CSC;
             vals_CSC = NULL;
@@ -453,15 +462,17 @@ SparseMatrix<T>::SparseMatrix(
         word_id_t freq_less_words = 0;
 
         // Check:  rounding down vs round to nearest
-        const doc_id_t count_gr = (doc_id_t)(w0_c * (FPTYPE)num_docs() / (2.0 * (FPTYPE)num_topics));
-        const doc_id_t count_eq = (doc_id_t)std::ceil(3.0 * eps1_c * w0_c * (FPTYPE)num_docs() / (FPTYPE)num_topics);
+        doc_id_t count_gr = (doc_id_t)(w0_c * (FPTYPE)(_nz_docs) / (2.0 * (FPTYPE)num_topics));
+        doc_id_t count_eq = (doc_id_t)std::ceil(3.0 * eps1_c * w0_c * (FPTYPE)_nz_docs / (FPTYPE)num_topics);
+        if (count_gr == 0) count_gr = 1;
+        if (count_eq == 0) count_eq = 1;
 
         for (word_id_t word = word_begin; word < word_end; ++word) {
             assert(std::is_sorted(freqs[word].begin(), freqs[word].end(), std::greater<>()));
 
             if (std::is_same<T, FPTYPE>::value) {
                 for (auto iter = freqs[word].begin(); iter != freqs[word].end(); ++iter) {
-                    assert(*iter <= avg_doc_sz);
+                    assert(*iter <= avg_doc_sz + 1e-2);
                     *iter = std::round(*iter);
                 }
                 auto trunc = std::lower_bound(freqs[word].begin(), freqs[word].end(), 0.0, std::greater<>());
@@ -804,19 +815,20 @@ SparseMatrix<T>::SparseMatrix(
                 FPTYPE max = 0.0, max2 = 0.0; // second max
                 int max_topic = -1, max2_topic = -1;
                 for (auto iter = doc_topic_sum->begin() + doc_start_index[doc];
-                     iter < doc_topic_sum->begin() + doc_start_index[doc + 1]; ++iter)
+                  iter < doc_topic_sum->begin() + doc_start_index[doc + 1]; ++iter) 
                 {
                     if (std::get<2>(*iter) > max)
                     {
                         max2 = max;
                         max2_topic = max_topic;
+
                         max = std::get<2>(*iter);
-                        max_topic = std::get<1>(*iter);
+                        max_topic = (int)std::get<1>(*iter);
                     }
                     else if (std::get<2>(*iter) > max2)
                     {
                         max2 = std::get<2>(*iter);
-                        max2_topic = std::get<1>(*iter);
+                        max2_topic = (int)std::get<1>(*iter);
                     }
                 }
                 if (max_topic >= 0 && max2_topic >= 0)
@@ -843,9 +855,7 @@ SparseMatrix<T>::SparseMatrix(
         if (num_topic_blocks * topic_block_size < num_topics)
             ++num_topic_blocks;
 
-	#pragma omp parallel for schedule(dynamic, 1) num_threads(MAX_THREADS)
-        for(int64_t topic_block = 0; topic_block < num_topic_blocks; ++topic_block)
-        {
+        pfor_dynamic_1(int64_t topic_block = 0; topic_block < num_topic_blocks; ++topic_block) {
             auto topic_begin = topic_block * topic_block_size;
             auto topic_end = std::min((topic_block + 1) * topic_block_size, num_topics);
 
@@ -990,21 +1000,18 @@ SparseMatrix<T>::SparseMatrix(
         const FPTYPE coherence_eps)
     {
         assert(model.vocab_size() == vocab_size());
-        for (auto topic = 0; topic < num_topics; ++topic)
-            model.find_n_top_words(topic, M, top_words[topic]);
 
         // joint_counts[i][j] will hold joint freq for jth and ith dom words for j<i
         std::vector<std::vector<std::vector<size_t> > > joint_doc_freqs;
-        compute_joint_doc_frequency(num_topics, top_words, joint_doc_freqs);
+        compute_joint_doc_frequency(num_topics, M, top_words, joint_doc_freqs);
         std::vector<std::vector<size_t> > doc_freqs;
-        compute_doc_frequency(num_topics, top_words, doc_freqs);
+        compute_doc_frequency(num_topics, M, top_words, doc_freqs);
 
         coherences.resize(num_topics, 0.0);
         for (auto topic = 0; topic < num_topics; ++topic) {
             if (top_words[topic].size() > 1)
-			#pragma omp parallel for schedule(dynamic, 8192) num_threads(MAX_THREADS)	
-                for(long long word = 0; word < M; ++word)
-                for (word_id_t word2 = 0; word2 < word; ++word2) {
+              pfor_dynamic_8192(long long word = 0; word < (long long)M; ++word)
+                for (word_id_t word2 = 0; word2 < (word_id_t)word; ++word2) {
                     assert(doc_freqs[topic][word2] > 0);
                     coherences[topic]
                         += (FPTYPE)std::log(joint_doc_freqs[topic][word][word2] + coherence_eps)
@@ -1017,6 +1024,7 @@ SparseMatrix<T>::SparseMatrix(
     template<class T>
     void SparseMatrix<T>::compute_joint_doc_frequency(
         const int num_topics,
+		const int num_top_words,
         const std::vector<std::pair<word_id_t, FPTYPE> >* top_words,
         std::vector<std::vector<std::vector<size_t> > >& joint_counts)
         const
@@ -1029,7 +1037,7 @@ SparseMatrix<T>::SparseMatrix(
         for (auto topic = 0; topic < num_topics; ++topic) {
             joint_counts[topic].resize(top_words[topic].size());
 
-            for (word_id_t word = 0; word < top_words[topic].size(); ++word) {
+            for (word_id_t word = 0; word < num_top_words; ++word) {
                 assert(joint_counts[topic][word].size() == 0);
                 joint_counts[topic][word].resize(word, 0);
             }
@@ -1039,7 +1047,7 @@ SparseMatrix<T>::SparseMatrix(
         { // Serial version
             for (doc_id_t doc = 0; doc < num_docs(); ++doc)
                 for (auto topic = 0; topic < num_topics; ++topic)
-                    for (word_id_t w1 = 0; w1 < top_words[topic].size(); ++w1)
+                    for (word_id_t w1 = 0; w1 < num_top_words; ++w1)
                         for (word_id_t w2 = 0; w2 < w1; ++w2)
                             if (normalized(top_words[topic][w1].first, doc) > 0
                                 && normalized(top_words[topic][w2].first, doc) > 0)
@@ -1059,7 +1067,7 @@ SparseMatrix<T>::SparseMatrix(
                 for (auto topic = 0; topic < num_topics; ++topic) {
                     joint_counts_chunks[chunk][topic].resize(top_words[topic].size());
 
-                    for (word_id_t word = 0; word < top_words[topic].size(); ++word) {
+                    for (word_id_t word = 0; word < num_top_words; ++word) {
                         assert(joint_counts_chunks[chunk][topic][word].size() == 0);
                         joint_counts_chunks[chunk][topic][word].resize(word, 0);
                     }
@@ -1071,7 +1079,7 @@ SparseMatrix<T>::SparseMatrix(
                 for (int64_t doc = chunk*chunk_size;
                     doc < num_docs() && doc < (chunk + 1)*chunk_size; ++doc)
                     for (auto topic = 0; topic < num_topics; ++topic)
-                        for (word_id_t w1 = 0; w1 < top_words[topic].size(); ++w1)
+                        for (word_id_t w1 = 0; w1 < num_top_words; ++w1)
                             for (word_id_t w2 = 0; w2 < w1; ++w2)
                                 if (normalized(top_words[topic][w1].first, doc) > 0
                                     && normalized(top_words[topic][w2].first, doc) > 0)
@@ -1079,14 +1087,14 @@ SparseMatrix<T>::SparseMatrix(
 
             for (size_t chunk = 0; chunk < num_chunks; ++chunk)
                 for (auto topic = 0; topic < num_topics; ++topic)
-                    for (word_id_t w1 = 0; w1 < top_words[topic].size(); ++w1)
+                    for (word_id_t w1 = 0; w1 < num_top_words; ++w1)
                         for (word_id_t w2 = 0; w2 < w1; ++w2)
                             joint_counts[topic][w1][w2]
                             += joint_counts_chunks[chunk][topic][w1][w2];
         }
 
         for (auto topic = 0; topic < num_topics; ++topic)
-            for (word_id_t word = 0; word < top_words[topic].size(); ++word)
+            for (word_id_t word = 0; word < num_top_words; ++word)
                 assert(joint_counts[topic][word].size() == word);
 
         /*for (auto pos = offsets_CSC[doc]; pos != offsets_CSC[doc + 1]; ++pos)
@@ -1098,6 +1106,7 @@ SparseMatrix<T>::SparseMatrix(
     template<class T>
     void SparseMatrix<T>::compute_doc_frequency(
         const int num_topics,
+		const int num_top_words, 
         const std::vector<std::pair<word_id_t, FPTYPE> >* top_words,
         std::vector<std::vector<size_t> >& doc_frequencies)
         const
@@ -1107,7 +1116,7 @@ SparseMatrix<T>::SparseMatrix(
         Timer timer;
         doc_frequencies.resize(num_topics);
         for (auto topic = 0; topic < num_topics; ++topic) {
-            assert(top_words[topic].size() > 0);
+            assert(top_words[topic].size() >= num_top_words);
             doc_frequencies[topic].resize(top_words[topic].size(), 0);
         }
 
@@ -1115,7 +1124,7 @@ SparseMatrix<T>::SparseMatrix(
         { // Use Serial version
             for (int64_t doc = 0; doc < num_docs(); ++doc)
                 for (auto topic = 0; topic < num_topics; ++topic)
-                    for (word_id_t word = 0; word < top_words[topic].size(); ++word)
+                    for (word_id_t word = 0; word < num_top_words; ++word)
                         if (normalized(top_words[topic][word].first, doc) > (T)0.0)
                             doc_frequencies[topic][word]++;
         }
@@ -1141,19 +1150,19 @@ SparseMatrix<T>::SparseMatrix(
                 for (int64_t doc = chunk*chunk_size;
                     doc < num_docs() && doc < (chunk + 1)*chunk_size; ++doc)
                     for (auto topic = 0; topic < num_topics; ++topic)
-                        for (word_id_t word = 0; word < top_words[topic].size(); ++word)
+                        for (word_id_t word = 0; word < num_top_words; ++word)
                             if (normalized(top_words[topic][word].first, doc) > (T)0.0)
                                 doc_frequencies_chunks[chunk][topic][word]++;
 
             for (size_t chunk = 0; chunk < num_chunks; ++chunk)
                 for (auto topic = 0; topic < num_topics; ++topic)
-                    for (word_id_t word = 0; word < top_words[topic].size(); ++word)
+                    for (word_id_t word = 0; word < num_top_words; ++word)
                         doc_frequencies[topic][word] +=
                         doc_frequencies_chunks[chunk][topic][word];
         }
 
         for (auto topic = 0; topic < num_topics; ++topic) {
-            assert(doc_frequencies[topic].size() == top_words[topic].size());
+            assert(doc_frequencies[topic].size() == num_top_words);
             for (auto iter = doc_frequencies[topic].begin();
                 iter < doc_frequencies[topic].end(); ++iter)
                 assert(*iter > 0);
@@ -1182,7 +1191,7 @@ SparseMatrix<T>::SparseMatrix(
 
         assert(docs_log_fact.size() == 0);
         docs_log_fact.resize(num_docs());
-        pfor_dynamic_131072(int64_t doc = 0; doc < num_docs(); ++doc) {
+        pfor_dynamic_131072(int64_t doc = 0; doc < (int64_t)num_docs(); ++doc) {
             FPTYPE doclogfact = 0;
             for (offset_t pos = offset_CSC(doc); pos < offset_CSC(doc + 1); ++pos)
                 doclogfact -= log_fact[(int)val_CSC(pos)];
@@ -1219,6 +1228,7 @@ SparseMatrix<T>::SparseMatrix(
         const SparseMatrix<FPTYPE>& from,
         const bool copy_normalized)
         : SparseMatrix<FPTYPE>(from.vocab_size(), from.num_docs()),
+        U_rowmajor(NULL),     
         SigmaVT(NULL)
     {
         allocate(from.get_nnzs());
@@ -1331,6 +1341,8 @@ SparseMatrix<T>::SparseMatrix(
         assert(U_Spectra.IsRowMajor == false);
         assert(U_Spectra.rows() == vocab_size() && U_Spectra.cols() == num_topics);
         memcpy(U_colmajor, U_Spectra.data(), U_rows * U_cols * sizeof(FPTYPE));
+        if (!U_rowmajor)
+            compute_U_rowmajor();
         compute_sigmaVT(num_topics);
     }
 
@@ -1391,7 +1403,11 @@ SparseMatrix<T>::SparseMatrix(
         for (int i = 0; i < num_topics; ++i)
             evalues.push_back(sevs[i]);
         memcpy(U_colmajor, sevecs.memptr(), U_rows * U_cols * sizeof(FPTYPE));
+        if (!U_rowmajor)
+            compute_U_rowmajor();
+#if USE_EXPLICIT_PROJECTED_MATRIX
         compute_sigmaVT(num_topics);
+#endif
     }
     
     template<class FPTYPE>
@@ -1417,8 +1433,6 @@ SparseMatrix<T>::SparseMatrix(
     template<class FPTYPE>
     void FPSparseMatrix<FPTYPE>::compute_sigmaVT(const doc_id_t num_topics)
     {
-        if (!U_rowmajor)
-            compute_U_rowmajor();
 
         return;
 
@@ -1446,9 +1460,11 @@ SparseMatrix<T>::SparseMatrix(
         delete[] U_colmajor;
         U_colmajor = NULL;
 
+#if USE_EXPLICIT_PROJECTED_MATRIX
         assert(SigmaVT != NULL);
         delete[] SigmaVT;
         SigmaVT = NULL;
+#endif
     }
 
 
@@ -1679,7 +1695,7 @@ SparseMatrix<T>::SparseMatrix(
         std::cout << "sampling docs: pivot: " << pivot << std::endl;
 
         auto select_docs = new bool[num_docs()];
-        pfor_dynamic_131072(int64_t doc = 0; doc < num_docs(); ++doc) {
+        pfor_dynamic_131072(int64_t doc = 0; doc < (int64_t)num_docs(); ++doc) {
             select_docs[doc] = (doc_weights[doc] >= pivot);
         }
 
@@ -1787,12 +1803,15 @@ SparseMatrix<T>::SparseMatrix(
         std::fill_n(ones_vec, std::max(doc_end - doc_begin, num_centers), (FPTYPE)1.0);
 
         FPTYPE *centers_tr = new FPTYPE[(size_t)num_centers*(size_t)vocab_size()];
+				FPomatcopy('C', 'T', vocab_size(), num_centers, 1.0f, centers,
+             			 vocab_size(), centers_tr, num_centers);
+/*
         // Improve this
         for (word_id_t r = 0; r < vocab_size(); ++r)
             for (auto c = 0; c < num_centers; ++c)
                 centers_tr[(size_t)c + (size_t)r * (size_t)num_centers]
                 = centers[(size_t)r + (size_t)c * (size_t)vocab_size()];
-
+*/
         const char transa = 'N';
         const MKL_INT m = doc_end - doc_begin;
         const MKL_INT n = num_centers;
@@ -1840,7 +1859,7 @@ SparseMatrix<T>::SparseMatrix(
             num_centers, centers, centers_l2sq,
             doc_begin, doc_end, docs_l2sq, dist_matrix);
 
-        pfor_static_131072(int64_t d = 0; d < doc_end - doc_begin; ++d)
+        pfor_static_131072(int64_t d = 0; d < (int64_t)(doc_end - doc_begin); ++d)
             center_index[d] = (doc_id_t)FPimin(num_centers,
                 dist_matrix + (size_t)d * (size_t)num_centers, 1);
     }
@@ -1851,7 +1870,7 @@ SparseMatrix<T>::SparseMatrix(
         FPTYPE * centers_l2sq,
         const doc_id_t num_centers)
     {
-        pfor_static_256(int64_t c = 0; c < num_centers; ++c)
+        pfor_static_256(int64_t c = 0; c < (int64_t)num_centers; ++c)
             centers_l2sq[c] = FPdot(vocab_size(),
                 centers + (size_t)c * (size_t)vocab_size(), 1,
                 centers + (size_t)c * (size_t)vocab_size(), 1);
@@ -2203,7 +2222,7 @@ SparseMatrix<T>::SparseMatrix(
         const doc_id_t num_centers)
     {
         assert(U_cols == num_centers);
-        pfor_static_256(int64_t c = 0; c < num_centers; ++c)
+        pfor_static_256(int64_t c = 0; c < (int64_t)num_centers; ++c)
             projected_centers_l2sq[c] = FPdot(num_centers,
                 projected_centers + (size_t)c * (size_t)num_centers, 1,
                 projected_centers + (size_t)c * (size_t)num_centers, 1);
@@ -2522,7 +2541,8 @@ SparseMatrix<T>::SparseMatrix(
         while (centers.size() < k) {
             std::cout << "centers.size():  " << centers.size() 
                 << "   new_centers_added: " << new_centers_added << std::endl;
-            for(int64_t block = 0; block < divide_round_up(num_docs(), (doc_id_t)DOC_BLOCK_SIZE); ++block)
+
+            pfor(int64_t block = 0; block < (int64_t)divide_round_up(num_docs(), (doc_id_t)DOC_BLOCK_SIZE); ++block)
                 update_min_distsq_to_projected_centers(U_cols, new_centers_added,
                     centers_coords + (size_t)(centers.size() - new_centers_added) * (size_t)U_cols,
                     block*DOC_BLOCK_SIZE, std::min(((doc_id_t)block + 1)*(doc_id_t)DOC_BLOCK_SIZE, num_docs()),
@@ -2538,7 +2558,7 @@ SparseMatrix<T>::SparseMatrix(
                 assert(std::find(iter + 1, centers.end(), *iter) == centers.end());
             }
 
-            int s = centers.size();
+            int s = (int)centers.size();
             new_centers_added = 0;
             for (int c = 0; (c < 1 + std::sqrt(s - 5 > 0 ? s - 5 : 0)) && (centers.size() < k); ++c) {
                 auto dice_throw = dist_cumul[num_docs()] * rand_fraction();

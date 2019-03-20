@@ -146,7 +146,7 @@ void ISLE::Logger::log_diagnostic(
   std::string str;
   for (int i = 0; i < level_; ++i) str += "\t";
   if (isDiagnosticFileOpen)
-    diagnosticLogStream << str << std::endl;
+    diagnosticLogStream << str << msg << std::endl;
 #endif
 }
 

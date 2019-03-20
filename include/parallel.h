@@ -8,6 +8,8 @@
 //
 //#define NO_PAR
 
+#define NUM_OMP_THR 28
+
 #if defined(NO_PAR)
 #define pfor			    for
 #define pfor_static_256		for
@@ -55,18 +57,18 @@
 #ifndef CILK
 #include <omp.h>
 
-#define pfor			_Pragma("omp parallel for schedule(static, 1)")		for
-#define pfor_static_256		_Pragma("omp parallel for schedule(static, 256)")	for
-#define pfor_static_1024	_Pragma("omp parallel for schedule(static, 1024)")	for
-#define pfor_static_131072	_Pragma("omp parallel for schedule(static, 131072)")	for
-#define pfor_dynamic_1		_Pragma("omp parallel for schedule(dynamic, 1)")		for
-#define pfor_dynamic_16		_Pragma("omp parallel for schedule(dynamic, 16)")	for
-#define pfor_dynamic_256	_Pragma("omp parallel for schedule(dynamic, 256)")	for
-#define pfor_dynamic_512	_Pragma("omp parallel for schedule(dynamic, 512)")	for
-#define pfor_dynamic_1024	_Pragma("omp parallel for schedule(dynamic, 1024)")	for
-#define pfor_dynamic_8192	_Pragma("omp parallel for schedule(dynamic, 8292)")	for
-#define pfor_dynamic_65536	_Pragma("omp parallel for schedule(dynamic, 65536)")	for
-#define pfor_dynamic_131072	_Pragma("omp parallel for schedule(dynamic, 131072)") for
+#define pfor			    _Pragma("omp parallel for schedule(static, 1) num_threads(NUM_OMP_THR)")		for
+#define pfor_static_256		_Pragma("omp parallel for schedule(static, 256) num_threads(NUM_OMP_THR)")	    for
+#define pfor_static_1024	_Pragma("omp parallel for schedule(static, 1024) num_threads(NUM_OMP_THR)")	    for
+#define pfor_static_131072	_Pragma("omp parallel for schedule(static, 131072) num_threads(NUM_OMP_THR)")	for
+#define pfor_dynamic_1		_Pragma("omp parallel for schedule(dynamic, 1) num_threads(NUM_OMP_THR)")		for
+#define pfor_dynamic_16		_Pragma("omp parallel for schedule(dynamic, 16) num_threads(NUM_OMP_THR)")	    for
+#define pfor_dynamic_256	_Pragma("omp parallel for schedule(dynamic, 256) num_threads(NUM_OMP_THR)")	    for
+#define pfor_dynamic_512	_Pragma("omp parallel for schedule(dynamic, 512) num_threads(NUM_OMP_THR)")	    for
+#define pfor_dynamic_1024	_Pragma("omp parallel for schedule(dynamic, 1024) num_threads(NUM_OMP_THR)")	for
+#define pfor_dynamic_8192	_Pragma("omp parallel for schedule(dynamic, 8292) num_threads(NUM_OMP_THR)")	for
+#define pfor_dynamic_65536	_Pragma("omp parallel for schedule(dynamic, 65536) num_threads(NUM_OMP_THR)")	for
+#define pfor_dynamic_131072	_Pragma("omp parallel for schedule(dynamic, 131072) num_threads(NUM_OMP_THR)")  for
 #define cilk_spawn
 #define cilk_sync
 
@@ -78,18 +80,18 @@
 
 #elif defined(_MSC_VER)
 #include <omp.h>
-#define pfor				__pragma(omp parallel for schedule(static, 1))		for
-#define pfor_static_256		__pragma(omp parallel for schedule(static, 256))	for
-#define pfor_static_1024	__pragma(omp parallel for schedule(static, 1024))	for
-#define pfor_static_131072	__pragma(omp parallel for schedule(static, 131072))	for
-#define pfor_dynamic_1		__pragma(omp parallel for schedule(dynamic, 1))		for
-#define pfor_dynamic_16		__pragma(omp parallel for schedule(dynamic, 16))	for
-#define pfor_dynamic_256	__pragma(omp parallel for schedule(dynamic, 256))	for
-#define pfor_dynamic_512	__pragma(omp parallel for schedule(dynamic, 512))	for
-#define pfor_dynamic_1024	__pragma(omp parallel for schedule(dynamic, 1024))	for
-#define pfor_dynamic_8192	__pragma(omp parallel for schedule(dynamic, 8292))	for
-#define pfor_dynamic_65536	__pragma(omp parallel for schedule(dynamic, 65536))	for
-#define pfor_dynamic_131072	__pragma(omp parallel for schedule(dynamic, 131072)) for
+#define pfor				__pragma(omp parallel for schedule(static, 1) num_threads(NUM_OMP_THR))		    for
+#define pfor_static_256		__pragma(omp parallel for schedule(static, 256) num_threads(NUM_OMP_THR))       for
+#define pfor_static_1024	__pragma(omp parallel for schedule(static, 1024) num_threads(NUM_OMP_THR))	    for
+#define pfor_static_131072	__pragma(omp parallel for schedule(static, 131072) num_threads(NUM_OMP_THR))    for
+#define pfor_dynamic_1		__pragma(omp parallel for schedule(dynamic, 1) num_threads(NUM_OMP_THR))		for
+#define pfor_dynamic_16		__pragma(omp parallel for schedule(dynamic, 16) num_threads(NUM_OMP_THR))	    for
+#define pfor_dynamic_256	__pragma(omp parallel for schedule(dynamic, 256) num_threads(NUM_OMP_THR))	    for
+#define pfor_dynamic_512	__pragma(omp parallel for schedule(dynamic, 512) num_threads(NUM_OMP_THR))	    for
+#define pfor_dynamic_1024	__pragma(omp parallel for schedule(dynamic, 1024) num_threads(NUM_OMP_THR))	    for
+#define pfor_dynamic_8192	__pragma(omp parallel for schedule(dynamic, 8292) num_threads(NUM_OMP_THR))	    for
+#define pfor_dynamic_65536	__pragma(omp parallel for schedule(dynamic, 65536) num_threads(NUM_OMP_THR))	for
+#define pfor_dynamic_131072	__pragma(omp parallel for schedule(dynamic, 131072) num_threads(NUM_OMP_THR))   for
 #define cilk_spawn
 #define cilk_sync
 

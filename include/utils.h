@@ -413,7 +413,8 @@ namespace ISLE
         {
             if (buf_ptr - buf_base > write_buf_size - 100)
                 double_buffer();
-            buf_ptr = itoa_mv(num, buf_ptr, terminal);
+            assert(num < 0x7fffffff); // Else, can not print using itoa_mv
+            buf_ptr = itoa_mv((int)num, buf_ptr, terminal);
         }
 
         template<class FPTYPE>
@@ -537,7 +538,8 @@ namespace ISLE
         const doc_id_t num_topics,
         const std::string& output_path_base,
         const bool& sample_docs,
-        const FPTYPE& sample_rate);
+        const FPTYPE& sample_rate,
+		const bool tf_idf);
 
     void create_dir(const std::string& dir_name);
 

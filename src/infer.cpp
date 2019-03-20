@@ -142,7 +142,7 @@ namespace ISLE
         int state = 1;
 
         for (size_t i = 0; i < fileSize; ++i) {
-            assert(word < vocab_size);
+            assert(word <= vocab_size);
             switch (buf[i]) {
             case '\r':
                 break;
@@ -343,6 +343,7 @@ namespace ISLE
         M_slice = new FPTYPE[MAX_NNZS * num_topics];
         gradw = new FPTYPE[num_topics];
         z = new FPTYPE[MAX_NNZS];
+       
 
         assert(a != NULL);
         assert(M_slice != NULL);
@@ -360,7 +361,7 @@ namespace ISLE
     }
 
     // Return 0.0 if the calculation did not converge
-    FPTYPE ISLEInfer::infer_doc_in_file(
+    std::pair<FPTYPE, FPTYPE> ISLEInfer::infer_doc_in_file(
         const doc_id_t doc,
         FPTYPE* w,
         const int iters,
@@ -369,9 +370,11 @@ namespace ISLE
         auto start_pos = infer_data->offset_CSC(doc);
         auto end_pos = infer_data->offset_CSC(doc + 1);
         auto nnzs_in_doc = 0;
+        auto words_in_doc = 0; 
 
         for (auto pos = start_pos; pos < end_pos; ++pos) {
             auto word_id = infer_data->row_CSC(pos);
+            words_in_doc+=1;		
             if (std::accumulate(model_by_word + word_id * num_topics,
                 model_by_word + (word_id + 1)* num_topics, (FPTYPE)0.0) > 1.0e-10)
             {
@@ -383,9 +386,10 @@ namespace ISLE
         }
         assert(nnzs_in_doc < MAX_NNZS);
 
-        FPTYPE llh = 0.0;
+        //FPTYPE llh = 0.0;
+        std::pair<FPTYPE, FPTYPE> llh;
         if (mwu(a, M_slice, w, nnzs_in_doc, iters, Lfguess) == true) // MWU converged
-            llh = calculate_llh(a, M_slice, w, nnzs_in_doc);
+            llh = calculate_llh(a, M_slice, w, nnzs_in_doc, words_in_doc);
         return llh;
     }
 
@@ -394,7 +398,7 @@ namespace ISLE
         const FPTYPE *const a,
         const FPTYPE *const M,
         FPTYPE* w,
-        const int nnzs,
+        const int nnzs_in_doc,
         const int iters,
         FPTYPE Lf)
     {
@@ -403,14 +407,16 @@ namespace ISLE
         for (auto topic = 0; topic < num_topics; ++topic)
             w[topic] = (FPTYPE)1.0 / ((FPTYPE)num_topics);
 
+        if (nnzs_in_doc == 0)
+            return converged;
+
         for (int guessLf = 0; guessLf < 10; guessLf++) {
 
             for (auto topic = 0; topic < num_topics; ++topic)
                 w[topic] = (FPTYPE)1.0 / ((FPTYPE)num_topics);
 
-            for (auto iter = 0; iter < iters; ++iter) {
-                //std::cout << calculate_llh(a, M, w, nnzs) << "\t";
-                grad(gradw, a, M, w, nnzs);
+            for (auto iter = 0; iter < iters; ++iter){        
+                grad(gradw, a, M, w, nnzs_in_doc);
                 auto eta = std::sqrt(2.0 * std::log((FPTYPE)num_topics) / (FPTYPE)(iter + 1)) / Lf;
 
                 for (auto topic = 0; topic < num_topics; ++topic)
@@ -441,9 +447,9 @@ namespace ISLE
         const FPTYPE *const a,
         const FPTYPE *const M,
         FPTYPE* w,
-        const int nnzs)
+        const int nnzs_in_doc)
     {
-        FPgemv(CblasRowMajor, CblasNoTrans, nnzs, num_topics,
+        FPgemv(CblasRowMajor, CblasNoTrans, nnzs_in_doc, num_topics,
             1.0, M, num_topics, w, 1, 0.0, z, 1);
         /* Equivalent to FPgemv above
         for (int r = 0; r < nnzs; ++r) {
@@ -453,28 +459,34 @@ namespace ISLE
             }
         } */
 
-        for (int d = 0; d < num_topics; ++d)
+        for (int d = 0; d < nnzs_in_doc; ++d)
             z[d] = a[d] / z[d];
 
-        FPgemv(CblasRowMajor, CblasTrans, nnzs, num_topics,
+        FPgemv(CblasRowMajor, CblasTrans, nnzs_in_doc, num_topics,
             1.0, M, num_topics, z, 1, 0.0, gradw, 1);
     }
 
-    FPTYPE ISLEInfer::calculate_llh(
+    std::pair<FPTYPE, FPTYPE> ISLEInfer::calculate_llh(
         const FPTYPE *const a,
         const FPTYPE *const M,
         FPTYPE* w,
-        const int nnzs)
+        const int nnzs_in_doc,
+        const int words_in_doc
+   )
     {
-        auto z = new FPTYPE[nnzs];
+        auto z = new FPTYPE[nnzs_in_doc];
+        std::pair<FPTYPE, FPTYPE> llh;
 
-        FPgemv(CblasRowMajor, CblasNoTrans, nnzs, num_topics,
+        FPgemv(CblasRowMajor, CblasNoTrans, nnzs_in_doc, num_topics,
             1.0, M, num_topics, w, 1, 0.0, z, 1);
 
-        FPTYPE llh = 0.0;
-        for (int d = 0; d < nnzs; ++d)
-            llh += a[d] * std::log(z[d]);
+        llh.first = 0.0;
+        for (int d = 0; d < nnzs_in_doc; ++d)
+            llh.first += a[d] * std::log(z[d]);
 
+        llh.second = llh.first * words_in_doc;
+        llh.first = llh.first * infer_data->get_avg_doc_sz();
+        
         delete[] z;
 
         return llh;

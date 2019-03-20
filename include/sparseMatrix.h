@@ -28,11 +28,12 @@ namespace ISLE
     protected:
         word_id_t	_vocab_size;	// Size of the vocabulary
         doc_id_t	_num_docs;		// Number of documents
-        offset_t    _nnzs;			// Number of non-zero entries
-                                    //  3-row Compressed Sparse Column format, 0-index-based
-        T			*vals_CSC;		// vals_CSC array 
+        doc_id_t  _nz_docs;
+        offset_t  _nnzs;			  // Number of non-zero entries
+                                //  3-row Compressed Sparse Column format, 0-index-based
+        T			    *vals_CSC;		// vals_CSC array 
         word_id_t	*rows_CSC;		// Row array for non-zero word count
-        offset_t	*offsets_CSC;		// offsets_CSC array
+        offset_t	*offsets_CSC;	// offsets_CSC array
 
         flash::flash_ptr<T> vals_CSC_fptr;          // flash-backed vals_CSC
         flash::flash_ptr<word_id_t> rows_CSC_fptr;  // flash-backed rows_CSC
@@ -71,6 +72,7 @@ namespace ISLE
         }
         inline doc_id_t  num_docs()		const { return _num_docs; }
         inline word_id_t vocab_size()	const { return _vocab_size; }
+        inline T         get_avg_doc_sz()       const { return avg_doc_sz; } 
 
         inline offset_t	 offset_CSC(doc_id_t doc)		const { return offsets_CSC[doc]; }
         inline word_id_t row_CSC(offset_t pos)			const { return rows_CSC[pos]; }
@@ -94,6 +96,9 @@ namespace ISLE
         void allocate_flash(const offset_t nnzs_);
 
         void shrink(const offset_t new_nnzs_);
+
+        void shrink(const offset_t new_nnzs_);
+
 
         inline T elem(
             const word_id_t& word,
@@ -205,6 +210,7 @@ namespace ISLE
         // Output: @joint_counts: joint_counts[i][j] contains joint freq for j<i
         void compute_joint_doc_frequency(
             const int num_topics,
+			const int num_top_words,
             const std::vector<std::pair<word_id_t, FPTYPE> >* top_words,
             std::vector<std::vector<std::vector<size_t> > >& joint_counts)
             const;
@@ -212,7 +218,8 @@ namespace ISLE
         // Convert to algebra. Equivalent to "this*column(1)"
         void compute_doc_frequency(
             const int num_topics,
-            const std::vector<std::pair<word_id_t, FPTYPE> >* top_words,
+			const int num_top_words,
+			const std::vector<std::pair<word_id_t, FPTYPE> >* top_words,
             std::vector<std::vector<size_t> >& doc_frequencies)
             const;
 

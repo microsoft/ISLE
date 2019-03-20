@@ -25,7 +25,7 @@ namespace ISLE
         size_t num_chunks = size / chunk_size;
         if (size % chunk_size > 0)
             num_chunks++;
-        pfor(int64_t chunk = 0; chunk < num_chunks; ++chunk)
+        pfor(int64_t chunk = 0; chunk < (int64_t)num_chunks; ++chunk)
         {
             size_t n = size > (chunk + 1) * chunk_size
                 ? chunk_size
@@ -77,7 +77,7 @@ namespace ISLE
         const std::vector<std::string>& vocab_words)
     {
         std::vector<std::pair<word_id_t, FPTYPE> > top_words;
-        find_top_words_above_threshold(topic, threshold, top_words);
+        find_top_words_above_threshold(topic, (FPTYPE)threshold, top_words);
         std::sort(top_words.begin(), top_words.end(),
             [](auto &left, auto &right) {return left.first < right.first; });
         std::cout << "#Dom words: " << top_words.size() << "\n";
@@ -546,7 +546,7 @@ namespace ISLE
             dim, num_centers, centers, centers_l2sq,
             num_docs, docs, docs_l2sq,
             dist_matrix, ones_vec);
-        pfor_static_131072(int64_t d = 0; d < num_docs; ++d) {
+        pfor_static_131072(int64_t d = 0; d < (int64_t)num_docs; ++d) {
             FPTYPE min = FP_MAX;
             for (doc_id_t c = 0; c < num_centers; ++c)
                 if (dist_matrix[(size_t)c + (size_t)d * (size_t)num_centers] < min)
@@ -685,7 +685,7 @@ namespace ISLE
     {
         FPTYPE  KMEANSBB_L_FACTOR = 0.5;
         MKL_UINT KMEANSBB_L = (count_t)(KMEANSBB_L_FACTOR * (FPTYPE)k);
-        MKL_UINT KMEANSBB_R = 10 + 5 * std::log(k);
+        MKL_UINT KMEANSBB_R = 10 + 5 * (MKL_UINT)std::log(k);
 
         MKL_UINT max_centers = KMEANSBB_L * KMEANSBB_R + 1;
 
@@ -821,7 +821,7 @@ namespace ISLE
         auto refresh_rate = 1;
         while (centers.size() < k)
         {
-            FPaxpy(num_docs(), -1 / (2 * num_docs()), ones_vec, 1, init_prob, 1);
+            FPaxpy(num_docs(), -1.0 / (2.0 * (FPTYPE)num_docs()), ones_vec, 1, init_prob, 1);
             update_min_distsq_to_centers(vocab_size(),
                 centers.size() - num_centers_processed,
                 centers_coords + (size_t)num_centers_processed * (size_t)vocab_size(),
@@ -831,7 +831,7 @@ namespace ISLE
                 centers.size(), centers_coords, centers_l2sq,
                 num_docs(), data(), docs_l2sq,
                 init_prob);*/
-            FPaxpy(num_docs(), 1 / (2 * num_docs()), ones_vec, 1, init_prob, 1);
+            FPaxpy(num_docs(), -1.0 / (2.0 * (FPTYPE)num_docs()), ones_vec, 1, init_prob, 1);
             dist_cumul[0] = 0;
             for (doc_id_t doc = 0; doc < num_docs(); ++doc)
                 dist_cumul[doc + 1] = dist_cumul[doc] + init_prob[doc];
@@ -857,7 +857,7 @@ namespace ISLE
                     sample_size, sampled_docs_coords, sampled_docs_l2sq,
                     sampled_docs_distsq_to_centers);
 
-                auto new_center = 0;
+                size_t new_center = 0;
                 for (size_t s = 1; s < sample_size; ++s)
                     if ((sampled_docs_distsq_to_centers[s] * init_prob[sampled_docs[new_center]]) /
                         (sampled_docs_distsq_to_centers[new_center] * init_prob[sampled_docs[s]]) > rand_fraction())
@@ -1090,7 +1090,7 @@ namespace ISLE
 
         int BUF_PAD = 32;
         int CHUNK_SIZE = 8196;
-        int nchunks = num_docs() / CHUNK_SIZE + (num_docs() % CHUNK_SIZE == 0 ? 0 : 1);
+        int nchunks = (int)(num_docs() / CHUNK_SIZE + (num_docs() % CHUNK_SIZE == 0 ? 0 : 1));
         std::vector<FPTYPE> residuals(nchunks*BUF_PAD, 0.0);
 
         pfor(int chunk = 0; chunk < nchunks; ++chunk)

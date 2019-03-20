@@ -20,6 +20,7 @@ namespace ISLE
         const doc_id_t		num_docs_,
         const offset_t		max_entries_,
         const doc_id_t		num_topics_,
+        const bool          tf_idf_,
         const bool			flag_sample_docs_,
         const FPTYPE		sample_rate_,
         const data_ingest	how_data_loaded_,
@@ -39,6 +40,7 @@ namespace ISLE
         avg_doc_sz(0),
         max_entries(max_entries_),
         num_topics(num_topics_),
+        tf_idf(tf_idf_),
         how_data_loaded(how_data_loaded_),
         input_file(input_file_),
         vocab_file(vocab_file_),
@@ -74,7 +76,7 @@ namespace ISLE
         //
         // Initialize  is_log_file_open directories, vocablist, and timer
         //
-        log_dir = log_dir_name(num_topics, output_path_base, flag_sample_docs, sample_rate);
+        log_dir = log_dir_name(num_topics, output_path_base, flag_sample_docs, sample_rate, tf_idf);
         create_dir(log_dir);
 
         out_log = new LogUtils(log_dir);
@@ -147,6 +149,7 @@ namespace ISLE
             << std::setw(15) << std::left << "#Words" << vocab_size << "\n"
             << std::setw(15) << std::left << "#Docs" << num_docs << "\n"
             << std::setw(15) << std::left << "#Topics" << num_topics << "\n"
+            << std::setw(15) << std::left << "TF-IDF" << tf_idf << "\n"
             << std::setw(15) << std::left << "Sampling?" << flag_sample_docs << "\n"
             << std::setw(15) << std::left << "Sample rate" << sample_rate << "\n"
             << std::setw(15) << std::left << "Edge topics?" << flag_construct_edge_topics << "\n"
@@ -269,6 +272,21 @@ namespace ISLE
                 ++vocab_size;
                 std::cout << std::setw(20) << std::left << "#Words(updated)" << vocab_size << "\n";
             }
+        }
+
+        if (tf_idf) {
+            if (how_data_loaded == data_ingest::PREPROCESSED_DATA_LOAD) {
+                std::cerr << "TF-IDF is to be used only for text inputs." << std::endl;
+                exit(-1);
+            }
+           
+            std::vector<float> idf(vocab_size+1, 0.0);
+            for (auto iter : entries)
+                idf[iter.word] += 1.0;
+			for (word_id_t w = 1; w <= vocab_size; ++w)
+				idf[w] = std::log(((float)num_docs) / idf[w]);
+			for (auto iter : entries)
+                iter.count = (count_t) std::ceil(idf[iter.word] * (float)iter.count); 
         }
 
         A_sp = new SparseMatrix<A_TYPE>(vocab_size, num_docs);
@@ -428,335 +446,350 @@ namespace ISLE
         timer->next_time_secs("Spectra A_sp computation");
     }
 
+
     void ISLETrainer::train()
     {
-		// flash::flash_setup("/raid/tmp/");
-        flash::flash_ptr<FPTYPE> base_csr_vals = normalized_vals_CSR_fptr;
-        flash::flash_ptr<doc_id_t> base_csr_cols = cols_CSR_fptr;
+      // flash::flash_setup("/raid/tmp/");
+      flash::flash_ptr<FPTYPE> base_csr_vals = normalized_vals_CSR_fptr;
+      flash::flash_ptr<doc_id_t> base_csr_cols = cols_CSR_fptr;
 
-        //
-        // Threshold
-        //
-        std::vector<A_TYPE> thresholds(vocab_size,0);
-        auto freqs = new std::vector<A_TYPE>[vocab_size];
-        offset_t new_nnzs = 0;
-        if (how_data_loaded == data_ingest::FILE_DATA_LOAD) {
-            A_sp->list_word_freqs_by_sorting(freqs);
-            new_nnzs = A_sp->compute_thresholds(0, vocab_size, freqs, thresholds, num_topics);
+      //
+      // Threshold
+      //
+      std::vector<A_TYPE> thresholds(vocab_size, 0);
+      auto freqs = new std::vector<A_TYPE>[vocab_size];
+      offset_t new_nnzs = 0;
+      if (how_data_loaded == data_ingest::FILE_DATA_LOAD) {
+        A_sp->list_word_freqs_by_sorting(freqs);
+        new_nnzs = A_sp->compute_thresholds(0, vocab_size, freqs, thresholds, num_topics);
+      }
+      else if (how_data_loaded == data_ingest::PREPROCESSED_DATA_LOAD) {
+        offset_t chunk_size = 1 << 27;
+        word_id_t *word_begins = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
+        word_id_t *word_ends = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
+        word_id_t word_begin = 0;
+        word_id_t word_end = 0;
+        word_id_t num_word_chunks = 0;
+        while (word_begin < vocab_size) {
+          while (offsets_CSR[word_end] - offsets_CSR[word_begin] < chunk_size && word_end < vocab_size)
+            ++word_end;
+          word_begins[num_word_chunks] = word_begin;
+          word_ends[num_word_chunks] = word_end;
+          ++num_word_chunks;
+          word_begin = word_end;
         }
-        else if (how_data_loaded == data_ingest::PREPROCESSED_DATA_LOAD) {
-            offset_t chunk_size = 1 << 27;
-            word_id_t *word_begins = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
-            word_id_t *word_ends = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
-            word_id_t word_begin = 0; 
-            word_id_t word_end = 0;
-            word_id_t num_word_chunks = 0;
-            while (word_begin < vocab_size) {
-                while (offsets_CSR[word_end] - offsets_CSR[word_begin] < chunk_size && word_end < vocab_size)
-                    ++word_end;
-                word_begins[num_word_chunks] = word_begin;
-                word_ends[num_word_chunks] = word_end;
-                ++num_word_chunks;
-                word_begin = word_end;
-            }
-            assert(num_word_chunks <= divide_round_up(offsets_CSR[vocab_size], chunk_size));
+        assert(num_word_chunks <= divide_round_up(offsets_CSR[vocab_size], chunk_size));
+        assert(word_ends[num_word_chunks - 1] == vocab_size);
 
-            offset_t *new_nnzs_in_chunk = new offset_t[num_word_chunks];
-            
-            // pfor(int64_t chunk = 0; chunk < num_word_chunks; ++chunk) {
-            //     A_sp->list_word_freqs_from_CSR(word_begins[chunk], word_ends[chunk],
-            //         normalized_vals_CSR + offsets_CSR[word_begins[chunk]], 
-            //         offsets_CSR + word_begins[chunk], freqs);
-            //     new_nnzs_in_chunk[chunk] = A_sp->compute_thresholds(word_begins[chunk], word_ends[chunk],
-            //         freqs, thresholds, num_topics);
-            //     for (word_id_t word = word_begins[chunk]; word < word_ends[chunk]; ++word)
-            //         freqs[word].clear();
-            // }
+        offset_t *new_nnzs_in_chunk = new offset_t[num_word_chunks];
 
-            // compute thresholds using flash
-            {
-                GLOG_DEBUG("using num_word_chunks=", num_word_chunks);
-                ThresholdTask **threshold_tasks = new ThresholdTask *[num_word_chunks];
-                for (uint64_t chunk = 0; chunk < num_word_chunks; ++chunk)
-                {
-                    uint64_t chunk_start = word_begins[chunk];
-                    uint64_t chunk_size = word_ends[chunk] - chunk_start;
-                    threshold_tasks[chunk] = new ThresholdTask(A_sp, offsets_CSR, base_csr_vals,
-                                                               chunk_start, chunk_size, thresholds,
-                                                               freqs, num_topics, new_nnzs_in_chunk + chunk, avg_doc_sz);
-                    flash::sched.add_task(threshold_tasks[chunk]);
-                }
+        // pfor(int64_t chunk = 0; chunk < num_word_chunks; ++chunk) {
+        //     A_sp->list_word_freqs_from_CSR(word_begins[chunk], word_ends[chunk],
+        //         normalized_vals_CSR + offsets_CSR[word_begins[chunk]], 
+        //         offsets_CSR + word_begins[chunk], freqs);
+        //     new_nnzs_in_chunk[chunk] = A_sp->compute_thresholds(word_begins[chunk], word_ends[chunk],
+        //         freqs, thresholds, num_topics);
+        //     for (word_id_t word = word_begins[chunk]; word < word_ends[chunk]; ++word)
+        //         freqs[word].clear();
+        // }
 
-                // wait for threshold tasks to complete
-                flash::sleep_wait_for_complete(threshold_tasks, num_word_chunks);
+        // compute thresholds using flash
+        {
+          GLOG_DEBUG("using num_word_chunks=", num_word_chunks);
+          ThresholdTask **threshold_tasks = new ThresholdTask *[num_word_chunks];
+          for (uint64_t chunk = 0; chunk < num_word_chunks; ++chunk)
+          {
+            uint64_t chunk_start = word_begins[chunk];
+            uint64_t chunk_size = word_ends[chunk] - chunk_start;
+            threshold_tasks[chunk] = new ThresholdTask(A_sp, offsets_CSR, base_csr_vals,
+              chunk_start, chunk_size, thresholds,
+              freqs, num_topics, new_nnzs_in_chunk + chunk, avg_doc_sz);
+            flash::sched.add_task(threshold_tasks[chunk]);
+          }
 
-                // cleanup threshold tasks
-                for (uint64_t chunk = 0; chunk < num_word_chunks; ++chunk)
-                {
-                    delete threshold_tasks[chunk];
-                }
-                delete[] threshold_tasks;
-            }
+          // wait for threshold tasks to complete
+          flash::sleep_wait_for_complete(threshold_tasks, num_word_chunks);
 
-            // compute new nnzs
-            new_nnzs = std::accumulate(new_nnzs_in_chunk, new_nnzs_in_chunk + num_word_chunks, (offset_t)0);
-            GLOG_DEBUG("new_nnzs=", new_nnzs);
-            delete[] word_begins;
-            delete[] word_ends;
-            delete[] new_nnzs_in_chunk;
+          // cleanup threshold tasks
+          for (uint64_t chunk = 0; chunk < num_word_chunks; ++chunk)
+          {
+            delete threshold_tasks[chunk];
+          }
+          delete[] threshold_tasks;
         }
-        delete[] freqs;
-        assert(thresholds.size() == vocab_size);
-        timer->next_time_secs("Computing thresholds");
-        out_log->print_string("Number of entries above threshold: " + std::to_string(new_nnzs) + "\n");
 
-        std::vector<doc_id_t> original_cols;
-        if (flag_sample_docs) {
-            assert(sample_rate > 0.0 && sample_rate < 1.0);
-            B_fl_CSC->sampled_threshold_and_copy<A_TYPE>(
-                *A_sp, thresholds, new_nnzs, original_cols, sample_rate);
-        } 
-        else {
-            B_fl_CSC->threshold_and_copy<A_TYPE>(
-                *A_sp, thresholds, new_nnzs, original_cols);
-        }
-        timer->next_time_secs("Creating thresholded and scaled matrix");
+        // compute new nnzs
+        new_nnzs = std::accumulate(new_nnzs_in_chunk, new_nnzs_in_chunk + num_word_chunks, (offset_t)0);
+        GLOG_DEBUG("new_nnzs=", new_nnzs);
+        delete[] word_begins;
+        delete[] word_ends;
+        delete[] new_nnzs_in_chunk;
+      }
+      delete[] freqs;
+      assert(thresholds.size() == vocab_size);
+      timer->next_time_secs("Computing thresholds");
+      out_log->print_string("Number of entries above threshold: " + std::to_string(new_nnzs) + "\n");
 
-        //
-        // Truncated SVD with Spectra (ARPACK) or Block KS
-        //
-        // out_log->print_string("Frob(B_fl_CSC): " + std::to_string(B_fl_CSC->frobenius()) + "\n");
-        std::vector<FPTYPE> evalues;
-        B_fl_CSC->initialize_for_eigensolver(num_topics);
-        timer->next_time_secs("eigen solver init");
-        if (EIGENSOLVER == SPECTRA)
-            B_fl_CSC->compute_Spectra(num_topics, evalues);
-        else if (EIGENSOLVER == BLOCK_KS)
-            B_fl_CSC->compute_block_ks(num_topics, evalues);
-        else
-            assert(false);
-        out_log->print_eigen_data(evalues, num_topics);
-        auto &B_fl = B_fl_CSC;
-        timer->next_time_secs("Spectra eigen solve");
+      std::vector<doc_id_t> original_cols;
+      if (flag_sample_docs) {
+        assert(sample_rate > 0.0 && sample_rate < 1.0);
+        B_fl_CSC->sampled_threshold_and_copy<A_TYPE>(
+          *A_sp, thresholds, new_nnzs, original_cols, sample_rate);
+      }
+      else {
+        B_fl_CSC->threshold_and_copy<A_TYPE>(
+          *A_sp, thresholds, new_nnzs, original_cols);
+      }
+      timer->next_time_secs("Creating thresholded and scaled matrix");
 
-        //
-        // k-means++ on the column space (Simga*VT) of k-rank approx of B
-        //
-        if (!ENABLE_KMEANS_ON_LOWD)
-            assert(KMEANS_INIT_METHOD == KMEANSPP || KMEANS_INIT_METHOD == KMEANSMCMC);
+      //
+      // Truncated SVD with Spectra (ARPACK) or Block KS
+      //
+      // out_log->print_string("Frob(B_fl_CSC): " + std::to_string(B_fl_CSC->frobenius()) + "\n");
+      std::vector<FPTYPE> evalues;
+      B_fl_CSC->initialize_for_eigensolver(num_topics);
+      timer->next_time_secs("eigen solver init");
+      if (EIGENSOLVER == SPECTRA)
+        B_fl_CSC->compute_Spectra(num_topics, evalues);
+      else if (EIGENSOLVER == BLOCK_KS)
+        B_fl_CSC->compute_block_ks(num_topics, evalues);
+      else
+        assert(false);
+      out_log->print_eigen_data(evalues, num_topics);
+      auto &B_fl = B_fl_CSC;
+      timer->next_time_secs("Spectra eigen solve");
 
-        std::vector<doc_id_t> best_kmeans_seeds;
-        int num_centers_lowd = num_topics;
-        FPTYPE *centers_lowd = NULL;
-        FPTYPE best_residual = 0.0;
-        if (ENABLE_KMEANS_ON_LOWD) centers_lowd = new FPTYPE[(size_t)num_topics * (size_t)num_centers_lowd];
+      //
+      // k-means++ on the column space (Simga*VT) of k-rank approx of B
+      //
+      if (!ENABLE_KMEANS_ON_LOWD)
+        assert(KMEANS_INIT_METHOD == KMEANSPP || KMEANS_INIT_METHOD == KMEANSMCMC);
 
-        if (KMEANS_INIT_METHOD == KMEANSPP) out_log->print_string("k-means init method: KMEANSPP\n");
-        if (KMEANS_INIT_METHOD == KMEANSMCMC) out_log->print_string("k-means init method: KMEANSMCMC\n");
-        if (KMEANS_INIT_METHOD == KMEANSBB) out_log->print_string("k-means init method: KMEANSBB\n");
-        
-        FPDenseMatrix<FPTYPE> *B_sigmaVT_d_fl = NULL;
+      std::vector<doc_id_t> best_kmeans_seeds;
+      int num_centers_lowd = num_topics;
+      FPTYPE *centers_lowd = NULL;
+      FPTYPE best_residual = 0.0;
+      if (ENABLE_KMEANS_ON_LOWD) centers_lowd = new FPTYPE[(size_t)num_topics * (size_t)num_centers_lowd];
+
+      if (KMEANS_INIT_METHOD == KMEANSPP) out_log->print_string("k-means init method: KMEANSPP\n");
+      if (KMEANS_INIT_METHOD == KMEANSMCMC) out_log->print_string("k-means init method: KMEANSMCMC\n");
+      if (KMEANS_INIT_METHOD == KMEANSBB) out_log->print_string("k-means init method: KMEANSBB\n");
+
+      FPDenseMatrix<FPTYPE> *B_sigmaVT_d_fl = NULL;
+      if (USE_EXPLICIT_PROJECTED_MATRIX) {
+        B_sigmaVT_d_fl = new FPDenseMatrix<FPTYPE>((word_id_t)num_topics, B_fl_CSC->num_docs());
+        B_sigmaVT_d_fl->copy_sigmaVT_from(*B_fl, num_topics);
+        best_residual = B_sigmaVT_d_fl->kmeans_init(num_centers_lowd,
+          KMEANS_INIT_REPS, KMEANS_INIT_METHOD, best_kmeans_seeds, centers_lowd);
+      }
+      else {
+        best_residual = B_fl->kmeans_init_on_projected_space(num_centers_lowd,
+          KMEANS_INIT_REPS, best_kmeans_seeds, centers_lowd);
+      }
+      out_log->print_string("Best k-means init residual: " + std::to_string(best_residual) + "\n");
+      timer->next_time_secs("K-means seeds initialization");
+
+      // flush cache (DISABLED as kmeanspp uses the same doc blocks)
+      // flash::sched.flush_cache();
+
+      //
+      // Lloyds on B_k with k-means++ seeds
+      //
+      if (ENABLE_KMEANS_ON_LOWD) {
         if (USE_EXPLICIT_PROJECTED_MATRIX) {
-            B_sigmaVT_d_fl = new FPDenseMatrix<FPTYPE>((word_id_t)num_topics, B_fl_CSC->num_docs());
-            B_sigmaVT_d_fl->copy_sigmaVT_from(*B_fl, num_topics);
-            best_residual = B_sigmaVT_d_fl->kmeans_init(num_centers_lowd,
-                KMEANS_INIT_REPS, KMEANS_INIT_METHOD, best_kmeans_seeds, centers_lowd);
+          B_sigmaVT_d_fl->run_lloyds(num_centers_lowd, centers_lowd,
+            NULL, MAX_KMEANS_LOWD_REPS);
+          delete B_sigmaVT_d_fl;
         }
         else {
-            best_residual = B_fl->kmeans_init_on_projected_space(num_centers_lowd,
-                KMEANS_INIT_REPS, best_kmeans_seeds, centers_lowd);
+          B_fl->run_lloyds_on_projected_space(num_centers_lowd, centers_lowd,
+            NULL, MAX_KMEANS_LOWD_REPS);
         }
-        out_log->print_string("Best k-means init residual: " + std::to_string(best_residual) + "\n");
-        timer->next_time_secs("K-means seeds initialization");
 
-        // flush cache (DISABLED as kmeanspp uses the same doc blocks)
-        // flash::sched.flush_cache();
+        B_fl->left_multiply_by_U_Spectra(centers, centers_lowd, num_topics, num_topics);
+        delete[] centers_lowd;
+        timer->next_time_secs("Converging LLoyds k-means on B_k");
+      }
+      B_fl->cleanup_after_eigensolver();
 
-        //
-        // Lloyds on B_k with k-means++ seeds
-        //
-        if (ENABLE_KMEANS_ON_LOWD) {
-            if (USE_EXPLICIT_PROJECTED_MATRIX) {
-                B_sigmaVT_d_fl->run_lloyds(num_centers_lowd, centers_lowd,
-                    NULL, MAX_KMEANS_LOWD_REPS);
-                delete B_sigmaVT_d_fl;
-            }
-            else {
-                B_fl->run_lloyds_on_projected_space(num_centers_lowd, centers_lowd,
-                    NULL, MAX_KMEANS_LOWD_REPS);
-            }
+      // flush cache
+      // flash::sched.flush_cache();
 
-            B_fl->left_multiply_by_U_Spectra(centers, centers_lowd, num_topics, num_topics);
-            delete[] centers_lowd;
-            timer->next_time_secs("Converging LLoyds k-means on B_k");
+      //
+      // Lloyds on B with k-means++ seeds
+      //
+      if (!ENABLE_KMEANS_ON_LOWD)
+        for (doc_id_t d = 0; d < num_topics; ++d)
+          B_fl->copy_col_to(centers + (size_t)d * (size_t)vocab_size, best_kmeans_seeds[d]);
+      if (KMEANS_ALGO_FOR_SPARSE == LLOYDS_KMEANS)
+        B_fl->run_lloyds(num_topics, centers, closest_docs, MAX_KMEANS_REPS);
+      else if (KMEANS_ALGO_FOR_SPARSE == ELKANS_KMEANS)
+        B_fl->run_elkans(num_topics, centers, closest_docs, MAX_KMEANS_REPS);
+      else assert(false);
+      count_t closest_docs_sizes_sum = 0;
+      for (int t = 0; t < num_topics; ++t)
+        closest_docs_sizes_sum += closest_docs[t].size();
+      assert(closest_docs_sizes_sum == B_fl->num_docs());
+      timer->next_time_secs("k-means on B");
+
+      for (doc_id_t topic = 0; topic != num_topics; ++topic)
+        for (auto d = closest_docs[topic].begin(); d < closest_docs[topic].end(); ++d)
+          *d = original_cols[*d];
+
+      // flush cache - rth highest uses CSR
+      flash::sched.flush_cache();
+
+      //
+      // Identify Catchwords
+      //
+      MKL_UINT r;
+      if (flag_sample_docs)
+        r = std::floor(eps2_c*w0_c*(FPTYPE)num_docs*sample_rate / (FPTYPE)(2.0*num_topics));
+      else
+        r = std::floor(eps2_c*w0_c*(FPTYPE)num_docs / (FPTYPE)(2.0*num_topics));
+
+      if (how_data_loaded == data_ingest::FILE_DATA_LOAD
+        || how_data_loaded == data_ingest::ITERATIVE_DATA_LOAD) {
+        pfor_dynamic_16(int topic = 0; topic < num_topics; ++topic)
+          A_sp->rth_highest_element(r, closest_docs[topic],
+            catchword_thresholds + (size_t)topic * (size_t)vocab_size);
+      }
+      else if (how_data_loaded == data_ingest::PREPROCESSED_DATA_LOAD) {
+        FPTYPE *threshold_matrix_tr = new FPTYPE[(size_t)num_topics * (size_t)vocab_size];
+
+        int *cluster_ids = new int[num_docs];
+        for (int64_t d = 0; d < num_docs; ++d) cluster_ids[d] = -1;
+        for (int topic = 0; topic < num_topics; ++topic)
+          for (auto iter = closest_docs[topic].begin(); iter < closest_docs[topic].end(); ++iter)
+            cluster_ids[*iter] = topic;
+
+
+        offset_t chunk_size = (offset_t)1 << 28;
+        word_id_t *word_begins = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
+        word_id_t *word_ends = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
+        word_id_t word_begin = 0;
+        word_id_t word_end = 0;
+        word_id_t num_word_chunks = 0;
+        while (word_begin < vocab_size) {
+          while (offsets_CSR[word_end] - offsets_CSR[word_begin] < chunk_size && word_end < vocab_size)
+            ++word_end;
+          word_begins[num_word_chunks] = word_begin;
+          word_ends[num_word_chunks] = word_end;
+          ++num_word_chunks;
+          word_begin = word_end;
         }
-        B_fl->cleanup_after_eigensolver();
+        assert(num_word_chunks <= divide_round_up(offsets_CSR[vocab_size], chunk_size));
 
-        // flush cache
-        // flash::sched.flush_cache();
+        // pfor(int64_t chunk = 0; chunk < num_word_chunks; ++chunk) {
+        //     A_sp->rth_highest_element_using_CSR(word_begins[chunk], word_ends[chunk],
+        //         num_topics, r, closest_docs,
+        //         normalized_vals_CSR + offsets_CSR[word_begins[chunk]],
+        //         cols_CSR + offsets_CSR[word_begins[chunk]],
+        //         offsets_CSR + word_begins[chunk],
+        //         cluster_ids, threshold_matrix_tr);
+        // }
 
-        //
-        // Lloyds on B with k-means++ seeds
-        //
-        if (!ENABLE_KMEANS_ON_LOWD)
-            for (doc_id_t d = 0; d < num_topics; ++d)
-                B_fl->copy_col_to(centers + (size_t)d * (size_t)vocab_size, best_kmeans_seeds[d]);
-        if (KMEANS_ALGO_FOR_SPARSE == LLOYDS_KMEANS)
-            B_fl->run_lloyds(num_topics, centers, closest_docs, MAX_KMEANS_REPS);
-        else if (KMEANS_ALGO_FOR_SPARSE == ELKANS_KMEANS)
-            B_fl->run_elkans(num_topics, centers, closest_docs, MAX_KMEANS_REPS);
-        else assert(false);
-        count_t closest_docs_sizes_sum = 0;
-        for (int t = 0; t < num_topics; ++t)
-            closest_docs_sizes_sum += closest_docs[t].size();
-        assert(closest_docs_sizes_sum == B_fl->num_docs());
-        timer->next_time_secs("k-means on B");
-
-        for (doc_id_t topic = 0; topic != num_topics; ++topic)
-            for (auto d = closest_docs[topic].begin(); d < closest_docs[topic].end(); ++d)
-                *d = original_cols[*d];
-
-        // flush cache - rth highest uses CSR
-        flash::sched.flush_cache();
-
-        //
-        // Identify Catchwords
-        //
-        MKL_UINT r;
-        if (flag_sample_docs)
-            r = std::floor(eps2_c*w0_c*(FPTYPE)num_docs*sample_rate / (FPTYPE)(2.0*num_topics));
-        else
-            r = std::floor(eps2_c*w0_c*(FPTYPE)num_docs / (FPTYPE)(2.0*num_topics));
-
-        if (how_data_loaded == data_ingest::FILE_DATA_LOAD 
-            || how_data_loaded == data_ingest::ITERATIVE_DATA_LOAD) {
-            pfor_dynamic_16(int topic = 0; topic < num_topics; ++topic)
-                A_sp->rth_highest_element(r, closest_docs[topic],
-                    catchword_thresholds + (size_t)topic * (size_t)vocab_size);
+        // rth highest using flash
+        {
+          // create tasks to compute rth_highest
+          RthHighest **rth_highest_tasks = new RthHighest *[num_word_chunks];
+          for (int64_t chunk = 0; chunk < num_word_chunks; ++chunk)
+          {
+            uint64_t chunk_start = word_begins[chunk];
+            uint64_t chunk_size = word_ends[chunk] - chunk_start;
+            rth_highest_tasks[chunk] = new RthHighest(A_sp, offsets_CSR, base_csr_cols,
+              base_csr_vals, chunk_start, chunk_size,
+              num_topics, r, closest_docs, cluster_ids,
+              threshold_matrix_tr, avg_doc_sz);
+            flash::sched.add_task(rth_highest_tasks[chunk]);
+          }
+          // wait for rth highest tasks to complete
+          flash::sleep_wait_for_complete(rth_highest_tasks, num_word_chunks);
+          // cleanup rth highest tasks
+          for (int64_t chunk = 0; chunk < num_word_chunks; ++chunk)
+          {
+            delete rth_highest_tasks[chunk];
+          }
+          delete[] rth_highest_tasks;
         }
-        else if (how_data_loaded == data_ingest::PREPROCESSED_DATA_LOAD) {
-            FPTYPE *threshold_matrix_tr = new FPTYPE[(size_t)num_topics * (size_t)vocab_size];
 
-            int *cluster_ids = new int[num_docs];
-            for (int64_t d = 0; d < num_docs; ++d) cluster_ids[d] = -1;
-            for (int topic = 0; topic < num_topics; ++topic)
-                for (auto iter = closest_docs[topic].begin(); iter < closest_docs[topic].end(); ++iter)
-                    cluster_ids[*iter] = topic;
+        pfor_dynamic_8192(int64_t w = 0; w < vocab_size; ++w)
+          for (int t = 0; t < num_topics; ++t)
+            catchword_thresholds[(size_t)w + (size_t)t * (size_t)vocab_size]
+            = threshold_matrix_tr[(size_t)w * (size_t)num_topics + (size_t)t];
 
+        delete[] word_begins;
+        delete[] word_ends;
+        delete[] threshold_matrix_tr;
+        delete[] cluster_ids;
+      }
+      timer->next_time_secs("Collecting word freqs in clusters");
 
-            offset_t chunk_size = (offset_t) 1 << 28;
-            word_id_t *word_begins = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
-            word_id_t *word_ends = new word_id_t[divide_round_up(offsets_CSR[vocab_size], chunk_size)];
-            word_id_t word_begin = 0;
-            word_id_t word_end = 0;
-            word_id_t num_word_chunks = 0;
-            while (word_begin < vocab_size) {
-                while (offsets_CSR[word_end] - offsets_CSR[word_begin] < chunk_size && word_end < vocab_size)
-                    ++word_end;
-                word_begins[num_word_chunks] = word_begin;
-                word_ends[num_word_chunks] = word_end;
-                ++num_word_chunks;
-                word_begin = word_end;
-            }
-            assert(num_word_chunks <= divide_round_up(offsets_CSR[vocab_size], chunk_size));
-
-            // pfor(int64_t chunk = 0; chunk < num_word_chunks; ++chunk) {
-            //     A_sp->rth_highest_element_using_CSR(word_begins[chunk], word_ends[chunk],
-            //         num_topics, r, closest_docs,
-            //         normalized_vals_CSR + offsets_CSR[word_begins[chunk]],
-            //         cols_CSR + offsets_CSR[word_begins[chunk]],
-            //         offsets_CSR + word_begins[chunk],
-            //         cluster_ids, threshold_matrix_tr);
-            // }
-
-            // rth highest using flash
-            {
-                // create tasks to compute rth_highest
-                RthHighest **rth_highest_tasks = new RthHighest *[num_word_chunks];
-                for (int64_t chunk = 0; chunk < num_word_chunks; ++chunk)
-                {
-                    uint64_t chunk_start = word_begins[chunk];
-                    uint64_t chunk_size = word_ends[chunk] - chunk_start;
-                    rth_highest_tasks[chunk] = new RthHighest(A_sp, offsets_CSR, base_csr_cols,
-                                                              base_csr_vals, chunk_start, chunk_size,
-                                                              num_topics, r, closest_docs, cluster_ids,
-                                                              threshold_matrix_tr, avg_doc_sz);
-                    flash::sched.add_task(rth_highest_tasks[chunk]);
-                }
-                // wait for rth highest tasks to complete
-                flash::sleep_wait_for_complete(rth_highest_tasks, num_word_chunks);
-                // cleanup rth highest tasks
-                for (int64_t chunk = 0; chunk < num_word_chunks; ++chunk)
-                {
-                    delete rth_highest_tasks[chunk];
-                }
-                delete[] rth_highest_tasks;
-            }
-
-            pfor_dynamic_8192(int64_t w = 0; w < vocab_size; ++w)
-                for (int t = 0; t < num_topics; ++t)
-                    catchword_thresholds[(size_t)w + (size_t)t * (size_t)vocab_size]
-                    = threshold_matrix_tr[(size_t)w * (size_t)num_topics + (size_t)t];
-            
-            delete[] word_begins;
-            delete[] word_ends;
-            delete[] threshold_matrix_tr;
-            delete[] cluster_ids;
-        }
-        timer->next_time_secs("Collecting word freqs in clusters");
-
-        A_sp->find_catchwords(num_topics, catchword_thresholds, catchwords);
-        timer->next_time_secs("Finding catchwords for clusters");
-
-        // flush cache
-        flash::sched.flush_cache();
-
-        //
-        // Construct the topic model
-        //   
-        A_sp->construct_topic_model(
-            *Model, num_topics, closest_docs, catchwords,
-            AVG_CLUSTER_FOR_CATCHLESS_TOPIC,
-            flag_construct_edge_topics || flag_print_top_two_topics ? &top_topic_pairs : NULL,
-            &catchword_topics,
-            &doc_topic_sum);
-        timer->next_time_secs("Constructing topic vectors");
+      A_sp->find_catchwords(num_topics, catchword_thresholds, catchwords);
+      timer->next_time_secs("Finding catchwords for clusters");
 
 
-        //
-        // Construct edge topics
-        //
-        if (flag_construct_edge_topics)
-            construct_edge_topics_v2(top_topic_pairs);
-        timer->next_time_secs("Constructing edge topic model");
+      //
+      // Construct the topic model
+      //   
+      A_sp->construct_topic_model(
+        *Model, num_topics, closest_docs, catchwords,
+        AVG_CLUSTER_FOR_CATCHLESS_TOPIC,
+        flag_construct_edge_topics && flag_print_top_two_topics ? &top_topic_pairs : NULL,
+        &catchword_topics,
+        &doc_topic_sum);
+      timer->next_time_secs("Constructing topic vectors");
 
-        is_training_complete = true;
+      is_training_complete = true;
     }
 
-    void ISLETrainer::write_output_to_files()
+	void ISLETrainer::write_model_to_file()
+	{
+		output_model(true);
+		timer->next_time_secs("Output model");
+
+    // flush cache
+    flash::sched.flush_cache();
+
+		//output_top_words();
+		//timer->next_time_secs("Output topwords");
+
+		/* if (flag_print_doctopic) {
+		output_doc_topic(catchword_topics, doc_topic_sum);
+		timer->next_time_secs("Output doc-topic-catchword");
+		}*/
+	}
+
+	//
+	// Construct edge topics
+	//
+	void ISLETrainer::train_edge_topics()
+	{
+		if (!is_training_complete) {
+			std::cerr << "Train basic topics before computing edge topics" << std::endl;
+			exit(-1);
+		}
+		if (!flag_construct_edge_topics) {
+			std::cerr << "Flag for edge topic construction must be turned on" << std::endl;
+			exit(-1);
+		}
+		construct_edge_topics_v2(top_topic_pairs);
+        timer->next_time_secs("Constructing edge topic model");
+    }
+
+    void ISLETrainer::write_edgemodel_to_file()
     {
-        //
-        // Print top 2 topics for each document to file
-        //
-        if (flag_print_top_two_topics)
-            print_top_two_topics(top_topic_pairs);
-        timer->next_time_secs("Printing top 2 topics/doc");
+		if (flag_construct_edge_topics) {
+			output_edge_model(true);
+			timer->next_time_secs("Output edge model");
+		}
 
-        output_model(true);
-        timer->next_time_secs("Output model");
-
-        if (flag_construct_edge_topics) {
-            output_edge_model(true);
-            timer->next_time_secs("Output edge model");
-        }
-
-        output_top_words();
-        timer->next_time_secs("Output topwords");
-
-        if (flag_print_doctopic) {
-            output_doc_topic(catchword_topics, doc_topic_sum);
-            timer->next_time_secs("Output doc-topic-catchword");
-        }
+		//
+		// Print top 2 topics for each document to file
+		//
+		//if (flag_construct_edge_topics && flag_print_top_two_topics)
+		//	print_top_two_topics(top_topic_pairs);
+		//timer->next_time_secs("Printing top 2 topics/doc");
     }
 
     //
@@ -837,13 +870,17 @@ namespace ISLE
     {
         assert(is_training_complete);
 
+		for (auto topic = 0; topic < num_topics; ++topic)
+			Model->find_n_top_words(topic,
+				DEFAULT_COHERENCE_NUM_WORDS > 10? DEFAULT_COHERENCE_NUM_WORDS:10,
+				topwords[topic]);
+
         Timer timer;
         FPTYPE avg_nl_coherence;
         std::vector<FPTYPE> nl_coherences(num_topics, 0.0);
-        if (flag_compute_avg_coherence)
+        /*if (flag_compute_avg_coherence)
             output_avg_topic_coherence(avg_nl_coherence, nl_coherences);
-        timer.next_time_secs("Calculating average coherence");
-
+        timer.next_time_secs("Calculating average coherence");*/
 
         std::vector<FPTYPE> coherences; coherences.resize(num_topics, 0);
         A_sp->topic_coherence(num_topics, DEFAULT_COHERENCE_NUM_WORDS, *Model, topwords, coherences);
@@ -858,7 +895,7 @@ namespace ISLE
             std::ostringstream top_word_stream;
             Model->print_top_words(vocab_words, topwords[t], top_word_stream);
             out_log->print_stringstream(top_word_stream, false);
-            out_log->print_string("\nCoherence: " + std::to_string(coherences[t]) + "\n", false);
+            //out_log->print_string("\nCoherence: " + std::to_string(coherences[t]) + "\n", false);
         }
         out_log->print_string("\n---------------------------\n", false);
         if (flag_compute_avg_coherence)
@@ -876,6 +913,8 @@ namespace ISLE
         //}
         out_log->print_cluster_details(num_topics, distsq, catchwords, closest_docs, coherences, nl_coherences);
         timer.next_time_secs("Output summary");
+        output_top_words();
+
     }
 
     //
@@ -885,7 +924,7 @@ namespace ISLE
     {
         assert(is_training_complete);
 
-        Model->write_to_file(concat_file_path(log_dir, std::string("M_hat_catch")));
+        //Model->write_to_file(concat_file_path(log_dir, std::string("M_hat_catch")));
         if (output_sparse)
             Model->write_to_file_as_sparse(concat_file_path(log_dir, std::string("M_hat_catch_sparse")));
     }
@@ -897,7 +936,7 @@ namespace ISLE
     {
         assert(is_training_complete);
 
-        EdgeModel->write_to_file(concat_file_path(log_dir, std::string("EdgeModel")));
+        //EdgeModel->write_to_file(concat_file_path(log_dir, std::string("EdgeModel")));
         if (output_sparse)
             EdgeModel->write_to_file_as_sparse(concat_file_path(log_dir, std::string("EdgeModel_sparse")));
     }
@@ -1191,9 +1230,7 @@ namespace ISLE
         int edge_topic_threshold;
         for (auto iter = selected_pairs.begin(); iter != selected_pairs.end(); ++iter) {
             if (++running_count > max_edge_topics) {
-                edge_topic_threshold = std::get<2>(*iter);
-                // while (std::get<2>(*iter) == edge_topic_threshold && iter != selected_pairs.end())
-                //    iter++;
+                edge_topic_threshold = std::get<2>(*iter); 
                 selected_pairs.erase(iter, selected_pairs.end());
                 break;
             }
@@ -1205,14 +1242,15 @@ namespace ISLE
         EdgeModel = new DenseMatrix<FPTYPE>(vocab_size, selected_pairs.size());
         assert(Model != NULL);
 
-        for (auto t = 0; t < selected_pairs.size(); ++t) {
+        pfor_dynamic_8192 (int64_t t = 0; t < selected_pairs.size(); ++t) {
             FPaxpy(vocab_size, EDGE_TOPIC_PRIMARY_RATIO,
-                Model->data() + std::get<0>(selected_pairs[t]), 1,
+                Model->data() + std::get<0>(selected_pairs[t]) * vocab_size, 1,
                 EdgeModel->data() + t * vocab_size, 1);
             FPaxpy(vocab_size, 1 - EDGE_TOPIC_PRIMARY_RATIO,
-                Model->data() + std::get<1>(selected_pairs[t]), 1,
+                Model->data() + std::get<1>(selected_pairs[t]) * vocab_size, 1,
                 EdgeModel->data() + t * vocab_size, 1);
         }
+        std::cout << "Completed edge topic construction" << std::endl;
 
         if (flag_print_edge_topic_composition) {
             print_edge_topic_composition(selected_pairs);
@@ -1237,9 +1275,9 @@ namespace ISLE
 #elif FILE_IO_MODE == WIN_MMAP_FILE_IO || FILE_IO_MODE == LINUX_MMAP_FILE_IO
         MMappedOutput out(filename);
         for (auto iter = topic_pairs.begin(); iter != topic_pairs.end(); ++iter) {
-            out.concat_int(std::get<0>(*iter) + 1, '\t');
-            out.concat_int(std::get<1>(*iter) + 1, '\t');
-            out.concat_int(std::get<2>(*iter) + 1, '\n');
+            out.concat_int(std::get<0>(*iter), '\t');
+            out.concat_int(std::get<1>(*iter), '\t');
+            out.concat_int(std::get<2>(*iter), '\n');
         }
         out.flush_and_close();
 #else
@@ -1272,9 +1310,9 @@ namespace ISLE
                 [](const auto& l, const auto& r) {return l.second >= r.second; });*/
 
             std::vector<std::pair<word_id_t, FPTYPE> > top_words;
-            EdgeModel->find_n_top_words(t, num_top_words, top_words);
+            EdgeModel->find_n_top_words(t, 2* num_top_words, top_words);
             out << "Top words in edge_topic: \n";
-            for (int word = 0; word < num_top_words; ++word)
+            for (int word = 0; word < 2 * num_top_words; ++word)
                 out << vocab_words[top_words[word].first]
                 << "(" << top_words[word].first << "," << top_words[word].second << ")\t";
             out << "\n";
@@ -1288,7 +1326,7 @@ namespace ISLE
             out << "\n";
 
 
-            EdgeModel->find_n_top_words(std::get<1>(*iter), num_top_words, top_words);
+            Model->find_n_top_words(std::get<1>(*iter), num_top_words, top_words);
             out << "Top words in topic: " << std::get<1>(*iter) << "\n";
             for (int word = 0; word < num_top_words; ++word)
                 out << vocab_words[top_words[word].first]

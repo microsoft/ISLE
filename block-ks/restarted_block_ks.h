@@ -195,7 +195,7 @@ BlockKs<ProdOp>::BlockKs(
   this->nev = nev;
   this->ncv = ncv;
   this->maxit = maxit;
-  this->blk_size = blk_size;
+  this->blk_size = blk_size < nev ? blk_size : 1;
   this->tol = tol;
   this->dim = op->rows();
 }

@@ -15,6 +15,7 @@ MKL_SEQ_LDFLAGS = $(MKL_COMMON_LDFLAGS) -lmkl_sequential -lmkl_core -lm -ldl
 MKL_PAR_LDFLAGS = $(MKL_COMMON_LDFLAGS) -lmkl_intel_thread -lmkl_core -liomp5 -lpthread -lm -ldl
 MKL_PAR_STATIC_LDFLAGS = -L$(INTEL_ROOT)/lib/intel64 -Wl,--start-group $(MKL_ROOT)/lib/intel64/libmkl_intel_ilp64.a $(MKL_ROOT)/lib/intel64/libmkl_intel_thread.a $(MKL_ROOT)/lib/intel64/libmkl_core.a -Wl,--end-group -liomp5 -lpthread -lm -ldl
 
+
 CILK_LDFLAGS = #-lcilkrts
 # Use Cilk above if you are certain, Mixing Cilk + Intel MKL/OpenMP causes problems
 
@@ -27,7 +28,7 @@ BLOCK_KS_DIR = block-ks
 
 CC=g++
 IFLAGS= -I. -I$(SPECTRA_DIR) -I$(ARMA_DIR)/include  -I$(BLOCK_KS_DIR)  -I$(MKL_ROOT)/include  -I $(INCLUDE_DIR)
-CFLAGS= -Ofast -fopenmp -march=native -mtune=native -std=c++14
+CFLAGS= -g -w -O3 -fopenmp  -std=c++14
 
 INCLUDES =  $(INCLUDE_DIR)/timer.h $(INCLUDE_DIR)/logUtils.h \
 	    $(INCLUDE_DIR)/matUtils.h $(INCLUDE_DIR)/hyperparams.h \
