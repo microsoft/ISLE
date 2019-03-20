@@ -18,7 +18,7 @@ set(INTEL_ROOT /opt/intel/compilers_and_libraries/linux)
 set(MKL_ROOT ${INTEL_ROOT}/mkl)
 add_definitions(-DMKL_ILP64)
 add_compile_options(-m64 -Wl,--no-as-needed)
-include_directories(include ${INTEL_ROOT}/include ${MKL_ROOT}/include)
+include_directories(include ${INTEL_ROOT}/include ${MKL_ROOT}/include ${CMAKE_SOURCE_DIR}/BLAS-on-flash/include)
 link_directories(${INTEL_ROOT}/lib/intel64 ${MKL_ROOT}/lib/intel64)
 
 # Flash definitions
