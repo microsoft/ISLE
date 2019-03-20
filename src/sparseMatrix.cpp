@@ -6,10 +6,10 @@
 #include "kmeans.h"
 #include "topic_model.h"
 
-#include "blas-on-flash/include/utils.h"
-#include "blas-on-flash/include/lib_funcs.h"
-#include "blas-on-flash/include/flash_blas.h"
-#include "blas-on-flash/include/scheduler/scheduler.h"
+#include "BLAS-on-flash/include/utils.h"
+#include "BLAS-on-flash/include/lib_funcs.h"
+#include "BLAS-on-flash/include/flash_blas.h"
+#include "BLAS-on-flash/include/scheduler/scheduler.h"
 #include "flash_tasks/l2_thresh_norm.h"
 
 namespace flash{

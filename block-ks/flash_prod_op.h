@@ -3,7 +3,7 @@
 #include <string>
 #include "ks_types.h"
 #include "ks_utils.h"
-#include "blas-on-flash/include/pointers/allocator.h"
+#include "BLAS-on-flash/include/pointers/allocator.h"
 #include "timer.h"
 
 using namespace flash;

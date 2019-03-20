@@ -1,9 +1,9 @@
 #include "flash_prod_op.h"
 #include "ks_utils.h"
-#include "blas-on-flash/include/blas_utils.h"
-#include "blas-on-flash/include/flash_blas.h"
-#include "blas-on-flash/include/lib_funcs.h"
-#include "blas-on-flash/include/scheduler/scheduler.h"
+#include "BLAS-on-flash/include/blas_utils.h"
+#include "BLAS-on-flash/include/flash_blas.h"
+#include "BLAS-on-flash/include/lib_funcs.h"
+#include "BLAS-on-flash/include/scheduler/scheduler.h"
 
 namespace flash {
   extern Scheduler sched;
