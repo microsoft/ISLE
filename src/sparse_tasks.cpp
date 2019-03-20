@@ -1,7 +1,7 @@
 #include "types.h"
 #include "kmeans.h"
 
-#include "BLAS-on-flash/include/utils.h"
+#include "BLAS-on-flash/include/bof_utils.h"
 #include "BLAS-on-flash/include/lib_funcs.h"
 #include "BLAS-on-flash/include/flash_blas.h"
 #include "BLAS-on-flash/include/scheduler/scheduler.h"

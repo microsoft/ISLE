@@ -27,7 +27,9 @@ add_definitions(-DFLASH_CSRMM_MKL_NTHREADS=1
                 -DSECTOR_LEN=512
                 -DMAX_NNZS=10000000
                 -DMAX_CSRMM_BLK_SIZE=1048576
-                -DIS_ALIGNED=IS_512_ALIGNED)
+                -DIS_ALIGNED=IS_512_ALIGNED
+                -DMAP_BLK_SIZE=1048576
+                -DREDUCE_BLK_SIZE=1048576) 
 
 add_library(fblas STATIC IMPORTED)
 set_target_properties(fblas PROPERTIES
