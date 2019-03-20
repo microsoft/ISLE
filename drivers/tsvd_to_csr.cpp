@@ -25,7 +25,7 @@ typedef struct TSVDEntry {
   }
 } TSVDEntry;
 
-std::vector<std::string> split(std::string str, std::string token = " ") {
+std::vector<std::string> split(std::string str, std::string token = "\t") {
   std::vector<std::string> result;
   while (str.size()) {
     int index = str.find(token);
@@ -44,7 +44,7 @@ std::vector<std::string> split(std::string str, std::string token = " ") {
 
 void fill_entry(std::string line, int64_t line_no, int64_t nrows, int64_t ncols,
                 TSVDEntry &entry) {
-  std::vector<std::string> vstrings = split(line, " ");
+  std::vector<std::string> vstrings = split(line);
   //std::cout << vstrings[2].c_str() << "\n";
   if (vstrings.size() != 3) {
     std::cerr << "Ignoring " << line_no << ":" << " - expected 3 vals, got " << vstrings.size()  << "vstrings[0]= "<< vstrings[0]<< " - str = " << line << std::endl;
