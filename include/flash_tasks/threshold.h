@@ -1,8 +1,8 @@
 #pragma once
 
-#include "blas-on-flash/include/pointers/pointer.h"
-#include "blas-on-flash/include/pointers/allocator.h"
-#include "blas-on-flash/include/tasks/task.h"
+#include "BLAS-on-flash/include/pointers/pointer.h"
+#include "BLAS-on-flash/include/pointers/allocator.h"
+#include "BLAS-on-flash/include/tasks/task.h"
 
 namespace ISLE
 {
