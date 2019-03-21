@@ -60,18 +60,14 @@ void fill_entry(std::string line, int64_t line_no, int64_t nrows, int64_t ncols,
   }
 }
 
-
-
 void write_sum(std::string filename, float *arr, int num)
 { 
 	std::ofstream ofs(filename);
-	for (auto i = 0; i < num; i+=1){
+	for (auto i = 0; i < num; i++){
 		ofs << arr[i] << "\n";
 	}
 	ofs.close();
 }
-
-
 
 // write entries stored in `entries` into `csr_loc` in CSR format
 void write_csr(std::vector<TSVDEntry> &entries, int64_t nrows, int64_t ncols,
@@ -247,10 +243,10 @@ void compute_tfidf(std::vector<TSVDEntry> &entries, int64_t num_docs) {
 
 
 int main(int argc, char **argv) {
-  if (argc != 8) {
+  if (argc != 9) {
     std::cout << "usage: <exec> <tsvd_file> <csr location prefix> "
                  "<unique_tsvd(write 0 if you don't want)> <n_rows> "
-                 "<n_cols> <n_nzs> <tf-idf(0/1)>\n";
+                 "<n_cols> <n_nzs> <tf-idf(0/1)> <normalize(0/1)>\n";
     exit(-1);
   }
 
@@ -265,6 +261,8 @@ int main(int argc, char **argv) {
   int64_t     ncols = std::stol(argv[5]);
   int64_t     nnzs = std::stol(argv[6]);
   bool        tf_idf = std::stoi(argv[7]);
+  bool        normalize = std::stoi(argv[8]);
+
   std::string col_sum = csr_loc + ".col_sum"; 
 
   std::cout << "Reading TSVD file with nrows: " << nrows << "  ncols: " << ncols
@@ -272,27 +270,22 @@ int main(int argc, char **argv) {
 
   std::vector<TSVDEntry> entries;
   entries.reserve(nnzs);
+
   TSVDEntry entry;
   {  // Read the TSVD input file
     std::ifstream fs(tsvdfile);
 
     int64_t     line_no = 0;
     std::string line;
-    for (std::string line; std::getline(fs, line) && (line_no < nnzs);
-         line_no++) {
+    for (std::string line; std::getline(fs, line) && (line_no < nnzs); line_no++) {
       fill_entry(line, line_no, nrows, ncols, entry);
-      //std::cout << entry.val << " ";
       if (entry.val > 0) {
         entries.push_back(entry);
       }
       if (line_no % (10 * (1 << 20)) == 0) {
         std::cout << "Finished reading " << line_no << " lines" << std::endl;
       }
-      //if (line_no == 10000)
-      //   break;
     }
-    //exit(0);    
-
 
     assert((int64_t) line_no == nnzs);
     fs.close();
@@ -321,8 +314,6 @@ int main(int argc, char **argv) {
                                   return l.row == r.row && l.col == r.col;
                                 });
     nnzs = end_iter - entries.begin();
-    //std::cout << "#entries (initial): " << entries.end() - entries.begin()
-    //          << "\n";
     std::cout << "#entries (after unique): " << end_iter - entries.begin()
               << "\n";
     if (entries.size() < nnzs) {
@@ -335,34 +326,36 @@ int main(int argc, char **argv) {
   std::cout << "Finished deduplication, now writing CSC" << std::endl;
  
 
-  if (tf_idf){
+  if (tf_idf) {
       std::cout << "Computing tf-idf scores " << std::endl;
-      // compute_tf-idf    
       compute_tfidf(entries, ncols);
   }
   
   // compute column sums
   float *sums = new float[ncols];
   memset(sums, 0, ncols * sizeof(float));
-  for (auto entry = entries.begin(); entry != entries.end(); ++entry) {
-    sums[entry->col] += entry->val;
-  }
+  for (auto entry : entries)
+    sums[entry.col] += entry.val;
+ 
+  int64_t empty_docs = 0;
+  for (int64_t c = 0; c < ncols; ++c)
+    if (sums[c] = 0.0)
+      empty_docs++;
    
   // compute total sum
-  float avg_doc_size = std::accumulate(sums, sums + ncols, 0.0) / (ncols * 1.0);
-  //write_sum(col_sum, sums, ncols); 
-  /* 
-  #pragma omp parallel for
-  for (int64_t idx = 0; idx < nnzs; ++idx) {
-    entries[idx].val /= sums[entries.at(idx).col];
-    entries[idx].val *= avg_doc_size;
+  float avg_doc_size = std::accumulate(sums, sums + ncols, 0.0) / ((ncols - empty_docs) * 1.0);
+
+  if (normalize) {
+#pragma omp parallel for
+    for (int64_t idx = 0; idx < nnzs; ++idx) {
+      entries[idx].val /= sums[entries.at(idx).col];
+      entries[idx].val *= avg_doc_size;
+    }
   }
-  */
-  //delete[] sums;  
-  
 
   write_sum(col_sum, sums, ncols); 
   delete[] sums;
+
   // dump CSC to disk
   write_csc(entries, ncols, nrows, csr_loc + "_tr", avg_doc_size);
   std::cout << "Finished writing CSC, sorting for CSR format" << std::endl;
