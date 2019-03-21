@@ -344,6 +344,7 @@ int main(int argc, char **argv) {
    
   // compute total sum
   float avg_doc_size = std::accumulate(sums, sums + ncols, 0.0) / ((ncols - empty_docs) * 1.0);
+  std::cout << "Avg doc size: " << avg_doc_size << std::endl;
 
   if (normalize) {
 #pragma omp parallel for
