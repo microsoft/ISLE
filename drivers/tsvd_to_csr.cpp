@@ -339,7 +339,7 @@ int main(int argc, char **argv) {
  
   int64_t empty_docs = 0;
   for (int64_t c = 0; c < ncols; ++c)
-    if (sums[c] = 0.0)
+    if (sums[c] == 0.0)
       empty_docs++;
    
   // compute total sum
