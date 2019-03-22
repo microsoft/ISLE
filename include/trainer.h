@@ -112,6 +112,7 @@ namespace ISLE
             const std::string&	input_file_ = std::string(""),   // This file contains one triple <docid> <wordid> <freq> per line, upto max_entries line (1-based numbering)
             const std::string&	vocab_file_ = std::string(""),   // This file contains word names for each wordid. Line i lists the full string for wordid i.
             const std::string&	output_path_base_ = std::string(""), // Logs and output are written in a subdir under this directory
+            const std::string&  tmp_path_ = std::string("/tmp"),  // Directory for flash library to open temp files
             const bool	construct_edge_topics_ = false,          // Construct edge topics (aka compound topics) from simple topics
             const int	max_edge_topics_ = 100000,           // Maximum number of edge topics
             const bool	compute_log_combinatorial_ = false,      // Compute is_log_file_open(#TotalWordsInDoc)/\prod_{word \in doc}is_log_file_open(freq(word)) for each doc in input

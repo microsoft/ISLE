@@ -6,12 +6,12 @@
 using namespace ISLE;
 
 int main(int argv, char **argc) {
-    if (argv != 13) {
+    if (argv != 14) {
         std::cout << "Incorrect usage of ISLETrain. Use: \n"
             << "trainFromFile <tdf_file> <vocab_file> <output_dir> "
             << "<vocab_size> <num_docs> <max_entries> <num_topics> "
             << "<apply tf-idf(0/1)> <sample(0/1)> <sample_rate> " 
-            << "<edge topics(0/1) <max_edge_topics>" << std::endl;
+            << "<edge topics(0/1) <max_edge_topics> <disk_tmp_file_prefix>" << std::endl;
         exit(-1);
     }
 
@@ -31,6 +31,8 @@ int main(int argv, char **argc) {
     const bool compute_edge_topics = atoi(argc[11]);
     const int max_edge_topics = atoi(argc[12]);
 
+    const std::string tmp_path = argc[13];
+
     if (compute_edge_topics == 1) {
       std::cout << "Edge topics not yet supported" << std::endl;
       exit(-1);
@@ -49,6 +51,7 @@ int main(int argv, char **argc) {
           tdf_file,
           vocab_file,
           output_dir,
+          tmp_path,
           compute_edge_topics, 
           max_edge_topics);
 

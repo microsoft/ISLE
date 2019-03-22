@@ -27,6 +27,7 @@ namespace ISLE
         const std::string&	input_file_,
         const std::string&	vocab_file_,
         const std::string&	output_path_base_,
+        const std::string&  tmp_path_,
         const bool			flag_construct_edge_topics_,
         const int			max_edge_topics_,
         const bool			flag_compute_log_combinatorial_,
@@ -59,7 +60,7 @@ namespace ISLE
         flag_print_top_two_topics(flag_print_top_two_topics_),
         is_training_complete(false)
     {
-        flash::flash_setup("/data/tmp/");
+        flash::flash_setup(tmp_path_);
 
         //
         // Check size alignments
@@ -449,7 +450,6 @@ namespace ISLE
 
     void ISLETrainer::train()
     {
-      // flash::flash_setup("/raid/tmp/");
       flash::flash_ptr<FPTYPE> base_csr_vals = normalized_vals_CSR_fptr;
       flash::flash_ptr<doc_id_t> base_csr_cols = cols_CSR_fptr;
 
