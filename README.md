@@ -1,3 +1,5 @@
+This project is archived. Reach out to authors by email for questions.
+
 # Build
 
 Both Linux and Windows 10 builds use Intel(R) MKL(R) library. We used 2017 version; other versions might work as well.
